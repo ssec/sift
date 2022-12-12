@@ -161,8 +161,7 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         self.ui.radiusOfInfluenceSpinBox.valueChanged.connect(self.update_resampling_info)
 
-        self.ui.projectionComboBox.addItems(AreaDefinitionsManager.available_area_def_names())
-        self.ui.projectionComboBox.setCurrentIndex(parent.document.current_projection_index())
+        self.ui.projectionComboBox.setModel(parent.ui.projectionComboBox.model())
         self.ui.projectionComboBox.currentIndexChanged.connect(self.update_resampling_info)
 
         self._update_resampling_shape_spin_boxes()
@@ -285,7 +284,9 @@ class OpenFileWizard(QtWidgets.QWizard):
                 col_idx += 1
         self.ui.selectIDTable.cellChanged.connect(self._check_product_page_completeness)
 
+        self.ui.projectionComboBox.setCurrentIndex(self.parent().document.current_projection_index())
         self.update_resampling_method_combobox()
+        self.update_resampling_info()
 
     def _pretty_identifiers(self, data_id: DataID) -> Generator[Tuple[str, object, str], None, None]:
         """Determine pretty version of each identifier."""
@@ -648,7 +649,7 @@ class OpenFileWizard(QtWidgets.QWizard):
 
     def update_resampling_method_combobox(self):
         reader = self.get_reader()
-        geometry_definition: str = config.get(f"data_reading.{reader}" f".geometry_definition", "AreaDefinition")
+        geometry_definition: str = config.get(f"data_reading.{reader}.geometry_definition", "AreaDefinition")
 
         previous_resampling_method = self.ui.resamplingMethodComboBox.currentData()
 
@@ -686,7 +687,6 @@ class OpenFileWizard(QtWidgets.QWizard):
                 if resampling_method == previous_resampling_method:
                     self.ui.resamplingMethodComboBox.setCurrentIndex(item_index)
 
-        self.update_resampling_info()
         self._set_opts_disabled(self.ui.resamplingMethodComboBox.currentData() == "none")
         self.ui.resamplingMethodComboBox.blockSignals(False)
 
