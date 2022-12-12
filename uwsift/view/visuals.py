@@ -846,8 +846,11 @@ class MultiChannelImageVisual(ImageVisual):
     @staticmethod
     def _cast_arrays_if_needed(data_arrays):
         for data in data_arrays:
-            if data is not None and should_cast_to_f32(data.dtype):
-                data = data.astype(np.float32)
+            try:
+                data = downcast_to_32(data, copy=copy)
+            except NameError:
+                if data is not None and should_cast_to_f32(data.dtype):
+                    data = data.astype(np.float32)
             yield data
 
     @staticmethod
