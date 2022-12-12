@@ -178,6 +178,9 @@ def generate_guidebook_metadata(info) -> Mapping:
     info[Info.COLORMAP] = metadata_utils.get_default_colormap(info, guidebook)
     if info[Info.KIND] == Kind.POINTS:
         info[Info.STYLE] = metadata_utils.get_default_point_style_name(info)
+    valid_range = guidebook.valid_range(info)
+    if valid_range is not None:
+        info[Info.VALID_RANGE] = valid_range
     if Info.DISPLAY_TIME not in info:
         info[Info.DISPLAY_TIME] = guidebook._default_display_time(info)
     if Info.DISPLAY_NAME not in info:

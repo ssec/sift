@@ -761,7 +761,6 @@ class Main(QtWidgets.QMainWindow):
         def update_probe_polygon(points: list):
             probeable_layers = self.layer_model.get_probeable_layers()
             probeable_layers_uuids = [layer.uuid for layer in probeable_layers]
-            LOG.debug("top visible UUID is {0!r:s}".format(probeable_layers_uuids[0]))
 
             # TODO, when the plots manage their own layer selection, change this call
             # FUTURE, once the polygon is a layer, this will need to change

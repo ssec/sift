@@ -84,7 +84,8 @@ PROBE_UNIT = "Unit"
 
 LAYER_TREE_VIEW_HEADER = [VISIBILITY, SOURCE, NAME, WAVELENGTH, PROBE_VALUE, PROBE_UNIT]
 
-INVALID_COLOR_LIMITS = (None, None)
+INVALID_COLOR_LIMITS = (float("inf"), float("-inf"))
+FALLBACK_RANGE = (0.0, 255.0)
 
 
 # Calculate and provide LayerModel column indices from LAYER_TREE_VIEW_HEADER

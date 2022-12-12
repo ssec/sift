@@ -23,12 +23,17 @@ from typing import Optional, Tuple
 import numpy as np
 from PyQt5 import QtWidgets
 
-from uwsift.common import INVALID_COLOR_LIMITS, Info, Kind
+from uwsift.common import FALLBACK_RANGE, INVALID_COLOR_LIMITS, Info, Kind
 from uwsift.model.layer_item import LayerItem
 from uwsift.model.layer_model import LayerModel
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.ui.layer_details_widget_ui import Ui_LayerDetailsPane
-from uwsift.util.common import format_resolution, get_initial_gamma
+from uwsift.util.common import (
+    format_resolution,
+    get_initial_gamma,
+    range_hull,
+    range_hull_no_fail,
+)
 from uwsift.view.colormap import COLORMAP_MANAGER
 
 LOG = logging.getLogger(__name__)
@@ -37,8 +42,6 @@ LOG = logging.getLogger(__name__)
 class SingleLayerInfoPane(QtWidgets.QWidget):
     """Shows details about one layer that is currently selected."""
 
-    _valid_min = None
-    _valid_max = None
     _slider_steps = 100
 
     def __init__(self, *args, **kwargs):
@@ -46,6 +49,8 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
         Hide the subwidgets at the beginning because no layer is selected."""
         super(SingleLayerInfoPane, self).__init__(*args, **kwargs)
+
+        self._valid_min, self._valid_max = FALLBACK_RANGE
 
         layout = QtWidgets.QVBoxLayout(self)
         self.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
@@ -79,8 +84,20 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
     def initiate_update(self):
         """Start the update process if a layer is currently selected."""
-        if self._current_selected_layer:
-            self._update_displayed_info()
+        self._clear_details_pane()
+        if not self._current_selected_layer:
+            return
+
+        clims = self._current_selected_layer.presentation.climits
+        valid_range = self._current_selected_layer.valid_range
+        if valid_range:
+            self._valid_min, self._valid_max = range_hull(clims, valid_range)
+        elif clims and clims != INVALID_COLOR_LIMITS:
+            self._valid_min, self._valid_max = clims
+        else:
+            self._valid_min, self._valid_max = FALLBACK_RANGE
+
+        self._update_displayed_info()
 
     def selection_did_change(self, layers: Tuple[LayerItem]):
         """Update the displayed values only when one layer is selected.
@@ -89,17 +106,11 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
         :param layers: Layers which are currently selected
         """
-        self._clear_details_pane()
         if layers is not None and len(layers) == 1:
             self._current_selected_layer = layers[0]
-            if self._current_selected_layer.valid_range:
-                valid_range = self._current_selected_layer.valid_range
-                clims = self._current_selected_layer.presentation.climits
-                self._set_valid_min_max(clims, valid_range)
-            else:
-                self._valid_min = None
-                self._valid_max = None
             self.initiate_update()
+        else:
+            self._clear_details_pane()
 
     def update_displayed_clims(self):
         """Update the corresponding viewed values for the color limits of the layer
@@ -183,7 +194,8 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         model.change_color_limits_for_layer(self._current_selected_layer.uuid, actual_range)
         valid_range = self._current_selected_layer.valid_range
 
-        self._set_valid_min_max(actual_range, valid_range)
+        assert actual_range != (None, None)
+        self._valid_min, self._valid_max = range_hull_no_fail(actual_range, valid_range, actual_range)
 
         self._update_vmin()
         self._update_vmax()
@@ -197,7 +209,8 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
             valid_range = self._current_selected_layer.valid_range
 
-            self._set_valid_min_max(actual_range, valid_range)
+            assert actual_range != (None, None)
+            self._valid_min, self._valid_max = range_hull_no_fail(actual_range, valid_range, actual_range)
 
             self._update_vmin()
             self._update_vmax()
@@ -276,13 +289,16 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         model.change_colormap_for_layer(
             self._current_selected_layer.uuid, self._current_selected_layer.info[Info.COLORMAP]
         )
-        model.change_color_limits_for_layer(
-            self._current_selected_layer.uuid, self._current_selected_layer.info[Info.VALID_RANGE]
-        )
+
+        clims = self._current_selected_layer.determine_initial_clims()
+        model.change_color_limits_for_layer(self._current_selected_layer.uuid, clims)
         model.change_gamma_for_layer(
             self._current_selected_layer.uuid, get_initial_gamma(self._current_selected_layer.info)
         )
-        self._valid_min, self._valid_max = self._current_selected_layer.valid_range
+        actual_range = self._current_selected_layer.get_actual_range_from_first_active_dataset()
+        valid_range = self._current_selected_layer.valid_range
+
+        self._valid_min, self._valid_max = valid_range if valid_range else actual_range
         self._update_vmin()
         self._update_vmax()
         self._update_gamma()
@@ -294,10 +310,6 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
             new_clims = (val, self._current_selected_layer.presentation.climits[1])
         model = self._current_selected_layer.model
         model.change_color_limits_for_layer(self._current_selected_layer.uuid, new_clims)
-
-    def _set_valid_min_max(self, clims, valid_range):
-        self._valid_min = min(clims[0], valid_range[0])
-        self._valid_max = max(clims[1], valid_range[1])
 
     def _slider_changed(self, value=None, is_max=True):
         spin_box = self._details_pane_ui.vmax_spinbox if is_max else self._details_pane_ui.vmin_spinbox
@@ -367,11 +379,17 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
     def _update_displayed_resolution(self):
         resolution_str = "N/A"
+        if self._current_selected_layer.info.get("resolution"):
+            resolution_str = format_resolution(self._current_selected_layer.info["resolution"])
+        elif self._current_selected_layer.info.get("resolution-x") or self._current_selected_layer.info.get(
+            "resolution-y"
+        ):
+            resolution_x = self._current_selected_layer.info.get("resolution-x")
+            resolution_y = self._current_selected_layer.info.get("resolution-y")
 
-        if self._current_selected_layer.info.get("resolution-x"):
-            resolution_str = format_resolution(self._current_selected_layer.info.get("resolution-x"))
+            resolution_str = format_resolution(resolution_x) if resolution_x else "N/A"
             resolution_str += " / "
-            resolution_str += format_resolution(self._current_selected_layer.info.get("resolution-y"))
+            resolution_str += format_resolution(resolution_y) if resolution_y else "N/A"
 
         self._details_pane_ui.layerResolutionValue.setText(resolution_str)
 

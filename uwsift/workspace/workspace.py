@@ -54,7 +54,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 from rasterio import Affine
 from shapely.geometry.polygon import LinearRing
 
-from uwsift.common import Flags, Info, Kind
+from uwsift.common import FALLBACK_RANGE, Flags, Info, Kind
 from uwsift.model.shapes import content_within_shape
 
 from .importer import SatpyImporter, generate_guidebook_metadata
@@ -558,9 +558,9 @@ class BaseWorkspace(QObject):
         # See: https://stackoverflow.com/a/35608701/433202
         names = list(dep_metadata.keys())
         try:
-            valid_combos = np.array(np.meshgrid(*tuple(dep_metadata[n][Info.VALID_RANGE] for n in names))).reshape(
-                len(names), -1
-            )
+            valid_combos = np.array(
+                np.meshgrid(*tuple(self.get_range_for_dataset_no_fail(dep_metadata[n]) for n in names))
+            ).reshape(len(names), -1)
         except KeyError:
             badboys = [n for n in names if Info.VALID_RANGE not in dep_metadata[n]]
             LOG.error("missing VALID_RANGE for: {}".format(repr([dep_metadata[n][Info.DISPLAY_NAME] for n in badboys])))
@@ -598,6 +598,20 @@ class BaseWorkspace(QObject):
             info, content[result_name], namespace=namespace, codeblock=operations
         )
         return uuid, info, data
+
+    def get_range_for_dataset_no_fail(self, info: dict) -> tuple:
+        """Return always a range.
+        If possible, it is the valid range from the metadata, otherwise the actual range of the data given by the
+        minimum and maximum data values, and if that doesn't work either, the FALLBACK_RANGE"""
+        if Info.VALID_RANGE in info:
+            return info[Info.VALID_RANGE]
+
+        actual_range = self.get_min_max_value_for_dataset_by_uuid(info[Info.UUID])
+
+        if actual_range:
+            return actual_range
+
+        return FALLBACK_RANGE
 
     @abstractmethod
     def _create_product_from_array(
@@ -804,13 +818,33 @@ class BaseWorkspace(QObject):
         if uuid:
             ac: ActiveContent = self._get_active_content_by_uuid(uuid)
             stats = ac.statistics
-            min_ranges = stats.get("stats").get("min")
-            max_ranges = stats.get("stats").get("max")
 
-            if min_ranges is None and max_ranges is None:
+            if not stats:
+                LOG.error("Could not determine 'min/max' values: dataset has no computed statistics.")
+                return None, None
+
+            stats_values = stats.get("stats")
+
+            if isinstance(stats_values, dict):
+                min_ranges = stats_values.get("min")
+                max_ranges = stats_values.get("max")
+            else:
+                # TODO: The following is a workaround for a missing concept for color mapping of categorial data and
+                #  should be revised!
+                # We seem to have categorial data (a dataset with "flag_{values,meanings,masks}") where the values
+                # stored are numbers but have no numerical meaning, only that of an identifier.
+                # Currently, for technical reasons, we need to be able to get a value range (i.e. a kind of min/max
+                # values) even for such a dataset, otherwise no colormap could be applied automatically.
+                # So, we trick the statistics module to compute everything as if the data was normal data:
+                # To achieve this we simply don't provide the xarr.attrs which the statistics module uses to distinguish
+                # categorial from normal data:
                 dataarray = xarray.DataArray(ac.data)
                 stats = dataset_statistical_analysis(dataarray)
                 min_ranges = stats.get("stats").get("min")
                 max_ranges = stats.get("stats").get("max")
+
+            if not min_ranges or not max_ranges:  # Note: bool([0]) == True!
+                LOG.error("Could not determine 'min/max' values: dataset statistics are invalid.")
+                return None, None
 
             return min_ranges[0], max_ranges[0]

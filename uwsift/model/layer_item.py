@@ -4,6 +4,8 @@ from types import MappingProxyType
 from typing import List, Optional, Tuple
 from uuid import UUID, uuid1
 
+from pyresample import AreaDefinition
+
 from uwsift import config
 from uwsift.common import INVALID_COLOR_LIMITS, N_A, Info
 from uwsift.common import LayerModelColumns as LMC
@@ -82,12 +84,11 @@ class LayerItem:
             if key in info:
                 layer_info[key] = info[key]
 
-        if 'area' in info:
-            layer_info["resolution-x"] = info['area'].pixel_size_x
-            layer_info["resolution-y"] = info['area'].pixel_size_y
-        elif 'resolution' in info:
-            layer_info["resolution-x"] = info["resolution"]
-            layer_info["resolution-y"] = info["resolution"]
+        if "area" in info and isinstance(info["area"], AreaDefinition):
+            layer_info["resolution-x"] = info["area"].pixel_size_x
+            layer_info["resolution-y"] = info["area"].pixel_size_y
+        elif "resolution" in info:
+            layer_info["resolution"] = info["resolution"]
 
         return frozendict(layer_info)
 
@@ -390,22 +391,30 @@ class LayerItem:
     def get_actual_range_from_layer(self) -> Tuple:
         """Calculate on the fly the actual range of the layer.
 
-        The actual range of a layer is the union of all actual ranges of its owned datasets."""
+        The 'actual range' of a layer is the union of the 'actual ranges' of all datasets belonging to that layer."""
+
         if len(self._timeline) == 0:
             return None, None
 
-        actual_range = INVALID_COLOR_LIMITS
-        min = 0
-        max = 1
+        MIN = 0  # noqa   Define constants for indexes just to increase readability ...
+        MAX = 1  # noqa   ... but spell checker complains without 'noqa'.
+
+        actual_range = list(INVALID_COLOR_LIMITS)  # In tuples values cannot be updated in place
         for dataset in self._timeline.values():
             dataset_actual_range = self._get_actual_range_from_dataset(dataset.uuid)
 
-            if actual_range == INVALID_COLOR_LIMITS:
-                actual_range = dataset_actual_range
+            if actual_range[MIN] > dataset_actual_range[MIN]:
+                actual_range[MIN] = dataset_actual_range[MIN]
+            if actual_range[MAX] < dataset_actual_range[MAX]:
+                actual_range[MAX] = dataset_actual_range[MAX]
 
-            if dataset_actual_range[min] < actual_range[min]:
-                actual_range[min] = dataset_actual_range[min]
-            if dataset_actual_range[max] > actual_range[max]:
-                actual_range[max] = dataset_actual_range[max]
+        return tuple(actual_range)
 
-        return actual_range
+    def determine_initial_clims(self):
+        """Returns a range based on available metadata either of the layer self or its owned first dataset"""
+        if self.valid_range:
+            return self.valid_range
+        elif self.get_first_active_product_dataset():
+            return self.model._workspace.get_range_for_dataset_no_fail(self.get_first_active_product_dataset().info)
+        else:
+            return INVALID_COLOR_LIMITS
