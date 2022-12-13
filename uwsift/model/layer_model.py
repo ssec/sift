@@ -138,7 +138,7 @@ class LayerModel(QAbstractItemModel):
     def get_dynamic_layers(self):
         return [layer for layer in self.layers if layer.dynamic]
 
-    def data(self, index: QModelIndex, role: int = None):
+    def data(self, index: QModelIndex, role: Optional[int] = None):
         if not index.isValid():
             return None
         if role not in self._supportedRoles:
@@ -400,6 +400,8 @@ class LayerModel(QAbstractItemModel):
     def on_didMatchTimes(self, t_matched_dict: dict):  # noqa
         for layer_uuid, active_dataset_uuids in t_matched_dict.items():
             layer = self.get_layer_by_uuid(layer_uuid)
+            if layer is None:
+                continue
             for product_dataset in layer.timeline.values():
                 if product_dataset.uuid in active_dataset_uuids:
                     product_dataset.is_active = True
@@ -439,6 +441,7 @@ class LayerModel(QAbstractItemModel):
 
     def change_colormap_for_layer(self, uuid: UUID, colormap: object):
         layer = self.get_layer_by_uuid(uuid)
+        assert layer is not None
         layer.presentation.colormap = colormap
         change_dict = self._build_presentation_change_dict(layer, colormap)
         self.didChangeColormap.emit(change_dict)
@@ -457,12 +460,14 @@ class LayerModel(QAbstractItemModel):
 
     def change_color_limits_for_layer(self, uuid: UUID, color_limits: object):
         layer = self.get_layer_by_uuid(uuid)
+        assert layer is not None
         layer.presentation.climits = color_limits
         change_dict = self._build_presentation_change_dict(layer, color_limits)
         self.didChangeColorLimits.emit(change_dict)
 
     def change_gamma_for_layer(self, uuid: UUID, gamma: float):
         layer = self.get_layer_by_uuid(uuid)
+        assert layer is not None
         layer.presentation.gamma = gamma
         change_dict = self._build_presentation_change_dict(layer, gamma)
         self.didChangeGamma.emit(change_dict)
@@ -609,16 +614,18 @@ class LayerModel(QAbstractItemModel):
         return datasets_to_added, datasets_to_update, datasets_to_remove
 
     @staticmethod
-    def _get_common_timeline_of_input_layers(timelines_to_compare: List[dict]):
+    def _get_common_timeline_of_input_layers(timelines_to_compare: List[dict]) -> list:
         if len(timelines_to_compare) == 0:
             return []
 
-        intersection = timelines_to_compare[-1].keys()
+        intersection = set(timelines_to_compare[-1].keys())
         for idx in range(len(timelines_to_compare) - 1):
             curr_timeline = timelines_to_compare[idx]
             intersection = intersection & curr_timeline.keys()
 
-        return intersection
+        common_times = list(intersection)
+        common_times.sort()
+        return common_times
 
     @staticmethod
     def _get_timeline_of_layers(input_layers: List[LayerItem]):
@@ -657,6 +664,7 @@ class LayerModel(QAbstractItemModel):
         :param recipe: Recipe of the layer whose timeline is to be updated
         """
         recipe_layer: LayerItem = self._get_layer_of_recipe(recipe.id)
+        assert recipe_layer and recipe_layer.recipe
 
         if isinstance(recipe, CompositeRecipe):
             self.update_rgb_layer_gamma(recipe)
@@ -684,6 +692,7 @@ class LayerModel(QAbstractItemModel):
         elif isinstance(recipe, AlgebraicRecipe):
             self._update_algebraic_datasets(sched_times_to_update, input_layers, recipe_layer)
             self._add_algebraic_datasets(sched_times_to_add, input_layers, recipe_layer)
+            assert isinstance(recipe_layer.recipe, AlgebraicRecipe)  # nosec B101 # suppress mypy [attr-defined]
             recipe_layer.recipe.modified = False
 
             self._update_dependent_recipe_layers(recipe_layer)
@@ -691,10 +700,11 @@ class LayerModel(QAbstractItemModel):
         dataset_uuids = recipe_layer.get_datasets_uuids()
         if dataset_uuids:
             dataset = recipe_layer.get_dataset_by_uuid(dataset_uuids[0])
+            assert dataset  # nosec B101 # suppress mypy [union-attr]
             recipe_layer.replace_recipe_layer_info(dataset.info)
         elif not all(input_layers):
             info = {Info.KIND: recipe_layer.kind}
-            recipe_layer.replace_recipe_layer_info(info)
+            recipe_layer.replace_recipe_layer_info(frozendict(info))
 
         # TODO (AR): is this the right place to check whether color limits
         #  should be reset to an invalid state? What, if the formula together
@@ -827,7 +837,7 @@ class LayerModel(QAbstractItemModel):
 
         prez = Presentation(uuid=None, kind=Kind.COMPOSITE, colormap="grays", climits=INVALID_COLOR_LIMITS)
 
-        algebraic_layer = LayerItem(self, info, prez, recipe=recipe)
+        algebraic_layer = LayerItem(self, frozendict(info), prez, recipe=recipe)
 
         self.didCreateLayer.emit(algebraic_layer)
         self._add_layer(algebraic_layer)
@@ -859,7 +869,7 @@ class LayerModel(QAbstractItemModel):
                 LOG.warning(f"Invalid formula of layer '{algebraic_layer.descriptor}': {e}")
                 return
 
-            dataset = algebraic_layer.add_algebraic_dataset(None, info, sched_time, input_datasets_uuids)
+            dataset = algebraic_layer.add_algebraic_dataset(None, frozendict(info), sched_time, input_datasets_uuids)
 
             self.didAddImageDataset.emit(algebraic_layer, dataset)
 
@@ -1006,19 +1016,16 @@ class LayerModel(QAbstractItemModel):
         else:
             return None
 
-    def get_input_layers_info(self, recipe_layer: LayerItem) -> Optional[List[frozendict]]:
-        if recipe_layer.recipe:
-            input_layer_infos = []
-            for layer_uuid in recipe_layer.recipe.input_layer_ids:
-                input_layer: LayerItem = self.get_layer_by_uuid(layer_uuid)
-                if input_layer:
-                    input_layer_infos.append(input_layer.info)
-                else:
-                    input_layer_infos.append(None)
-            return input_layer_infos
-
-        LOG.debug(f"Layer with {recipe_layer.uuid} is no recipe layer. So this layer does not own input layers.")
-        return None
+    def get_input_layers_info(self, recipe_layer: LayerItem) -> List[Optional[frozendict]]:
+        assert recipe_layer.recipe, "This method must only be called with 'recipe layers'"
+        input_layer_infos: List[Optional[frozendict]] = []
+        for layer_uuid in recipe_layer.recipe.input_layer_ids:
+            input_layer = self.get_layer_by_uuid(layer_uuid)
+            if input_layer:
+                input_layer_infos.append(input_layer.info)
+            else:
+                input_layer_infos.append(None)
+        return input_layer_infos
 
 
 class ProductFamilyKeyMappingPolicy:
