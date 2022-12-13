@@ -22,7 +22,7 @@ from uwsift.common import INVALID_COLOR_LIMITS, Info, Instrument, Platform
 from uwsift.view.colormap import DEFAULT_IR, DEFAULT_UNKNOWN, DEFAULT_VIS
 
 LOG = logging.getLogger(__name__)
-GUIDEBOOKS = {}
+GUIDEBOOKS: dict = {}
 
 
 class Guidebook(object):
