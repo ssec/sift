@@ -244,11 +244,6 @@ class UserControlsAnimation(QtCore.QObject):
     - start/stop animation
     """
 
-    ui = None
-    document: Document = None
-    scene_manager: SceneGraphManager = None
-    _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
-
     def __init__(self, ui, scene_manager: SceneGraphManager):
         """
         Args:
@@ -258,6 +253,8 @@ class UserControlsAnimation(QtCore.QObject):
         super(UserControlsAnimation, self).__init__()
         self.ui = ui
         self.scene_manager = scene_manager
+        # window we'll show temporarily with animation speed popup
+        self._animation_speed_popup: typ.Optional[AnimationSpeedPopupWindow] = None
 
         self.ui.animPlayPause.clicked.connect(self.toggle_animation)
         self.ui.animPlayPause.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -302,21 +299,19 @@ class UserControlsAnimation(QtCore.QObject):
 class Main(QtWidgets.QMainWindow):
     # TODO: the following settings, is this actually the best place to store
     #  them here?
-    _last_open_dir: str = None  # directory to open files in (preselection)
-    _last_reader: str = None  # reader to open files with (preselection)
+    _last_open_dir: str = ""  # directory to open files in (preselection)
+    _last_reader: str = ""  # reader to open files with (preselection)
 
     _recent_files_menu: QtWidgets.QMenu = None  # QMenu
     _open_cache_dialog: QtWidgets.QDialog = None
     _screenshot_dialog: QtWidgets.QDialog = None
     _cmap_editor = None  # Gradient editor widget
-    _resource_collector: ResourceSearchPathCollector = None
     _resource_collector_timer: QtCore.QTimer = None
     _last_imported_dataset_uuid: typ.Optional[UUID] = None
     _palette_text_green: QtGui.QPalette = None
     _palette_text_red: QtGui.QPalette = None
     _max_tolerable_idle_time: float = -1
     _max_tolerable_dataset_age: float = -1
-    _heartbeat_file = None
 
     didFinishLoading = QtCore.pyqtSignal(list)
 
@@ -488,7 +483,7 @@ class Main(QtWidgets.QMainWindow):
 
         :param dataset: recently loaded dataset
         """
-        dataset_sched_time_utc = dataset.info.get(Info.SCHED_TIME).replace(tzinfo=timezone.utc)
+        dataset_sched_time_utc = dataset.info[Info.SCHED_TIME].replace(tzinfo=timezone.utc)
         fmt_time = dataset_sched_time_utc.strftime(WATCHDOG_DATETIME_FORMAT_STORE).rstrip()
 
         journal_path = self._heartbeat_file + "-journal"
@@ -514,7 +509,7 @@ class Main(QtWidgets.QMainWindow):
 
         self._last_imported_dataset_uuid = dataset.uuid
 
-        dataset_sched_time_utc = dataset.info.get(Info.SCHED_TIME).replace(tzinfo=timezone.utc)
+        dataset_sched_time_utc = dataset.info[Info.SCHED_TIME].replace(tzinfo=timezone.utc)
         self.ui.timeLastDatasetCreationLineEdit.setText(
             dataset_sched_time_utc.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY)
         )
@@ -1336,7 +1331,7 @@ def _search_paths(arglist):
             yield subpath
 
 
-def create_app() -> (app.Application, QtWidgets.QApplication):
+def create_app() -> typ.Tuple[app.Application, QtWidgets.QApplication]:
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
     vispy_app = app.use_app("pyqt5")
     qt_app = vispy_app.create()
