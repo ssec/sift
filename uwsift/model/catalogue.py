@@ -406,7 +406,7 @@ class GlobbingCreator:
         dictionaries with only scalar items by combination including the given
         *initial_list_of_dict_of_scalars*
 
-        Correctly speaking the items of *dict_of_sequences* need not to have
+        Correctly speaking the items of *dict_of_sequences* don't need to have
         values of type list, but any iterable type (which corresponds to a
         sequence node in YAML). Already scalar valued items are detected and
         treated as single-element lists.
@@ -415,7 +415,7 @@ class GlobbingCreator:
         to not interpret them as iterables).
 
         **NOTE:** Dictionaries are also iterable with respect to the list of
-        their keys. Thus also items representing YAML mapping nodes, i.e., those
+        their keys. Thus, also items representing YAML mapping nodes, i.e., those
         with dictionary values, are handled, but maybe not as wanted: their
         mapping information will be lost.
 

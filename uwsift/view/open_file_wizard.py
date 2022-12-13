@@ -365,7 +365,7 @@ class OpenFileWizard(QtWidgets.QWizard):
 
     def _update_input_directory(self, path: str):
         # The DirectoryOnly FileMode is obsolete and the Directory FileMode
-        # doesn't work with the ShowDirsOnly option. Thus the user is able to
+        # doesn't work with the ShowDirsOnly option. Thus, the user is able to
         # select regular files. Filter these paths from the currentChanged
         # event.
         if not os.path.isdir(path):

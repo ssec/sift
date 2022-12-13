@@ -34,7 +34,7 @@ def dataset_statistical_analysis(xarr):
         if xarr.attrs["algebraic"] == "x-y":
             stats = ContinuousDifferenceStats()
         else:
-            LOG.debug(f"'ContinuousBasicStats' will be computed for algabraic operation {xarr.attrs['algebraic']}.")
+            LOG.debug(f"'ContinuousBasicStats' will be computed for algebraic operation {xarr.attrs['algebraic']}.")
 
     elif xarr.dtype.kind == "i" and len(np.unique(xarr)) < 25:
         # NOTE: This is a preliminary ugly workaround used to identify categorical dataset and guess the categories.

@@ -82,8 +82,8 @@ class DiskManagement:
         Collect a list of open files from all registered processes.
         If a file is opened in read only mode, then the access mode
         will be "r". If a file is opened in read/write mode, then the
-        access mode will be "r+". Also a file can be reopened with
-        write privileges. Additionally a message with the number of
+        access mode will be "r+". Also, a file can be reopened with
+        write privileges. Additionally, a message with the number of
         new files will be printed to stdout.
 
         :param interval: time between checks in seconds

@@ -555,7 +555,7 @@ class LayerModel(QAbstractItemModel):
             - Deletion of scene graph node of the dataset
             - Deletion of ProductDataset (+ its Presentation)
             - Deletion of saved info of the dataset in the document
-            - Deletion of the corrsponding parts of the dataset which are handled by the workspace
+            - Deletion of the corresponding parts of the dataset which are handled by the workspace
 
         :param layer: The Layer which the dataset belongs to
         :param sched_time: The schedule time of the dataset which will be removed
@@ -720,7 +720,7 @@ class LayerModel(QAbstractItemModel):
         return sched_times_to_update
 
     def _get_layer_of_recipe(self, recipe_id: UUID):
-        """Get layer which has the given recipe as a attribute
+        """Get layer which has the given recipe
 
         :param recipe_id: recipe which is used to search the wanted layers
         :return: the searched layers

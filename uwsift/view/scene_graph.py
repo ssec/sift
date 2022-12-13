@@ -1169,7 +1169,7 @@ class SceneGraphManager(QObject):
                 # TODO: TiledGeolocatedImage does not provide a way to tell it
                 #  that it should drop all retiled data and start from scratch.
             else:
-                # This is a unforeseen case: at the moment this method
+                # This is an unforeseen case: at the moment this method
                 # should only be called when merging data segments into existing
                 # image(!) data, looks like it was called for a node of another
                 # type not having set_data() too.

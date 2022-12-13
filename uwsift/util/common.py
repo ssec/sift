@@ -74,7 +74,7 @@ def _scene_contains_compressed_seviri_hrit_files(scn):
     #  workaround already
     for r in scn._readers.values():
         # only perform check when using a relevant reader, so that this is not
-        # triggered mistakenly when another reader uses the same meta data key
+        # triggered mistakenly when another reader uses the same metadata key
         # 'compression_flag_for_data' but does not need xRITDecompress to
         # uncompress
         if r.name in ["seviri_l1b_hrit"]:
@@ -100,7 +100,7 @@ Temperature_Quantities = ["brightness_temperature", "toa_brightness_temperature"
 
 def unit_symbol(unit):
     # FUTURE: Use cfunits or cf_units package
-    # cf_units gives the wrong symbol for celsius
+    # cf_units gives the wrong symbol for Celsius
     if unit == "1":
         return ""
     elif unit == "%":

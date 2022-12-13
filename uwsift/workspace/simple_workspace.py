@@ -125,7 +125,8 @@ class SimpleWorkspace(BaseWorkspace):
 
     def get_info(self, info_or_uuid, lod=None) -> Optional[frozendict]:
         """
-        :param info_or_uuid: existing datasetinfo dictionary, or its UUID
+        Get the metadata dictionary for the Product referenced by info_or_uuid.
+        :param info_or_uuid: existing dataset info dictionary containing a UUID, or the UUID directly
         :param lod: desired level of detail to focus
         :return: metadata access with mapping semantics, to be treated as read-only
         """
@@ -224,7 +225,7 @@ class SimpleWorkspace(BaseWorkspace):
             for prod in hauler.merge_products():
                 assert prod is not None
                 # add to-be-imported filenames to check for possible merge targets but
-                # do not include this filenames in the product info
+                # do not include these filenames in the product info
                 extended_prod_info = dict(prod.info)
                 extended_prod_info["paths"] = hauler.filenames
                 zult = frozendict(extended_prod_info)
@@ -315,7 +316,7 @@ class SimpleWorkspace(BaseWorkspace):
         for existing_prod in self.products.values():
             # exclude all products which are incomplete (products which are imported right now)
             # and products with different kind or parameter
-            # TODO: when loading granules without resampling after granules of
+            # TODO: when loading granules without resampling after granules
             #  of same FAMILY have been loaded *with* resampling already,
             #  merging must be prevented.
             #  As an attempt to achieve this the SHAPE size comparison checks,
@@ -432,6 +433,7 @@ class SimpleWorkspace(BaseWorkspace):
         np.ndarray-compatible view of the full dataset
         :param info_or_uuid: existing datasetinfo dictionary, or its UUID
         :param lod: desired level of detail to focus  (0 for overview)
+        :param kind: kind of the data referenced by info_or_uuid
         :return:
         """
         if info_or_uuid is None:

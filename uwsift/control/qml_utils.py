@@ -58,7 +58,7 @@ class QmlLayerManager(QObject):
                 # Calculate mean difference in timeline in seconds to support
                 # comparing timelines with non-regularly occurring
                 # timestamps. Timelines with zero or one entries (=> t_diffs
-                # is empty) are not suitable, assign largest possible mean
+                # is empty) are not suitable, assign the largest possible mean
                 # value for them!
                 temporal_differences[i] = (
                     sys.float_info.max if not t_diffs else np.mean(list(map(lambda td: td.total_seconds(), t_diffs)))
@@ -338,7 +338,7 @@ class QmlBackend(QObject):
     def clickConvFuncMenu(self, conv_func_name):
         """
         Slot triggered by the user clicking an entry in the convenience function popup menu.
-        A convenience function is then selected by it's index in the popup menu and executed. The
+        A convenience function is then selected by its index in the popup menu and executed. The
         resulting data_layer_index is then emitted via the didChangeTimebase signal.
         :param conv_func_name: Name of the clicked convenience function as a string
         """

@@ -814,7 +814,7 @@ class MultiChannelImageVisual(ImageVisual):
 
     def _build_color_transform(self):
         if self.num_channels != 3:
-            raise NotImplementedError("MultiChannelimageVisuals only support 3 channels.")
+            raise NotImplementedError("MultiChannelImageVisuals only support 3 channels.")
         else:
             # RGB/A image data (no colormap)
             fclim = Function(_apply_clim)
@@ -846,8 +846,11 @@ class MultiChannelImageVisual(ImageVisual):
     @staticmethod
     def _cast_arrays_if_needed(data_arrays):
         for data in data_arrays:
-            if data is not None and should_cast_to_f32(data.dtype):
-                data = data.astype(np.float32)
+            try:
+                data = downcast_to_32(data, copy=copy)
+            except NameError:
+                if data is not None and should_cast_to_f32(data.dtype):
+                    data = data.astype(np.float32)
             yield data
 
     @staticmethod
@@ -1253,8 +1256,8 @@ class _TipAlignedArrowHeadVisual(_ArrowHeadVisual):
 
 class TipAlignedArrowVisual(ArrowVisual):
     """
-        Almost exactly the same as vispy's ArrowVisual with the exception
-        of the arrow's head not being centered at the end of the arrow's
+        Almost exactly the same as vispy's ArrowVisual except
+        for the arrow's head not being centered at the end of the arrow's
         line but the arrows tip pointing to the coordinate of the arrow's line.
 
     Parameters

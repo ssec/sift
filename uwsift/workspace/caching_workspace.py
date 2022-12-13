@@ -269,7 +269,7 @@ class CachingWorkspace(BaseWorkspace):
     def _product_native_content(
         self, session, prod: Product = None, uuid: UUID = None, kind: Kind = Kind.IMAGE
     ) -> Optional[Content]:
-        # NOTE: This assumes the last Content object is the best resolution
+        # NOTE: This assumes the last Content object is the best resolution,
         #       but it is untested
         if prod is None and uuid is not None:
             # Get Product object
