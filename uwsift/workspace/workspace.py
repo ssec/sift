@@ -816,39 +816,42 @@ class BaseWorkspace(QObject):
         return stats
 
     def get_min_max_value_for_dataset_by_uuid(self, uuid: UUID):
-        """Return the minimum and maximum value of a dataset.
-        Fallbacks to calculate these values if the minimum and maximum are not stored.
+        """Return the minimum and maximum value of a dataset given by its UUID.
+
+        Falls back to calculate these values if the minimum and maximum are not stored.
+        The UUID must identify an existing dataset.
         """
-        if uuid:
-            ac: ActiveContent = self._get_active_content_by_uuid(uuid)
-            stats = ac.statistics
+        assert uuid is not None
+        ac: ActiveContent = self._get_active_content_by_uuid(uuid)
+        assert ac is not None
+        stats = ac.statistics
 
-            if not stats:
-                LOG.error("Could not determine 'min/max' values: dataset has no computed statistics.")
-                return None, None
+        if not stats:
+            LOG.debug("Could not determine 'min/max' values: dataset has no computed statistics.")
+            return None, None
 
-            stats_values = stats.get("stats")
+        stats_values = stats.get("stats")
 
-            if isinstance(stats_values, dict):
-                min_ranges = stats_values.get("min")
-                max_ranges = stats_values.get("max")
-            else:
-                # TODO: The following is a workaround for a missing concept for color mapping of categorial data and
-                #  should be revised!
-                # We seem to have categorial data (a dataset with "flag_{values,meanings,masks}") where the values
-                # stored are numbers but have no numerical meaning, only that of an identifier.
-                # Currently, for technical reasons, we need to be able to get a value range (i.e. a kind of min/max
-                # values) even for such a dataset, otherwise no colormap could be applied automatically.
-                # So, we trick the statistics module to compute everything as if the data was normal data:
-                # To achieve this we simply don't provide the xarr.attrs which the statistics module uses to distinguish
-                # categorial from normal data:
-                dataarray = xarray.DataArray(ac.data)
-                stats = dataset_statistical_analysis(dataarray)
-                min_ranges = stats.get("stats").get("min")
-                max_ranges = stats.get("stats").get("max")
+        if isinstance(stats_values, dict):
+            min_ranges = stats_values.get("min")
+            max_ranges = stats_values.get("max")
+        else:
+            # TODO: The following is a workaround for a missing concept for color mapping of categorial data and
+            #  should be revised!
+            # We seem to have categorial data (a dataset with "flag_{values,meanings,masks}") where the values
+            # stored are numbers but have no numerical meaning, only that of an identifier.
+            # Currently, for technical reasons, we need to be able to get a value range (i.e. a kind of min/max
+            # values) even for such a dataset, otherwise no colormap could be applied automatically.
+            # So, we trick the statistics module to compute everything as if the data was normal data:
+            # To achieve this we simply don't provide the xarr.attrs which the statistics module uses to distinguish
+            # categorial from normal data:
+            dataarray = xarray.DataArray(ac.data)
+            stats = dataset_statistical_analysis(dataarray)
+            min_ranges = stats.get("stats").get("min")
+            max_ranges = stats.get("stats").get("max")
 
-            if not min_ranges or not max_ranges:  # Note: bool([0]) == True!
-                LOG.error("Could not determine 'min/max' values: dataset statistics are invalid.")
-                return None, None
+        if not min_ranges or not max_ranges:  # Note: bool([0]) == True!
+            LOG.error("Could not determine 'min/max' values: dataset statistics are invalid.")
+            return None, None
 
-            return min_ranges[0], max_ranges[0]
+        return min_ranges[0], max_ranges[0]
