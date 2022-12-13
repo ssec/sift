@@ -84,7 +84,7 @@ class QmlLayerManager(QObject):
     def layerModel(self):
         return self._qml_layer_model
 
-    @layerModel.setter
+    @layerModel.setter  # type: ignore # mypy bug #9911
     def layerModel(self, new_model):
         self._qml_layer_model = new_model
         self.layerModelChanged.emit()
@@ -93,7 +93,7 @@ class QmlLayerManager(QObject):
     def convFuncModel(self):
         return self._conv_func_model
 
-    @convFuncModel.setter
+    @convFuncModel.setter  # type: ignore # mypy bug #9911
     def convFuncModel(self, new_model):
         self._conv_func_model = new_model
         self.convFuncModelChanged.emit()
@@ -129,7 +129,7 @@ class QmlLayerManager(QObject):
         return self._layer_to_display
 
     # Define the setter of the 'name' property.
-    @layerToDisplay.setter
+    @layerToDisplay.setter  # type: ignore # mypy bug #9911
     def layerToDisplay(self, data_layer_str):
         self._layer_to_display = data_layer_str
         self.layerToDisplayChanged.emit()
@@ -141,7 +141,7 @@ class QmlLayerManager(QObject):
         else:
             return self._date_to_display
 
-    @dateToDisplay.setter
+    @dateToDisplay.setter  # type: ignore # mypy bug #9911
     def dateToDisplay(self, new_date):
         self._date_to_display = new_date.strftime(self._format_str)
         self.dateToDisplayChanged.emit(self._date_to_display)
@@ -219,7 +219,8 @@ class TimebaseModel(QAbstractListModel):
         super().__init__(*args, **kwargs)
         self._format_str = DEFAULT_TIME_FORMAT
         self.timestamps = timestamps  # sets self._timestamps
-        self.currentTimestamp = None  # sets self._current_timestamp
+
+        self._current_timestamp = self._format_str.replace("%", "")
 
     @pyqtProperty("QVariantList", notify=modelChanged)
     def model(self):
@@ -240,7 +241,7 @@ class TimebaseModel(QAbstractListModel):
     def currentTimestamp(self):
         return self._current_timestamp
 
-    @currentTimestamp.setter
+    @currentTimestamp.setter  # type: ignore # mypy bug #9911
     def currentTimestamp(self, new_date):
         self._current_timestamp = new_date.strftime(self._format_str) if new_date else self._format_str.replace("%", "")
         self.currentTimestampChanged.emit(self._current_timestamp)
@@ -248,15 +249,6 @@ class TimebaseModel(QAbstractListModel):
     @property
     def timestamps(self):
         return self._timestamps
-
-    def clear(self):
-        """Set the two corresponding properties which has to do something with the timestamps to None.
-
-        The purpose of this is to give a possibility to return to a similar state like
-        when TimeBaseModel was initialized."""
-        self.timestamps = None
-        self.currentTimestamp = None
-        self.returnToInitialState.emit()
 
     @timestamps.setter
     def timestamps(self, timestamps):
@@ -270,6 +262,15 @@ class TimebaseModel(QAbstractListModel):
         self.changePersistentIndexList(from_index_list, to_index_list)
         self.layoutChanged.emit()
         self.timebaseChanged.emit()
+
+    def clear(self):
+        """Set the two corresponding properties which has to do something with the timestamps to None.
+
+        The purpose of this is to give a possibility to return to a similar state like
+        when TimeBaseModel was initialized."""
+        self.timestamps = None
+        self.currentTimestamp = None
+        self.returnToInitialState.emit()
 
     @staticmethod
     def _get_default_qdts(steps=5):
