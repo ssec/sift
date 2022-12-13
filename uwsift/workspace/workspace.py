@@ -130,7 +130,7 @@ class ActiveContent(QObject):
         attrs = dict(info)
         attrs = attrs.update({"algebraic": info.get(Info.ALGEBRAIC)}) if info.get(Info.ALGEBRAIC) else attrs
 
-        # exclude mulit channel images out of statistics calculation
+        # exclude multi-channel images out of statistics calculation
         if info.get(Info.KIND) != Kind.MC_IMAGE:
             data_array = xarray.DataArray(self._data, attrs=attrs)
             self.statistics = dataset_statistical_analysis(data_array)
@@ -206,7 +206,7 @@ class ActiveContent(QObject):
                 return None
             return np.memmap(full_path, *args, **kwargs)
 
-        self._data = mm(c.path, dtype=c.dtype or np.float32, mode=mode, shape=shape)  # potentially very very large
+        self._data = mm(c.path, dtype=c.dtype or np.float32, mode=mode, shape=shape)  # potentially very, very large
 
         if isinstance(c, ContentImage):
             self._y = mm(c.y_path, dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.y_path else None

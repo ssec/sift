@@ -105,7 +105,7 @@ class TextureAtlas2D(GPUScaledTexture2D):
 
 
 class MultiChannelGPUScaledTexture2D:
-    """Wrapper class around indiviual textures.
+    """Wrapper class around individual textures.
 
     This helper class allows for easier handling of multiple textures that
     represent individual R, G, and B channels of an image.

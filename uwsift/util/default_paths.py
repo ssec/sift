@@ -50,7 +50,7 @@ def _desktop_directory():
 USER_DESKTOP_DIRECTORY = _desktop_directory()
 
 # satpy uses gettempdir() for the extraction of compressed datasets
-# the default in Linux is /tmp, but we can cleanup these temp files better if we use a custom subdirectory
+# the default in Linux is /tmp, but we can clean up these temp files better if we use a custom subdirectory
 Path(WORKSPACE_TEMP_DIR).mkdir(parents=True, exist_ok=True)
 os.environ["TMPDIR"] = WORKSPACE_TEMP_DIR
 tempfile.tempdir = WORKSPACE_TEMP_DIR

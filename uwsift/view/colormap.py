@@ -41,7 +41,7 @@ class SquareRootColormap(BaseColormap):
 
 
 class FlippedColormap(Colormap):
-    """Simple wrapper to flip the provide colors and colormaps."""
+    """Simple wrapper to flip the provided colors and colormaps."""
 
     def __init__(self, colors, controls=None, **kwargs):
         colors = colors[::-1]

@@ -78,7 +78,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         self._details_pane_ui.climitsCurrentTime.clicked.connect(self._fit_clims_to_current_time)
         self._details_pane_ui.climitsAllTimes.clicked.connect(self._fit_clims_to_all_times)
 
-        self._details_pane_ui.colormap_reset_button.clicked.connect(self._reset_to_intial_state)
+        self._details_pane_ui.colormap_reset_button.clicked.connect(self._reset_to_initial_state)
 
     # Slot functions
 
@@ -94,7 +94,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
             self._valid_min, self._valid_max = range_hull(clims, valid_range)
         elif (
             clims and clims != INVALID_COLOR_LIMITS and isinstance(clims, tuple)
-        ):  # Internal RGB Composites s have a list of clim tuples
+        ):  # Internal RGB Composites have a list of color limit (clims) tuples
             self._valid_min, self._valid_max = clims
         else:
             self._valid_min, self._valid_max = FALLBACK_RANGE
@@ -180,12 +180,12 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
             self._details_pane_ui.layerColorLimitsValue.setText(clim_str)
         except TypeError:
             LOG.warning(
-                f"Unable to set the value for clims."
+                f"Unable to set the value for color limits."
                 f" Instead for {self._current_selected_layer.uuid} will the value 'N/A' be shown."
             )
         except KeyError:
             LOG.warning(
-                f"Unable to convert clims of layer {self._current_selected_layer}."
+                f"Unable to convert color limits of layer {self._current_selected_layer}."
                 f" Because there is no unit conversion in layer info: '{self._current_selected_layer.info}'."
                 f" Instead for {self._current_selected_layer.uuid} will the value 'N/A' be shown."
             )
@@ -285,7 +285,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         for colormap in COLORMAP_MANAGER.keys():
             self._details_pane_ui.cmap_combobox.addItem(colormap, colormap)
 
-    def _reset_to_intial_state(self):
+    def _reset_to_initial_state(self):
         model = self._current_selected_layer.model
         # rejecting (Cancel button) means reset previous settings
         model.change_colormap_for_layer(

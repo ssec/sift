@@ -94,7 +94,7 @@ class ProbeGraphManager(QObject):
     pointProbeChanged = pyqtSignal(str, bool, tuple)
 
     def __init__(self, tab_widget, auto_update_checkbox, update_button, workspace, layer_model: LayerModel, queue):
-        """Setup our tab widget with an appropriate graph object in the first
+        """Set up our tab widget with an appropriate graph object in the first
         tab.
 
         FUTURE, once we are saving our graph configurations, load those instead
@@ -595,7 +595,7 @@ class ProbeGraphDisplay(object):
             LOG.debug("Plot doesn't need to be rebuilt")
             return
 
-        # should be be plotting vs Y?
+        # should be plotting vs Y?
         doPlotVS = self.yCheckBox.isChecked()
         task_name = "%s_%s_region_plotting" % (self.xSelectedUUID, self.ySelectedUUID)
         task_description = (

@@ -95,7 +95,7 @@ class AlgebraicLayerConfigPane(QObject):
         if not layer_uuid:
             layer_uuid = None
 
-        LOG.debug(f"Alegbraic: user selected {repr(layer_uuid)} for {channel}")
+        LOG.debug(f"Algebraic: user selected {repr(layer_uuid)} for {channel}")
 
         self.didChangeAlgebraicInputLayers.emit(self.recipe, channel, layer_uuid)
 

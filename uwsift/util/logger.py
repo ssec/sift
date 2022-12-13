@@ -69,7 +69,7 @@ def __configure_available_loggers(logger_all_level: Optional[str]) -> None:
     """
     Remove handlers from all loggers to ensure that all write to either the
     console or a log file by propagating to the root logger.
-    Furthermore if found in the configuration set an individual log level or the
+    Furthermore, if found in the configuration set an individual log level or the
     one configured for "all" loggers.
     """
     # The following will collect all loggers except for the root logger. This is

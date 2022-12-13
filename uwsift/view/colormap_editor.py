@@ -161,7 +161,7 @@ class ColormapEditor(QtWidgets.QDialog):
                 newWidget.removeTick(tick[0])
 
             if not isinstance(controls, (tuple, list)):
-                # convert numpy arrays to a list so we can JSON serialize
+                # convert numpy arrays to a list, so we can JSON serialize
                 # numpy data types
                 controls = controls.tolist()
             for control, color in zip(controls, colors):

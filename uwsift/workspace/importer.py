@@ -775,7 +775,7 @@ class SatpyImporter(aImporter):
         SCENE information.
 
         The SCENE information is used at other locations to identify data that
-        has the roughly the same extent and projection. That is a  pre-requisite
+        has roughly the same extent and projection. That is a  pre-requisite
         to allow to derive algebraics and compositions from them.
 
         Unstructured data has no clear extent and not an intrinsic projection
@@ -891,7 +891,7 @@ class SatpyImporter(aImporter):
             except AttributeError:
                 # Some products (e.g. `latitude` and `longitude`) may not
                 # (for whatever reason) have an associated SwathDefinition.
-                # Without it, there is no geo-location information per data
+                # Without it, there is no geolocation information per data
                 # point, because it is taken from its fields 'lats', 'lons'.
                 # This cannot be healed, point data loading fails.
                 LOG.error(
@@ -1306,12 +1306,12 @@ class SatpyImporter(aImporter):
     def merge_data_into_memmap(self, segments_data, image_data, segments_indices):
         """
         Merge new segments from data into img_data. The data is expected to
-        contain the data for all segments with the last segment (highest segment
-        number) as first in the data array.
+        contain the data for all segments with the last segment (that has the
+        largest segment number) as first in the data array.
         The segments list defines which chunk of data belongs to which segment.
         The list must be sorted ascending.
         Those requirements match the current Satpy behavior which loads segments
-        in ascending order and produce an data array with the last segments data
+        in ascending order and produce a data array with the last segments data
         first.
         :param segments_data: the segments data as provided by Satpy importer
         :param image_data: the dataset data where the segments are merged into

@@ -107,7 +107,7 @@ class AutoUpdateManager:
         ) = Catalogue.extract_query_parameters(first_query)
 
     def on_loading_done(self, uuids: List[UUID]):
-        # The time consuming stuff is done, let's already start the next round
+        # The time-consuming stuff is done, let's already start the next round
         self.timer.start()
 
         # Only upon completion of data loading allow for removal of old data.

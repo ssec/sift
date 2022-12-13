@@ -69,7 +69,7 @@ LOG = logging.getLogger(__name__)
 Base = declarative_base()
 
 # resources can have multiple products in them
-# products may require multiple resourcse (e.g. separate GEO; tiled imagery)
+# products may require multiple resources (e.g. separate GEO; tiled imagery)
 PRODUCTS_FROM_RESOURCES_TABLE_NAME = "product_resource_assoc_v1"
 ProductsFromResources = Table(
     PRODUCTS_FROM_RESOURCES_TABLE_NAME,
