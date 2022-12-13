@@ -760,7 +760,7 @@ class BaseWorkspace(QObject):
         """
         pass
 
-    def find_merge_target(self, uuid: UUID, info) -> Optional[Product]:
+    def find_merge_target(self, uuid: UUID, paths, info) -> Optional[Product]:
         pass
 
     def get_points_arrays(self, uuid: UUID) -> Tuple[Optional[np.array], Optional[np.array]]:
