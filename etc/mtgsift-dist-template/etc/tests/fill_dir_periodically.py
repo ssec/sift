@@ -171,10 +171,10 @@ def fill_dir_periodically_fci(data_dir: str, tmp_dir: str, sleep_time: float, re
     # old_files = [os.path.join(data_dir, old_file) for old_file in old_files]
     for n, (old_file, new_filename) in enumerate(zip(files_fullpath, file_stack)):
         st = time.time()
+        tmp_path = pathlib.Path(shutil.copy(old_file, tmp_dir + "/tempfile.nc"))
         if n >= retain_n_times:
             os.remove(os.path.join(tmp_path.parent, file_stack[n - retain_n_times]))
             print(f"Removed: {file_stack[n-retain_n_times]}")
-        tmp_path = pathlib.Path(shutil.copy(old_file, tmp_dir + "/tempfile.nc"))
         os.rename(tmp_path, os.path.join(tmp_path.parent, new_filename))
         print(f"Created: {old_file} -> {new_filename}")
         elapsed_time = time.time() - st
