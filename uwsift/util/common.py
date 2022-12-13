@@ -162,7 +162,7 @@ def _unit_format_func_for_flags(info):
 
     else:
 
-        def _format_unit(val, numeric=True, include_units=True):
+        def _format_unit(val, numeric=True, include_units=True, flag_info=None):
             if np.isnan(val):
                 return N_A
             else:
@@ -262,12 +262,12 @@ def format_resolution(resolution: float) -> str:
     """Return string representing the given resolution (interpreted in meters)
     in the unit km for values greater than 1 km, otherwise in m, including the
     unit symbol."""
-    resolution = Decimal(resolution)
-    if resolution < 1000:
-        return str(resolution.quantize(Decimal("1."))) + " m"
+    resolution_dec = Decimal(resolution)
+    if resolution_dec < 1000:
+        return str(resolution_dec.quantize(Decimal("1."))) + " m"
     else:
-        resolution /= Decimal(1000)
-        return str(resolution.quantize(Decimal(".1"))) + " km"
+        resolution_dec /= Decimal(1000)
+        return str(resolution_dec.quantize(Decimal(".1"))) + " km"
 
 
 def normalize_longitude(lon: float) -> float:
@@ -298,15 +298,17 @@ def range_hull(range_1: tuple, range_2: tuple) -> tuple:
 
 
 def range_hull_no_fail(range_1: Optional[tuple], range_2: Optional[tuple], fallback: tuple) -> tuple:
-    """Get a range which contains the given ranges.
+    """Get a range which contains the given ranges, safely.
 
-    It is the same as 'range_hull()' but if the range can not be computed from 'range_1' and 'range_2'
-    then the given 'fallback' is returned.
+    Same as 'range_hull()' but if the range can not be computed from 'range_1' and 'range_2' then the given
+    'fallback' is returned. This happens if any of 'range_1' and 'range_2' is None or (None, None).
     """
 
     try:
-        lower = min(range_1[0], range_2[0])
-        upper = max(range_1[1], range_2[1])
+        # 'range_1' or 'range_2' can be None or (None, None), but this method exists solely to deal with that case.
+        # That's why we silence mypy by ignoring its findings here:
+        lower = min(range_1[0], range_2[0])  # type: ignore
+        upper = max(range_1[1], range_2[1])  # type: ignore
     except TypeError:
         return fallback
 
