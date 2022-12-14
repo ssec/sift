@@ -24,7 +24,7 @@ class Catalogue:
         from the given dictionary *query* and return them as tuple.
         """
         reader = query.get("reader")
-        _reader_info = config.get("data_reading." + reader, None)
+        _reader_info = config.get(f"data_reading.{reader}", None)
         filter_patterns = _reader_info.get("filter_patterns")
         group_keys = _reader_info.get("group_keys")
 
@@ -160,7 +160,7 @@ class GlobbingCreator:
     #  currently handled => upgrade this class for needed ones case by case
 
     # TODO make this "private" and add method to re-initialize it
-    now_utc: datetime = None
+    now_utc: datetime = datetime.now(timezone.utc)
 
     @staticmethod
     def init_now():
@@ -485,7 +485,7 @@ class GlobbingCreator:
         things.
         """
         normalized_constraints: dict = {}
-        expanded_datetime_constraints: Optional[List[dict]] = None
+        expanded_datetime_constraints: List[dict] = [{}]
         have_datetime_constraint_already = False
 
         for key, value in constraints.items():
