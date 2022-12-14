@@ -42,9 +42,6 @@ class Worker(QThread):
     Worker thread use by TaskQueue
     """
 
-    queue = None
-    depth = 0
-
     # worker id, sequence of dictionaries listing update information to be propagated to view
     workerDidMakeProgress = pyqtSignal(int, list)
     # task-key, ok: False if exception occurred else True
@@ -52,7 +49,7 @@ class Worker(QThread):
 
     def __init__(self, myid: int):
         super(Worker, self).__init__()
-        self.queue = OrderedDict()
+        self.queue: OrderedDict = OrderedDict()
         self.depth = 0
         self.id = myid
 
@@ -97,12 +94,6 @@ class TaskQueue(QObject):
     Two threads for interactive tasks (high priority), one thread for background tasks (low priority): 0, 1, 2
     """
 
-    process_pool = None  # process pool for background activity
-    workers = None  # thread pool for background activity
-    _interactive_round_robin = 0  # swaps between 0 and 1 for interactive tasks
-    _last_status = None  # list of last status reports for different workers
-    _completion_futures = None  # dictionary of id(task) : completion(bool)
-
     didMakeProgress = pyqtSignal(list)  # sequence of dictionaries listing update information to be propagated to view
 
     # started : inherited
@@ -111,11 +102,11 @@ class TaskQueue(QObject):
 
     def __init__(self, process_pool=None):
         super(TaskQueue, self).__init__()
-        self._interactive_round_robin = 0
-        self.process_pool = process_pool
-        self._completion_futures = {}
-        self._last_status = []
-        self.workers = []
+        self._interactive_round_robin = 0  # swaps between 0 and 1 for interactive tasks
+        self.process_pool = process_pool  # thread pool for background activity
+        self._completion_futures = {}  # dictionary of id(task) : completion(bool)
+        self._last_status = []  # list of last status reports for different workers
+        self.workers = []  # thread pool for background activity
         for id in range(3):
             worker = Worker(id)
             worker.workerDidMakeProgress.connect(self._did_progress)
