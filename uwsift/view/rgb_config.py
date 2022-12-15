@@ -181,9 +181,16 @@ class RGBLayerConfigPane(QObject):
         # reset slider position to min and max for layer
         self._set_minmax_slider(color, layer_uuid)
 
-        layer_valid_range = self.model.get_layer_by_uuid(layer_uuid).valid_range if layer_uuid else None
+        layer = self.model.get_layer_by_uuid(layer_uuid)
 
-        clim = layer_valid_range if layer_valid_range else (None, None)
+        if not layer:
+            clim = (None, None)
+        else:
+            valid_range = layer.valid_range
+            # TODO: is the actual range really used correctly here?
+            actual_range = layer.get_actual_range_from_layer()
+            assert actual_range != (None, None)
+            clim = valid_range if valid_range else actual_range
 
         self.didChangeRGBInputLayers.emit(self.recipe, color, layer_uuid, clim, DEFAULT_GAMMA_VALUE)
 
@@ -357,14 +364,17 @@ class RGBLayerConfigPane(QObject):
             editn.setDisabled(False)
             editx.setDisabled(False)
 
-            layer: LayerItem = self.model.get_layer_by_uuid(layer_uuid)
+            layer = self.model.get_layer_by_uuid(layer_uuid)
+            valid_range = layer.valid_range
+            # TODO: is the actual range really used correctly here?
+            actual_range = layer.get_actual_range_from_layer()
+            assert actual_range != (None, None)
+            layer_range = valid_range if valid_range else actual_range
+            self._valid_ranges[idx] = layer_range
 
-            valid_range = layer.info.get(Info.VALID_RANGE)
-            self._valid_ranges[idx] = valid_range
-
-            slider_val = self._create_slider_value(valid_range[0], valid_range[1], clims[0])
+            slider_val = self._create_slider_value(layer_range[0], layer_range[1], clims[0])
             slider[0].setSliderPosition(max(slider_val, 0))
-            slider_val = self._create_slider_value(valid_range[0], valid_range[1], clims[1])
+            slider_val = self._create_slider_value(layer_range[0], layer_range[1], clims[1])
             slider[1].setSliderPosition(min(slider_val, self._slider_steps))
 
             self._update_line_edits(color, *clims)
