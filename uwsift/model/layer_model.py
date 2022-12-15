@@ -696,12 +696,17 @@ class LayerModel(QAbstractItemModel):
             info = {Info.KIND: recipe_layer.kind}
             recipe_layer.replace_recipe_layer_info(info)
 
+        # TODO (AR): is this the right place to check whether color limits
+        #  should be reset to an invalid state? What, if the formula together
+        #  with the input layer slots state is invalid ('x' used by the formula
+        #  but the 'x' layer still set to None)?
+        #  On the other hand: do we need to reset the color limits at all?
         if isinstance(recipe, AlgebraicRecipe):
             if recipe_layer.presentation.climits == INVALID_COLOR_LIMITS:
                 climits = recipe_layer.determine_initial_clims()
 
                 self.change_color_limits_for_layer(recipe_layer.uuid, climits)
-            elif not all(input_layers):
+            elif not any(input_layers):
                 self.change_color_limits_for_layer(recipe_layer.uuid, INVALID_COLOR_LIMITS)
 
         self.didUpdateLayers.emit()
