@@ -227,16 +227,16 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         input_layers_info = model.get_input_layers_info(self._current_selected_layer)
 
         if len(input_layers_info) == len(clims):
-            multichannel_clim_strs = []
+            multichannel_clims_strs = []
             for idx in range(len(clims)):
-                curr_clim = clims[idx]
+                curr_clims = clims[idx]
                 curr_layer_info = input_layers_info[idx]
-                self._determine_clim_str_for_channel(curr_clim, curr_layer_info, multichannel_clim_strs)
+                self._determine_clim_str_for_channel(curr_clims, curr_layer_info, multichannel_clims_strs)
 
-            if len(multichannel_clim_strs) != len(input_layers_info) and len(multichannel_clim_strs) != len(clims):
+            if len(multichannel_clims_strs) != len(input_layers_info) and len(multichannel_clims_strs) != len(clims):
                 return None
 
-            return ", ".join(multichannel_clim_strs)
+            return ", ".join(multichannel_clims_strs)
 
     def _get_multichannel_instrument_str(self):
         used_instruments = set()
@@ -267,15 +267,15 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         return wavelength_str
 
     @staticmethod
-    def _get_single_clim_str(clim, unit_conv):
-        if clim == INVALID_COLOR_LIMITS:
+    def _format_clims(clims, unit_conv):
+        if clims == INVALID_COLOR_LIMITS:
             return "N/A"
 
-        display_clim = unit_conv[1](np.array(clim))
-        min_clim = unit_conv[2](display_clim[0], include_units=False)
-        max_clim = unit_conv[2](display_clim[1])
-        clim_str = f"{min_clim} ~ {max_clim}"
-        return clim_str
+        display_clims = unit_conv[1](np.array(clims))
+        min_str = unit_conv[2](display_clims[0], include_units=False)
+        max_str = unit_conv[2](display_clims[1])
+        clims_str = f"{min_str} ~ {max_str}"
+        return clims_str
 
     def _get_slider_value(self, slider_val):
         return (slider_val / self._slider_steps) * (self._valid_max - self._valid_min) + self._valid_min
