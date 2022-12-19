@@ -27,7 +27,6 @@ import numpy as np
 import shapefile
 from vispy.color import Color
 from vispy.gloo import VertexBuffer
-from vispy.gloo.texture import should_cast_to_f32
 from vispy.scene.visuals import create_visual_node
 from vispy.util.profiler import Profiler
 from vispy.visuals import ImageVisual, IsocurveVisual, LineVisual
@@ -845,10 +844,18 @@ class MultiChannelImageVisual(ImageVisual):
 
     @staticmethod
     def _cast_arrays_if_needed(data_arrays):
+        # FIXME: Remove the try/except and move the remaining import to the imports section of this file as soon as
+        #  support for VisPy < 0.11.0 is dropped.
         for data in data_arrays:
             try:
+                # Since VisPy v0.12.0
+                from vispy.gloo.texture import downcast_to_32bit_if_needed
+
                 data = downcast_to_32bit_if_needed(data)
-            except NameError:
+            except ImportError:
+                # Before VisPy v0.12.0
+                from vispy.gloo.texture import should_cast_to_f32
+
                 if data is not None and should_cast_to_f32(data.dtype):
                     data = data.astype(np.float32)
             yield data
