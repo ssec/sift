@@ -10,7 +10,7 @@ import satpy.readers.hrit_base
 from satpy import DataID, Scene
 
 from uwsift import config as config
-from uwsift.common import N_A, Info, Kind
+from uwsift.common import INVALID_COLOR_LIMITS, N_A, Info, Kind
 
 LOG = logging.getLogger(__name__)
 
@@ -233,6 +233,17 @@ def units_conversion(info):
     # Format strings
     format_func = _unit_format_func(info, punits)
     return punits, conv_func, format_func
+
+
+def format_clims(clims, unit_conv):
+    if clims == INVALID_COLOR_LIMITS:
+        return "N/A"
+
+    display_clims = unit_conv[1](np.array(clims))
+    min_str = unit_conv[2](display_clims[0], include_units=False)
+    max_str = unit_conv[2](display_clims[1])
+    clims_str = f"{min_str} ~ {max_str}"
+    return clims_str
 
 
 def format_wavelength(wl):
