@@ -759,10 +759,6 @@ class Main(QtWidgets.QMainWindow):
         )
 
         def update_probe_polygon(points: list):
-            # Show the area probe pane if a region is created
-            self.ui.areaProbePane.show()
-            self.ui.areaProbePane.raise_()
-
             probeable_layers = self.layer_model.get_probeable_layers()
             probeable_layers_uuids = [layer.uuid for layer in probeable_layers]
 
@@ -788,6 +784,7 @@ class Main(QtWidgets.QMainWindow):
         self.ui.panZoomToolButton.toggled.connect(partial(self.change_tool, name=Tool.PAN_ZOOM))
         self.ui.pointSelectButton.toggled.connect(partial(self.change_tool, name=Tool.POINT_PROBE))
         self.ui.regionSelectButton.toggled.connect(partial(self.change_tool, name=Tool.REGION_PROBE))
+        self.ui.regionSelectButton.toggled.connect(self.ui.areaProbePane.raise_)
         self.change_tool(True)
 
         def update_full_data_selection():
@@ -819,6 +816,7 @@ class Main(QtWidgets.QMainWindow):
         menu = QtWidgets.QMenu(parent=self)
         select_full_data_action = QtWidgets.QAction("Select Full Data", parent=menu)
         select_full_data_action.triggered.connect(update_full_data_selection)
+        select_full_data_action.triggered.connect(self.ui.areaProbePane.raise_)
         menu.addAction(select_full_data_action)
         self.ui.regionSelectButton.setMenu(menu)
 
@@ -1229,9 +1227,11 @@ class Main(QtWidgets.QMainWindow):
         composite = QtWidgets.QAction("Create Composite", self)
         composite.setShortcut("C")
         composite.triggered.connect(self.layer_model.start_rgb_composite_creation)
+        composite.triggered.connect(self.ui.rgbConfigPane.raise_)
 
         algebraic = QtWidgets.QAction("Create Algebraic", self)
         algebraic.triggered.connect(self.layer_model.start_algebraic_composite_creation)
+        algebraic.triggered.connect(self.ui.algebraicConfigPane.raise_)
 
         toggle_point = QtWidgets.QAction("Toggle Point Probe", self)
         toggle_point.setShortcut("X")
