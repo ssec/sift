@@ -343,6 +343,9 @@
     </item>
     <item>
      <widget class="QTableWidget" name="selectIDTable">
+      <property name="sizeAdjustPolicy">
+       <enum>QAbstractScrollArea::AdjustToContents</enum>
+      </property>
       <property name="editTriggers">
        <set>QAbstractItemView::NoEditTriggers</set>
       </property>

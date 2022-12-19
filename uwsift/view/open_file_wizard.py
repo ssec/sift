@@ -283,6 +283,8 @@ class OpenFileWizard(QtWidgets.QWizard):
                 self.ui.selectIDTable.setItem(idx, col_idx, item)
                 col_idx += 1
         self.ui.selectIDTable.cellChanged.connect(self._check_product_page_completeness)
+        # resize columns to fit to content (table's sizeAdjustPolicy is set to AdjustToContents)
+        self.ui.selectIDTable.resizeColumnsToContents()
 
         self.ui.projectionComboBox.setCurrentIndex(self.parent().document.current_projection_index())
         self.update_resampling_method_combobox()

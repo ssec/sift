@@ -163,21 +163,18 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
     def _create_slider_value(self, channel_val):
         return int((channel_val - self._valid_min) / (self._valid_max - self._valid_min) * self._slider_steps)
 
-    def _determine_clim_str_for_channel(self, curr_clim, curr_layer_info, multichannel_clim_strs):
-        curr_unit_conv = curr_layer_info.get(Info.UNIT_CONVERSION) if curr_layer_info else None
-
-        multichannel_clim_strs.append(self._get_single_clim_str(curr_clim, curr_unit_conv))
-
     def _determine_display_value_for_clims(self):
         try:
             clims = self._current_selected_layer.presentation.climits
             if self._current_selected_layer.kind == Kind.RGB:
-                clim_str = self._get_multichannel_clim_str(clims)
+                model: LayerModel = self._current_selected_layer.model
+                input_layers_info = model.get_input_layers_info(self._current_selected_layer)
+                clims_str = self._get_multichannel_clims_str(clims, input_layers_info)
             else:
                 unit_conv = self._current_selected_layer.info[Info.UNIT_CONVERSION]
-                clim_str = self._get_single_clim_str(clims, unit_conv)
+                clims_str = self._format_clims(clims, unit_conv)
 
-            self._details_pane_ui.layerColorLimitsValue.setText(clim_str)
+            self._details_pane_ui.layerColorLimitsValue.setText(clims_str)
         except TypeError:
             LOG.warning(
                 f"Unable to set the value for color limits."
@@ -221,22 +218,19 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         model = self._current_selected_layer.model
         model.change_gamma_for_layer(self._current_selected_layer.uuid, val)
 
-    def _get_multichannel_clim_str(self, clims):
+    def _get_multichannel_clims_str(self, clims, input_layers_info):
+        assert len(input_layers_info) == len(clims)
+        multichannel_clims_strs = []
+        for idx in range(len(clims)):
+            curr_clims = clims[idx]
+            curr_layer_info = input_layers_info[idx]
+            if curr_layer_info:
+                curr_unit_conv = curr_layer_info.get(Info.UNIT_CONVERSION)
+                multichannel_clims_strs.append(self._format_clims(curr_clims, curr_unit_conv))
+            else:
+                multichannel_clims_strs.append("N/A")
 
-        model: LayerModel = self._current_selected_layer.model
-        input_layers_info = model.get_input_layers_info(self._current_selected_layer)
-
-        if len(input_layers_info) == len(clims):
-            multichannel_clim_strs = []
-            for idx in range(len(clims)):
-                curr_clim = clims[idx]
-                curr_layer_info = input_layers_info[idx]
-                self._determine_clim_str_for_channel(curr_clim, curr_layer_info, multichannel_clim_strs)
-
-            if len(multichannel_clim_strs) != len(input_layers_info) and len(multichannel_clim_strs) != len(clims):
-                return None
-
-            return ", ".join(multichannel_clim_strs)
+        return ", ".join(multichannel_clims_strs)
 
     def _get_multichannel_instrument_str(self):
         used_instruments = set()
@@ -267,15 +261,15 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         return wavelength_str
 
     @staticmethod
-    def _get_single_clim_str(clim, unit_conv):
-        if clim == INVALID_COLOR_LIMITS:
+    def _format_clims(clims, unit_conv):
+        if clims == INVALID_COLOR_LIMITS:
             return "N/A"
 
-        display_clim = unit_conv[1](np.array(clim))
-        min_clim = unit_conv[2](display_clim[0], include_units=False)
-        max_clim = unit_conv[2](display_clim[1])
-        clim_str = f"{min_clim} ~ {max_clim}"
-        return clim_str
+        display_clims = unit_conv[1](np.array(clims))
+        min_str = unit_conv[2](display_clims[0], include_units=False)
+        max_str = unit_conv[2](display_clims[1])
+        clims_str = f"{min_str} ~ {max_str}"
+        return clims_str
 
     def _get_slider_value(self, slider_val):
         return (slider_val / self._slider_steps) * (self._valid_max - self._valid_min) + self._valid_min
@@ -342,14 +336,11 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
     def _update_displayed_info(self):
         self._update_displayed_layer_name()
-
         self._update_displayed_time()
-
         self._update_displayed_instrument()
-
         self._update_displayed_wavelength()
-
         self._update_displayed_resolution()
+        self.update_displayed_clims()
 
         self._update_displayed_kind_details()
 
@@ -372,7 +363,6 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
             self.update_displayed_colormap()
 
-            self.update_displayed_clims()
             self._update_gamma()
             self._update_vmin()
             self._update_vmax()
