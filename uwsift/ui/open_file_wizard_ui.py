@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'open_file_wizard.ui'
+# Form implementation generated from reading ui file 'uwsift/ui/open_file_wizard.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.7
 #
@@ -159,6 +159,7 @@ class Ui_openFileWizard(object):
         self.productSelectionButtonLayout.addWidget(self.resamplingShapeColumnSpinBox)
         self.verticalLayout.addLayout(self.productSelectionButtonLayout)
         self.selectIDTable = QtWidgets.QTableWidget(self.productSelectionPage)
+        self.selectIDTable.setSizeAdjustPolicy(QtWidgets.QAbstractScrollArea.AdjustToContents)
         self.selectIDTable.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.selectIDTable.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.selectIDTable.setObjectName("selectIDTable")
