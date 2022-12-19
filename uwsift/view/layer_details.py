@@ -20,7 +20,6 @@ import logging
 from functools import partial
 from typing import Optional, Tuple
 
-import numpy as np
 from PyQt5 import QtWidgets
 
 from uwsift.common import FALLBACK_RANGE, INVALID_COLOR_LIMITS, Info, Kind
@@ -29,6 +28,7 @@ from uwsift.model.layer_model import LayerModel
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.ui.layer_details_widget_ui import Ui_LayerDetailsPane
 from uwsift.util.common import (
+    format_clims,
     format_resolution,
     get_initial_gamma,
     range_hull,
@@ -172,7 +172,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
                 clims_str = self._get_multichannel_clims_str(clims, input_layers_info)
             else:
                 unit_conv = self._current_selected_layer.info[Info.UNIT_CONVERSION]
-                clims_str = self._format_clims(clims, unit_conv)
+                clims_str = format_clims(clims, unit_conv)
 
             self._details_pane_ui.layerColorLimitsValue.setText(clims_str)
         except TypeError:
@@ -226,7 +226,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
             curr_layer_info = input_layers_info[idx]
             if curr_layer_info:
                 curr_unit_conv = curr_layer_info.get(Info.UNIT_CONVERSION)
-                multichannel_clims_strs.append(self._format_clims(curr_clims, curr_unit_conv))
+                multichannel_clims_strs.append(format_clims(curr_clims, curr_unit_conv))
             else:
                 multichannel_clims_strs.append("N/A")
 
@@ -259,17 +259,6 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
             wavelength_tmp.append(f"{wv.central} {wv.unit}")
         wavelength_str = ", ".join(wavelength_tmp)
         return wavelength_str
-
-    @staticmethod
-    def _format_clims(clims, unit_conv):
-        if clims == INVALID_COLOR_LIMITS:
-            return "N/A"
-
-        display_clims = unit_conv[1](np.array(clims))
-        min_str = unit_conv[2](display_clims[0], include_units=False)
-        max_str = unit_conv[2](display_clims[1])
-        clims_str = f"{min_str} ~ {max_str}"
-        return clims_str
 
     def _get_slider_value(self, slider_val):
         return (slider_val / self._slider_steps) * (self._valid_max - self._valid_min) + self._valid_min
