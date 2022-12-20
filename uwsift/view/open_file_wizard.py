@@ -349,9 +349,16 @@ class OpenFileWizard(QtWidgets.QWizard):
             self.file_dialog = QtWidgets.QFileDialog(self, "Select Data Directory")
             self.file_dialog.setFileMode(QtWidgets.QFileDialog.Directory)
             self.file_dialog.setOption(QtWidgets.QFileDialog.ShowDirsOnly, True)  # Must come after setFileMode()
+
+            # Try enabling directory tree navigation in the file dialog.
+            # Qt prefers to use the platform native file dialog. If this dialog
+            # is not based on Qt (e.g. on Windows), the next call returns None,
+            # then we have to live with what the file dialog of the platform
+            # provides.
             tree = self.file_dialog.findChild(QtWidgets.QTreeView)
-            tree.setRootIsDecorated(True)
-            tree.setItemsExpandable(True)
+            if tree:
+                tree.setRootIsDecorated(True)
+                tree.setItemsExpandable(True)
 
             if self._initial_directory:
                 self.file_dialog.setDirectory(self._initial_directory)
