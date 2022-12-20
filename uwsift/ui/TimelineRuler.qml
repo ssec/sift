@@ -277,7 +277,7 @@ Rectangle{
             let markerBP = {"X": 1.0,"Y":1.0,"W": 1.0, "H":1.0, "R": 1.0};
             markerBP.W = markerRadius;
             markerBP.H = markerBP.W;
-            markerBP.R = markerBP.W*2.0;
+            markerBP.R = markerBP.W * 0.5;
 
             let resolution = timelineRulerCanvas.resolution;
             let resolutionMode = timelineRulerCanvas.resolutionMode;
@@ -378,31 +378,21 @@ Rectangle{
         anchors.fill: parent;
 
         onClicked: {
-            let numTicks = 1;
-            let tickWidth = 1;
-            let markerXs = []
-            for (var i=0; i<timelineMarkerCanvas.markerBluePrints.length;i++){
-                markerXs.push(timelineMarkerCanvas.markerBluePrints[i].X);
+            if (!timelineMarkerCanvas.dataLoaded)
+                return;
+
+            let markerCenterXs = []
+            for (var i=0; i<timelineMarkerCanvas.markerBluePrints.length;++i){
+                let markerCenterX =
+                    timelineMarkerCanvas.markerBluePrints[i].X + timelineMarkerCanvas.markerBluePrints[i].R;
+                markerCenterXs.push(markerCenterX);
             }
 
-            let thresh = (markerXs[1]-markerXs[0])/2;
-
-            let distVals = markerXs.filter((markerX)=>{
-                return (Math.abs(mouseX-markerX) < thresh)
+            let distVals = markerCenterXs.map((markerCenterX)=>{
+                return Math.abs(mouseX - markerCenterX)
             });
-            let val;
-            if (distVals.length > 1){
-                val = Math.min(...distVals);
-            }else{
-                val = distVals[0];
-            }
-            let clickedIndex = markerXs.indexOf(val)
-            if (clickedIndex===-1){
-                clickedIndex = prevIndex;
-            }else{
-                prevIndex = clickedIndex;
-            }
-
+            let val = Math.min(...distVals);
+            let clickedIndex = distVals.indexOf(val)
 
             backend.clickTimelineAtIndex(clickedIndex);
             timelineMarkerCanvas.currIndex = clickedIndex;
