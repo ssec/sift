@@ -45,7 +45,7 @@ Rectangle{
         // textMargin chosen to be 90 based on font and fontsize
         // TODO(mk): attach signal/event handler to tickFontSize to recalculate textMargin
         property var textMargin: 90;
-        property var rulerYPosition: timestamp_rect.height;
+        property var rulerYPosition: timestamp_rect.height + 0.5;
         // Signal declarations
         // Javascript functions
         function clear_canvas(context) {
@@ -143,10 +143,10 @@ Rectangle{
                 tickBP.Y = height/4;
                 tickBP.Length = height;
             }
-            tickBP.X = timelineRulerCanvas.tickMargin + index*tickWidth;
+            tickBP.X = Math.round(timelineRulerCanvas.tickMargin + index*tickWidth) + 0.5;
             tickBP.Text += Qt.formatDateTime(tickDate, "hh:mm");
-            tickBP.TextX = tickBP.X+1;
-            tickBP.TextY = rulerYPosition-1;
+            tickBP.TextX = tickBP.X + 2;
+            tickBP.TextY = rulerYPosition - 1;
             return tickBP;
         }
 
@@ -186,7 +186,7 @@ Rectangle{
             var context = getContext("2d");
             context.reset()
             context.strokeStyle = Qt.darker(timeline_rect.color, 2.0)
-            context.lineWidth = 2;
+            context.lineWidth = 1;
             // Draw horizontal ray
             context.moveTo(0, rulerYPosition);
             context.lineTo(width, rulerYPosition);
