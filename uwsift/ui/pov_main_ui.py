@@ -14,7 +14,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(1296, 1012)
+        MainWindow.resize(1296, 1000)
         MainWindow.setAcceptDrops(True)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
@@ -799,7 +799,7 @@ class Ui_MainWindow(object):
         self.layerDetailsPaneDockWidget.setWidget(self.layerDetailsPaneDockWidgetContents)
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.layerDetailsPaneDockWidget)
         self.LayerModelDockWidget = QtWidgets.QDockWidget(MainWindow)
-        self.LayerModelDockWidget.setMinimumSize(QtCore.QSize(90, 185))
+        self.LayerModelDockWidget.setMinimumSize(QtCore.QSize(90, 135))
         self.LayerModelDockWidget.setFeatures(
             QtWidgets.QDockWidget.DockWidgetFloatable | QtWidgets.QDockWidget.DockWidgetMovable
         )
