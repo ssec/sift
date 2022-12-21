@@ -1284,19 +1284,50 @@ class Main(QtWidgets.QMainWindow):
         self._cmap_editor.show()
 
 
-def set_default_geometry(window, desktop=0):
-    screen = QtWidgets.QApplication.desktop()
-    screen_geometry = screen.screenGeometry(desktop)
-    # TODO: Remove platform specific code
-    if "darwin" not in sys.platform:
-        w, h = screen_geometry.width() - 400, screen_geometry.height() - 300
-        window.setGeometry(200, 150, w, h)
-    else:
-        size = window.size()
-        w, h = size.width(), size.height()
-        center = screen_geometry.center()
-        screen_x, screen_y = center.x(), center.y()
-        window.move(int(screen_x - w / 2.0), int(screen_y - h / 2.0))
+def set_default_geometry(window, desktop=-1):
+    """
+    Try to fit the window centered on the screen given by its number
+    (`desktop`) or on its current screen.
+
+    If the screen resolution is too small, it may not be possible to shrink the
+    window to fit entirely on the screen. Also centering may not be perfect
+    since it is difficult to correctly take the window decorations and
+    restricted areas of the desktop like the task bar into account.
+    """
+    window.show()  # assures that the window has a windowHandle
+
+    desktop_window: QtGui.QWindow = window.windowHandle()
+    assert desktop_window  # Only call this for windows, i.e. toplevel widgets
+    screen: QtGui.QScreen = desktop_window.screen()
+    if desktop >= 0:
+        screens = QtWidgets.QApplication.screens()
+        if desktop < len(screens):
+            screen = screens[desktop]
+            desktop_window.setScreen(screen)
+
+    screen_available_geometry = screen.availableGeometry()
+    screen_margins = QtCore.QMargins(200, 150, 200, 150)  # left, top, right, bottom
+
+    # To cope for the space used by window decorations (the "frame"):
+    # TODO: without waiting for the window to be drawn at least the first time,
+    #  the following code does only results in frame margins (0, 0, 0, 0):
+    #  frame_margins = desktop_window.frameMargins()
+    #  To solve this, the call to this function must be deferred, e.g.
+    #  triggered by a timer event or a QShowEvent of the respective window.
+    #  So for now we set a sensible default:
+    frame_margins = QtCore.QMargins(0, 30, 0, 0)  # left, top, right, bottom
+
+    target_size = screen_available_geometry.size().shrunkBy(screen_margins).shrunkBy(frame_margins)
+    # If the screen is small, the target_size may be too small for the window:
+    possible_target_size = QtCore.QSize(
+        max(target_size.width(), desktop_window.minimumWidth()),
+        max(target_size.height(), desktop_window.minimumHeight()),
+    )
+
+    target_geometry = QtWidgets.QStyle.alignedRect(
+        QtCore.Qt.LeftToRight, QtCore.Qt.AlignCenter, possible_target_size, screen_available_geometry
+    )
+    desktop_window.setGeometry(target_geometry)
 
 
 def _search_paths(arglist):
