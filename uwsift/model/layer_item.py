@@ -310,7 +310,7 @@ class LayerItem:
         presentation: Optional[Presentation],
         sched_time: datetime,
         input_datasets_uuids: List[UUID],
-        input_datasets_infos: List[frozendict],
+        input_datasets_infos: List[Optional[frozendict]],
     ) -> Optional[ProductDataset]:
         """Add multichannel ProductDataset to Layer. If a Presentation is passed
         it overwrites the Presentation of the layer for the given dataset.

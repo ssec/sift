@@ -506,7 +506,7 @@ class LayerModel(QAbstractItemModel):
 
         prez = Presentation(uuid=None, kind=Kind.RGB, climits=recipe.color_limits, gamma=recipe.gammas)
 
-        rgb_layer = LayerItem(self, info, prez, recipe=recipe)
+        rgb_layer = LayerItem(self, frozendict(info), prez, recipe=recipe)
         self.didCreateLayer.emit(rgb_layer)
         self._add_layer(rgb_layer)
         return rgb_layer
@@ -529,7 +529,9 @@ class LayerModel(QAbstractItemModel):
         return input_datasets_uuids
 
     @staticmethod
-    def _get_datasets_infos_of_multichannel_dataset(sched_time: datetime, input_layers: List[LayerItem]) -> List[dict]:
+    def _get_datasets_infos_of_multichannel_dataset(
+        sched_time: datetime, input_layers: List[LayerItem]
+    ) -> List[Optional[frozendict]]:
         input_datasets_infos = []
         for layer in input_layers:
             dataset_info = layer.timeline.get(sched_time).info if layer else None

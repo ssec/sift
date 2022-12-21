@@ -40,7 +40,7 @@ class ProductDataset:
         input_datasets_uuids: List[UUID],
         kind: Kind,
         scheduled_time,
-        input_datasets_infos: List[frozendict],
+        input_datasets_infos: List[Optional[frozendict]],
     ) -> Optional["ProductDataset"]:
 
         if not any(input_datasets_uuids):
