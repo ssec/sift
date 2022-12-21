@@ -1,7 +1,7 @@
 import logging
 import struct
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 from uuid import UUID
 
 from PyQt5.QtCore import QAbstractItemModel, QMimeData, QModelIndex, Qt, pyqtSignal
@@ -465,7 +465,7 @@ class LayerModel(QAbstractItemModel):
         change_dict = self._build_presentation_change_dict(layer, color_limits)
         self.didChangeColorLimits.emit(change_dict)
 
-    def change_gamma_for_layer(self, uuid: UUID, gamma: float):
+    def change_gamma_for_layer(self, uuid: UUID, gamma: Union[float, List[float]]):
         layer = self.get_layer_by_uuid(uuid)
         assert layer is not None
         layer.presentation.gamma = gamma

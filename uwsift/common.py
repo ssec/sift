@@ -21,7 +21,7 @@ numba
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import NamedTuple, Optional
+from typing import List, NamedTuple, Optional, Union
 from uuid import UUID
 
 from pyproj import Proj
@@ -355,6 +355,6 @@ class Presentation:
     visible: bool = True  # whether it's visible or not
     colormap: object = None  # name or uuid: color map to use; name for default, uuid for user-specified
     style: object = None  # name or uuid: SVG/HTML style to use; name for default, (FUTURE?) uuid for user-specified
-    climits: tuple = INVALID_COLOR_LIMITS  # valid min and valid max used for color mapping normalization
-    gamma: float = 1.0  # valid (0 to 5) for gamma correction
+    climits: Union[tuple, list] = INVALID_COLOR_LIMITS  # valid min and valid max used for color mapping normalization
+    gamma: Union[float, List[float]] = 1.0  # valid (0 to 5) for gamma correction
     opacity: float = 1.0
