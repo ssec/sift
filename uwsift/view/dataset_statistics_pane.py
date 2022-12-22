@@ -7,7 +7,7 @@ from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
-from uwsift.common import Info, Kind
+from uwsift.common import Info
 from uwsift.model.layer_item import LayerItem
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.ui.dataset_statistics_widget_ui import Ui_datasetStatisticsPane
@@ -80,15 +80,15 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
     def _carry_out_update(self, first_active_dataset: Optional[ProductDataset]):
         self._clear_statistics_pane()
 
-        if first_active_dataset and first_active_dataset.kind != Kind.RGB:
+        if first_active_dataset:
             dataset_display_name = (
                 f"{self._current_selected_layer.descriptor} {first_active_dataset.info[Info.DISPLAY_TIME]}"
             )
+            self._pane_ui.datasetNameLabel.setText(dataset_display_name)
+
             stats = self._current_selected_layer.model._workspace.get_statistics_for_dataset_by_uuid(
                 first_active_dataset.uuid
             )
-
-            self._pane_ui.datasetNameLabel.setText(dataset_display_name)
             self._update_table_content(stats)
 
     def _clear_statistics_pane(self):
@@ -113,7 +113,7 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
         keys = list(stats.keys())
         max_col_number = 0
         for key in keys:
-            cur_col_number = len(stats.get(key))
+            cur_col_number = len(stats[key])
             if cur_col_number > max_col_number:
                 max_col_number = cur_col_number
         self._pane_ui.statisticsTableWidget.setRowCount(len(stats))
@@ -126,7 +126,7 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
             self._pane_ui.statisticsTableWidget.horizontalHeader().hide()
 
         for row in range(len(stats)):
-            curr_stat = stats.get(keys[row])
+            curr_stat = stats[keys[row]]
             for col in range(len(curr_stat)):
                 value = self._determine_value_for_table_item(curr_stat[col])
                 item = self._get_tailored_item(value)
@@ -156,7 +156,7 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
                 item = self._get_tailored_item(value)
                 self._pane_ui.statisticsTableWidget.setItem(row, col, item)
 
-    def _determine_value_for_table_item(self, value: numbers.Number):
+    def _determine_value_for_table_item(self, value: float):
         decimal_places = self._pane_ui.decimalPlacesSpinBox.value()
 
         if isinstance(value, np.number):
@@ -185,7 +185,9 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
 
     def _update_table_content(self, data: dict):
         stats = data.get("stats")
-        header = data.get("header")
+        if not stats:
+            return
+        header = data.get("header", [])
 
         if isinstance(stats, dict):
             self._determine_table_content_by_stats_dict(stats, header)

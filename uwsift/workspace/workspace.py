@@ -804,12 +804,12 @@ class BaseWorkspace(QObject):
         return content, None
 
     @abstractmethod
-    def _get_active_content_by_uuid(self, uuid: UUID):
+    def _get_active_content_by_uuid(self, uuid: UUID) -> Optional[ActiveContent]:
         pass
 
-    def get_statistics_for_dataset_by_uuid(self, uuid: UUID):
-        if uuid:
-            ac: ActiveContent = self._get_active_content_by_uuid(uuid)
+    def get_statistics_for_dataset_by_uuid(self, uuid: UUID) -> dict:
+        ac: ActiveContent = self._get_active_content_by_uuid(uuid)
+        if ac:
             stats = ac.statistics
         else:
             stats = {}

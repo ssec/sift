@@ -469,5 +469,5 @@ class SimpleWorkspace(BaseWorkspace):
         for c in p.content:
             self._available.pop(c.uuid, None)
 
-    def _get_active_content_by_uuid(self, uuid: UUID):
+    def _get_active_content_by_uuid(self, uuid: UUID) -> Optional[ActiveContent]:
         return self._available.get(uuid)
