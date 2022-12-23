@@ -318,6 +318,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             }
 
     def sort_product_uuids(self, uuids: typ.Iterable[UUID]) -> typ.List[UUID]:
+        assert isinstance(self._workspace, CachingWorkspace)
         uuidset = set(str(x) for x in uuids)
         if not uuidset:
             return []
