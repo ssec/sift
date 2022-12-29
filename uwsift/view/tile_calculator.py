@@ -471,15 +471,6 @@ class TileCalculator(object):
     UNDERSAMPLED = "undersampled"
     WELLSAMPLED = "wellsampled"
 
-    name = None
-    image_shape = None
-    pixel_rez = None
-    zero_point = None
-    tile_shape = None
-    # derived
-    image_extents_box = None  # word coordinates that this image and its tiles corresponds to
-    tiles_avail = None  # (ny,nx) available tile count for this image
-
     def __init__(
         self,
         name,
@@ -519,10 +510,12 @@ class TileCalculator(object):
         self.texture_shape = texture_shape
         # in units of data elements (float32):
         self.texture_size = (self.texture_shape[0] * self.tile_shape[0], self.texture_shape[1] * self.tile_shape[1])
+        # (ny,nx) available tile count for this image:
         self.image_tiles_avail = (self.image_shape[0] / self.tile_shape[0], self.image_shape[1] / self.tile_shape[1])
         self.wrap_lon = wrap_lon
 
         self.proj = Proj(projection)
+        # word coordinates that this image and its tiles corresponds to
         self.image_extents_box = e = Box(
             bottom=np.float64(self.ul_origin[0] - self.image_shape[0] * self.pixel_rez.dy),
             top=np.float64(self.ul_origin[0]),
