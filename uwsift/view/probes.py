@@ -40,12 +40,12 @@ LOG = logging.getLogger(__name__)
 DEFAULT_POINT_PROBE = "default_probe_name"
 
 
-class NavigationToolbar(NavigationToolbar):
+class CustomNavigationToolbar(NavigationToolbar):
     """Custom matplotlib toolbar."""
 
     def __init__(self, *args, **kwargs):
         self.__include_colorbar = kwargs.get("include_colorbar", False)
-        super(NavigationToolbar, self).__init__(*args, **kwargs)
+        super(CustomNavigationToolbar, self).__init__(*args, **kwargs)
 
     def edit_parameters(self):
         allaxes = self.canvas.figure.get_axes()
@@ -122,10 +122,10 @@ class ProbeGraphManager(QObject):
         self.auto_update_checkbox = auto_update_checkbox
         self.update_button = update_button
         # hold on to point probe locations (point probes are shared across tabs)
-        self.point_probes = {}
+        self.point_probes: dict = {}
 
         # set up the first tab
-        self.graphs = []
+        self.graphs: list = []
         self.selected_graph_index = 0
         self.max_tab_letter = "A"
         self.set_up_tab(self.selected_graph_index, do_increment_tab_letter=False)
@@ -377,7 +377,7 @@ class ProbeGraphDisplay(object):
         self.clearPlot()
 
         # make a matplotlib toolbar to attach to the graph
-        self.toolbar = NavigationToolbar(self.canvas, qt_parent)
+        self.toolbar = CustomNavigationToolbar(self.canvas, qt_parent)
 
         # create our selection controls
 
