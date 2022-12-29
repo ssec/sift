@@ -24,7 +24,7 @@ import os
 import sys
 import unittest
 from datetime import datetime
-from typing import Iterable, List, Mapping, Union
+from typing import Iterable, List, Mapping, Optional, Union
 
 from PyQt5.QtCore import QObject
 from satpy.readers import group_files
@@ -62,13 +62,19 @@ class ResourceSearchPathCollector(QObject):
     and mark for purge any files no longer available.
     """
 
-    _ws: BaseWorkspace = None
-    _paths: List[str] = None
-    _dir_mtimes: Mapping[str, datetime] = None
-    _timestamp_path: str = None  # path which tracks the last time we skimmed the paths
-    _is_posix: bool = None
-    _scheduled_dirs: List[str] = None
-    _scheduled_files: List[str] = None
+    def __init__(self, ws: Union[BaseWorkspace, _workspace_test_proxy]):
+        super(ResourceSearchPathCollector, self).__init__()
+        self._ws = ws
+        self._paths: List[str] = []
+        self._dir_mtimes: Mapping[str, datetime] = {}
+        self._scheduled_dirs: List[str] = []
+        self._scheduled_files: List[str] = []
+        # path which tracks the last time we skimmed the paths
+        self._timestamp_path = os.path.join(ws.cwd, ".last_collection_check")
+        self._is_posix = sys.platform in {"linux", "darwin"}
+        self.satpy_readers = config.get("data_reading.readers")
+        if not self.satpy_readers:
+            self.satpy_readers = available_satpy_readers()
 
     @property
     def paths(self):
@@ -101,7 +107,7 @@ class ResourceSearchPathCollector(QObject):
     def __bool__(self):
         return len(self._paths) > 0
 
-    def _skim(self, last_checked: int = 0, dirs: Iterable[str] = None):
+    def _skim(self, last_checked: int = 0, dirs: Optional[Iterable[str]] = None):
         """skim directories for new mtimes"""
         skipped_dirs = 0
         for rawpath in dirs or self._paths:
@@ -130,18 +136,6 @@ class ResourceSearchPathCollector(QObject):
                 fp.close()
         os.utime(self._timestamp_path)
         return mtime
-
-    def __init__(self, ws: Union[BaseWorkspace, _workspace_test_proxy]):
-        super(ResourceSearchPathCollector, self).__init__()
-        self._ws = ws
-        self._paths = []
-        self._dir_mtimes = {}
-        self._scheduled_files = []
-        self._timestamp_path = os.path.join(ws.cwd, ".last_collection_check")
-        self._is_posix = sys.platform in {"linux", "darwin"}
-        self.satpy_readers = config.get("data_reading.readers")
-        if not self.satpy_readers:
-            self.satpy_readers = available_satpy_readers()
 
     def look_for_new_files(self):
         if len(self._scheduled_dirs):
