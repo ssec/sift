@@ -2,10 +2,11 @@ import os
 import pathlib
 import re
 import shutil
-import warnings
-from datetime import datetime, timezone, timedelta
-from time import sleep
 import time
+import warnings
+from datetime import datetime, timedelta, timezone
+from time import sleep
+
 import trollsift
 from dateutil import parser as dt_parser
 from dateutil.relativedelta import relativedelta
@@ -133,11 +134,11 @@ def fill_dir_periodically_fci(data_dir: str, tmp_dir: str, sleep_time: float, re
     files_and_start_ts = []
     files_fullpath = []
     for subdata_dir in sorted(os.listdir(data_dir)):
-        for file_name in sorted(os.listdir(data_dir+'/'+subdata_dir)):
+        for file_name in sorted(os.listdir(data_dir + "/" + subdata_dir)):
             try:
                 start_t = trollsift.parse(format_string, file_name)["start_time"]
                 files_and_start_ts.append((file_name, start_t))
-                files_fullpath.append(data_dir+'/'+subdata_dir+'/'+file_name)
+                files_fullpath.append(data_dir + "/" + subdata_dir + "/" + file_name)
             except Exception:
                 # FIXME(mk): filter pattern does not work for TRAILER file...
                 warnings.warn("FCI TRAIL files not yet supported by parser, skipping...")
@@ -162,25 +163,27 @@ def fill_dir_periodically_fci(data_dir: str, tmp_dir: str, sleep_time: float, re
         # replace datetime
         sat_filename_keyvals["start_time"] = next(time_gen)
         sat_filename_keyvals["end_time"] = sat_filename_keyvals["start_time"] + start_to_end_span
-        sat_filename_keyvals["processing_time"] = sat_filename_keyvals["start_time"] + start_to_end_span + timedelta(seconds=5)
+        sat_filename_keyvals["processing_time"] = (
+            sat_filename_keyvals["start_time"] + start_to_end_span + timedelta(seconds=5)
+        )
         file_name = trollsift.compose(format_string, sat_filename_keyvals)
         file_stack.append(file_name)
     # old_files = [os.path.join(data_dir, old_file) for old_file in old_files]
     for n, (old_file, new_filename) in enumerate(zip(files_fullpath, file_stack)):
         st = time.time()
         if n >= retain_n_times:
-            os.remove(os.path.join(tmp_path.parent, file_stack[n-retain_n_times]))
+            os.remove(os.path.join(tmp_path.parent, file_stack[n - retain_n_times]))
             print(f"Removed: {file_stack[n-retain_n_times]}")
-        tmp_path = pathlib.Path(shutil.copy(old_file, tmp_dir+'/tempfile.nc'))
+        tmp_path = pathlib.Path(shutil.copy(old_file, tmp_dir + "/tempfile.nc"))
         os.rename(tmp_path, os.path.join(tmp_path.parent, new_filename))
         print(f"Created: {old_file} -> {new_filename}")
-        elapsed_time = time.time()-st
-        if elapsed_time<0:
+        elapsed_time = time.time() - st
+        if elapsed_time < 0:
             print("Copy is running late (longer than sleep time). Moving on right away.")
             continue
         else:
             print(f"Skipping elapsed time {elapsed_time}")
-            sleep(sleep_time-elapsed_time)
+            sleep(sleep_time - elapsed_time)
 
 
 if __name__ == "__main__":
@@ -208,9 +211,12 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "-r", "--retain_n_files", action="store", default=-1, type=int, help="Keep only the last n files in folder. "
-                                                                             "Default is -1 which means no automatic"
-                                                                             "cleanup."
+        "-r",
+        "--retain_n_files",
+        action="store",
+        default=-1,
+        type=int,
+        help="Keep only the last n files in folder. " "Default is -1 which means no automatic" "cleanup.",
     )
     args = parser.parse_args()
 
