@@ -73,13 +73,13 @@ class CachingWorkspace(BaseWorkspace):
         super(
             CachingWorkspace,
             self,
-        ).__init__(directory_path)
-        self._queue = queue
+        ).__init__(directory_path, queue=queue)
         self._max_size_gb = max_size_gb  # maximum size in gigabytes of flat files we cache in the workspace
         if self._max_size_gb < MIN_WORKSPACE_SIZE:
             self._max_size_gb = MIN_WORKSPACE_SIZE
             LOG.warning("setting workspace size to %dGB" % self._max_size_gb)
         if directory_path is None:
+            # a directory name was not given, we need a temporary directory
             import tempfile
 
             self._tempdir = tempfile.TemporaryDirectory()

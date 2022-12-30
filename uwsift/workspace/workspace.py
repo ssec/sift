@@ -103,25 +103,15 @@ class ActiveContent(QObject):
     Workspace instantiates ActiveContent from metadatabase Content entries
     """
 
-    _cid = None  # Content.id database entry I belong to
-    _wsd = None  # full path of workspace
-    _rcl = None
-    _y = None
-    _x = None
-    _z = None
-    _data = None
-    _coverage = None
-    _sparsity = None
-
     def __init__(self, workspace_cwd: str, C: Content, info):
         super(ActiveContent, self).__init__()
-        self._cid = C.id
-        self._wsd = workspace_cwd
+        self._cid = C.id  # Content.id database entry I belong to
+        self._wsd = workspace_cwd  # full path of workspace
         if workspace_cwd is None and C is None:
             LOG.warning("test initialization of ActiveContent")
             self._test_init()
         else:
-            self._attach(C)
+            self._attach(C)  # initializes self._data
 
         # Needed for the calculation of the correct statistics
         # we need a dict not a frozendict so convert it everytime to a dict
@@ -247,11 +237,6 @@ class BaseWorkspace(QObject):
 
     """
 
-    _pool = None  # process pool that importers can use for background activities, if any
-    # _importers = None  # list of importers to consult when asked to start an import
-    _tempdir = None  # TemporaryDirectory, if it's needed (i.e. a directory name was not given)
-    _queue = None
-
     # signals
     # a dataset started importing; generated after overview level of detail is available
     # didStartImport = pyqtSignal(dict)
@@ -277,12 +262,13 @@ class BaseWorkspace(QObject):
     def _S(self):
         pass
 
-    def __init__(self, directory_path: str):
+    def __init__(self, directory_path: str, queue=None):
         """
         Initialize a new or attach an existing workspace, creating any necessary bookkeeping.
         """
         super(BaseWorkspace, self).__init__()
 
+        self._queue = queue
         self.cache_dir = ""
         self.cwd = ""  # directory we work in
         self._own_cwd = (
