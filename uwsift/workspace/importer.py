@@ -1230,7 +1230,11 @@ class SatpyImporter(aImporter):
             # the application can use.
             # See https://pyresample.readthedocs.io/en/latest/multi.html
             #  and https://docs.python.org/3/library/os.html#os.cpu_count
-            nprocs = len(os.sched_getaffinity(0))
+            try:
+                nprocs = len(os.sched_getaffinity(0))
+            except AttributeError:
+                # Windows or even some Unix variants only provide:
+                nprocs = os.cpu_count()
 
             target_area_def = AreaDefinitionsManager.area_def_by_id(self.resampling_info["area_id"])
 
