@@ -45,7 +45,7 @@ Rectangle{
         // textMargin chosen to be 90 based on font and fontsize
         // TODO(mk): attach signal/event handler to tickFontSize to recalculate textMargin
         property var textMargin: 90;
-        property var rulerYPosition: timestamp_rect.height;
+        property var rulerYPosition: timestamp_rect.height + 0.5;
         // Signal declarations
         // Javascript functions
         function clear_canvas(context) {
@@ -143,10 +143,10 @@ Rectangle{
                 tickBP.Y = height/4;
                 tickBP.Length = height;
             }
-            tickBP.X = timelineRulerCanvas.tickMargin + index*tickWidth;
+            tickBP.X = Math.round(timelineRulerCanvas.tickMargin + index*tickWidth) + 0.5;
             tickBP.Text += Qt.formatDateTime(tickDate, "hh:mm");
-            tickBP.TextX = tickBP.X+1;
-            tickBP.TextY = rulerYPosition-1;
+            tickBP.TextX = tickBP.X + 2;
+            tickBP.TextY = rulerYPosition - 1;
             return tickBP;
         }
 
@@ -186,7 +186,7 @@ Rectangle{
             var context = getContext("2d");
             context.reset()
             context.strokeStyle = Qt.darker(timeline_rect.color, 2.0)
-            context.lineWidth = 2;
+            context.lineWidth = 1;
             // Draw horizontal ray
             context.moveTo(0, rulerYPosition);
             context.lineTo(width, rulerYPosition);
@@ -277,7 +277,7 @@ Rectangle{
             let markerBP = {"X": 1.0,"Y":1.0,"W": 1.0, "H":1.0, "R": 1.0};
             markerBP.W = markerRadius;
             markerBP.H = markerBP.W;
-            markerBP.R = markerBP.W*2.0;
+            markerBP.R = markerBP.W * 0.5;
 
             let resolution = timelineRulerCanvas.resolution;
             let resolutionMode = timelineRulerCanvas.resolutionMode;
@@ -378,31 +378,21 @@ Rectangle{
         anchors.fill: parent;
 
         onClicked: {
-            let numTicks = 1;
-            let tickWidth = 1;
-            let markerXs = []
-            for (var i=0; i<timelineMarkerCanvas.markerBluePrints.length;i++){
-                markerXs.push(timelineMarkerCanvas.markerBluePrints[i].X);
+            if (!timelineMarkerCanvas.dataLoaded)
+                return;
+
+            let markerCenterXs = []
+            for (var i=0; i<timelineMarkerCanvas.markerBluePrints.length;++i){
+                let markerCenterX =
+                    timelineMarkerCanvas.markerBluePrints[i].X + timelineMarkerCanvas.markerBluePrints[i].R;
+                markerCenterXs.push(markerCenterX);
             }
 
-            let thresh = (markerXs[1]-markerXs[0])/2;
-
-            let distVals = markerXs.filter((markerX)=>{
-                return (Math.abs(mouseX-markerX) < thresh)
+            let distVals = markerCenterXs.map((markerCenterX)=>{
+                return Math.abs(mouseX - markerCenterX)
             });
-            let val;
-            if (distVals.length > 1){
-                val = Math.min(...distVals);
-            }else{
-                val = distVals[0];
-            }
-            let clickedIndex = markerXs.indexOf(val)
-            if (clickedIndex===-1){
-                clickedIndex = prevIndex;
-            }else{
-                prevIndex = clickedIndex;
-            }
-
+            let val = Math.min(...distVals);
+            let clickedIndex = distVals.indexOf(val)
 
             backend.clickTimelineAtIndex(clickedIndex);
             timelineMarkerCanvas.currIndex = clickedIndex;

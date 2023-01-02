@@ -279,7 +279,7 @@ class LayerItem:
         return dataset_uuid in [pds.uuid for pds in self._timeline.values()]
 
     def _sort_timeline(self):
-        self._timeline = {kv[0]: kv[1] for kv in sorted(self._timeline.items(), key=lambda kv: kv[0])}
+        self._timeline = dict(sorted(self._timeline.items()))
 
     def get_dataset_by_uuid(self, uuid: UUID) -> Optional[ProductDataset]:
         items_for_uuid = [item for item in self.timeline.items() if item[1].uuid == uuid]
