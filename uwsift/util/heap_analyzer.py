@@ -18,7 +18,7 @@ LOG = logging.getLogger(__name__)
 
 
 class HeapAnalyzer:
-    _allocations = defaultdict(list)
+    _allocations: defaultdict = defaultdict(list)
     _combined_snapshot_count = 0
 
     @staticmethod
@@ -29,6 +29,8 @@ class HeapAnalyzer:
         for file in os.listdir(snapshot_directory):
             if file.endswith(".snapshot"):
                 captures = file_name_regex.search(file)
+                if captures is None:
+                    continue
                 idx = int(captures.group(1))
                 filtered_files[idx] = file
 

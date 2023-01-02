@@ -58,7 +58,7 @@ class TimeManager(QObject):
         self._qml_backend = backend
 
     def connect_to_model(self, layer_model: LayerModel):
-        self._layer_model: LayerModel = layer_model
+        self._layer_model = layer_model
         self.qml_layer_manager._layer_model = layer_model
 
         policy = WrappingDrivingPolicy(self._layer_model.layers)
@@ -90,6 +90,7 @@ class TimeManager(QObject):
 
         :param backwards: Flag which sets advancement either to `forwards` or `backwards`.
         """
+        assert self._time_transformer is not None  # nosec B101 # suppress mypy [union-attr]
         self._time_transformer.step(backwards=backwards)
         self.sync_to_time_transformer()
 
@@ -151,6 +152,7 @@ class TimeManager(QObject):
         describing all ProductDatasets within a layer that are to be set
         visible.
         """
+        assert self._layer_model is not None  # nosec B101 # suppress mypy [union-attr]
         t_matched_dict = {}
         for layer in self._layer_model.get_dynamic_layers():
             t_matched = self._time_matcher.match(layer.timeline, t_sim)
@@ -171,6 +173,7 @@ class TimeManager(QObject):
         # TODO(mk): the policy should not be responsible for UI, another policy or an object
                     that ingests a policy and handles UI based on that?
         """
+        assert self._time_transformer is not None  # nosec B101 # suppress mypy [union-attr]
         self.qml_engine.clearComponentCache()
         if not layer or not layer.dynamic:
             self.qml_timestamps_model.clear()

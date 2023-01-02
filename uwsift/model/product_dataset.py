@@ -14,7 +14,7 @@ class ProductDataset:
         self,
         layer_uuid: UUID,
         info: frozendict,
-        presentation: Presentation,
+        presentation: Optional[Presentation],
         input_datasets_uuids: Optional[List[UUID]] = None,
     ):
         self.info = info
@@ -36,27 +36,27 @@ class ProductDataset:
     def get_rgb_multichannel_product_dataset(
         cls,
         layer_uuid: UUID,
-        presentation: Presentation,
-        input_datasets_uuids: List[Optional[UUID]],
+        presentation: Optional[Presentation],
+        input_datasets_uuids: List[UUID],
         kind: Kind,
         scheduled_time,
-        input_datasets_infos: List[frozendict],
+        input_datasets_infos: List[Optional[frozendict]],
     ) -> Optional["ProductDataset"]:
 
         if not any(input_datasets_uuids):
             LOG.debug("Could not create a multichannel ProductDataset, when no input ProductDatasets exist.")
             return None
 
-        dataset_info = {Info.UUID: uuidgen(), Info.KIND: kind, Info.SCHED_TIME: scheduled_time}
+        initial_dataset_info = {Info.UUID: uuidgen(), Info.KIND: kind, Info.SCHED_TIME: scheduled_time}
 
-        dataset_info = cls._update_info_with_input_infos(dataset_info, input_datasets_infos)
+        dataset_info = cls._update_info_with_input_infos(initial_dataset_info, input_datasets_infos)
 
         if not dataset_info:
             return None
 
         dataset = cls(
             layer_uuid=layer_uuid,
-            info=dataset_info,
+            info=frozendict(dataset_info),
             presentation=presentation,
             input_datasets_uuids=input_datasets_uuids,
         )
@@ -64,7 +64,7 @@ class ProductDataset:
         return dataset
 
     @staticmethod
-    def _update_info_with_input_infos(dataset_info, input_datasets_infos) -> dict:
+    def _update_info_with_input_infos(dataset_info, input_datasets_infos) -> Optional[dict]:
         keys_to_compare = [
             Info.ORIGIN_X,
             Info.ORIGIN_Y,
@@ -129,7 +129,7 @@ class ProductDataset:
 
     @classmethod
     def get_algebraic_dataset(
-        cls, layer_uuid: UUID, info: frozendict, presentation: Presentation, input_datasets_uuids: List[Optional[UUID]]
+        cls, layer_uuid: UUID, info: frozendict, presentation: Optional[Presentation], input_datasets_uuids: List[UUID]
     ):
         if not any(input_datasets_uuids):
             LOG.debug("Could not create a algebraic ProductDataset, when no input ProductDatasets exist.")

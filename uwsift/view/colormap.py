@@ -1468,9 +1468,9 @@ OTHER_COLORMAPS = OrderedDict(
     ]
 )
 
-USER_COLORMAPS = OrderedDict()
+USER_COLORMAPS: OrderedDict = OrderedDict()
 USER_CATEGORY = "User"
-SITE_COLORMAPS = OrderedDict()
+SITE_COLORMAPS: OrderedDict = OrderedDict()
 SITE_CATEGORY = "Site"
 useable_vispy_cmaps = {k: v for k, v in _colormaps.items() if isinstance(v, BaseColormap)}
 CATEGORIZED_COLORMAPS = OrderedDict(

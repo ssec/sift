@@ -26,7 +26,7 @@ import uuid
 from abc import abstractmethod
 from dataclasses import dataclass
 from glob import glob
-from typing import Mapping, Tuple
+from typing import Mapping, Optional, Tuple
 from uuid import uuid1 as uuidgen
 
 import yaml
@@ -266,7 +266,12 @@ class RecipeManager(QObject):
         self.didCreateRGBCompositeRecipe.emit(recipe)
 
     def update_rgb_recipe_input_layers(
-        self, recipe: CompositeRecipe, channel: str, layer_uuid: uuid.UUID, clims: Tuple[float, float], gamma: float
+        self,
+        recipe: CompositeRecipe,
+        channel: str,
+        layer_uuid: Optional[uuid.UUID],
+        clims: Tuple[Optional[float], Optional[float]],
+        gamma: float,
     ):
         """Update the input layers in the recipe for a specific channel.
         With this change, the color limits and the gamma value of this specific
@@ -334,7 +339,9 @@ class RecipeManager(QObject):
         recipe.modified = True
         self.recipes[recipe.id] = recipe
 
-    def update_algebraic_recipe_input_layers(self, recipe: AlgebraicRecipe, channel: str, layer_uuid: uuid.UUID):
+    def update_algebraic_recipe_input_layers(
+        self, recipe: AlgebraicRecipe, channel: str, layer_uuid: Optional[uuid.UUID]
+    ):
         channel_idx = XYZ2IDX.get(channel)
 
         assert channel_idx is not None, f"Given channel '{channel}' is invalid"
@@ -343,7 +350,7 @@ class RecipeManager(QObject):
         recipe.modified = True
         self.recipes[recipe.id] = recipe
 
-    def remove_layer_as_recipe_input(self, layer_uuid: uuid):
+    def remove_layer_as_recipe_input(self, layer_uuid: uuid.UUID):
         """
         Remove a layer from all recipes in which it is used as input layer.
 
@@ -355,10 +362,10 @@ class RecipeManager(QObject):
             if layer_uuid in recipe.input_layer_ids:
                 idx = recipe.input_layer_ids.index(layer_uuid)
                 if isinstance(recipe, CompositeRecipe):
-                    channel = IDX2RGBA.get(idx)
+                    channel = IDX2RGBA[idx]
                     self.update_rgb_recipe_input_layers(recipe, channel, None, (None, None), 1.0)
                 if isinstance(recipe, AlgebraicRecipe):
-                    channel = IDX2XYZ.get(idx)
+                    channel = IDX2XYZ[idx]
                     self.update_algebraic_recipe_input_layers(recipe, channel, None)
                     self.didUpdateAlgebraicInputLayers.emit(recipe)
 

@@ -46,7 +46,7 @@ CASE_NAME_FORMAT = "{start}_{end}_{delta:02d}"
 DataCase = namedtuple("DataCase", ["topic_title", "start", "end", "delta", "bands"])
 
 ### Guam Cases ###
-guam_cases = {}
+guam_cases: dict = {}
 # Kathy's Cases
 guam_cases["Introduction"] = []
 guam_cases["Introduction"].append(

@@ -191,7 +191,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    out_dir = pathlib.Path(args.output_directory)
+    out_dir = str(pathlib.Path(args.output_directory))
 
     if not os.path.exists(args.input_directory):
         raise ValueError("Could not find data dir.")

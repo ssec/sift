@@ -34,15 +34,16 @@ repos:
 #    hooks:
 #      - id: bandit
 #        args: [--ini, .bandit]
-#  - repo: https://github.com/pre-commit/mirrors-mypy
-#    rev: 'v0.950'  # Use the sha / tag you want to point at
-#    hooks:
-#      - id: mypy
-#        additional_dependencies:
-#          - types-docutils
-#          - types-pkg-resources
-#          - types-PyYAML
-#          - types-requests
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: 'v0.991'  # Use the sha / tag you want to point at
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - types-docutils
+          - types-pkg-resources
+          - types-PyYAML
+          - types-requests
+          - types-python-dateutil
 ci:
   # To trigger manually, comment on a pull request with "pre-commit.ci autofix"
   autofix_prs: false

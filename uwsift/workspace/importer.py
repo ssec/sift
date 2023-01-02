@@ -38,7 +38,6 @@ from pyresample.geometry import AreaDefinition, StackedAreaDefinition
 from satpy import DataQuery, Scene, available_readers
 from satpy.dataset import DatasetDict
 from satpy.writers import get_enhanced_image
-from sqlalchemy.orm import Session
 from xarray import DataArray
 
 from uwsift import USE_INVENTORY_DB, config
@@ -47,7 +46,7 @@ from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.satpy_compat import DataID, get_id_items, get_id_value, id_from_attrs
 from uwsift.util import USER_CACHE_DIR
 from uwsift.util.common import get_reader_kwargs_dict
-from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
+from uwsift.workspace.guidebook import ABI_AHI_Guidebook
 
 from .metadatabase import (
     Content,
@@ -163,7 +162,7 @@ def filter_dataset_ids(ids_to_filter: Iterable[DataID]) -> Generator[DataID, Non
             yield ds_id
 
 
-def get_guidebook_class(dataset_info) -> Guidebook:
+def get_guidebook_class(dataset_info) -> ABI_AHI_Guidebook:
     platform = dataset_info.get(Info.PLATFORM)
     return GUIDEBOOKS.get(platform, DEFAULT_GUIDEBOOK)()
 
@@ -249,15 +248,12 @@ class aImporter(ABC):
     aImporter instances are backgrounded by the Workspace to bring Content into the workspace
     """
 
-    # dedicated sqlalchemy database session to use during this import instance;
-    # revert if necessary, commit as appropriate
-    _S: Session = None
-    # where content flat files should be imported to within the workspace, omit this from content path
-    _cwd: str = None
-
     def __init__(self, workspace_cwd, database_session, **kwargs):
         super(aImporter, self).__init__()
+        # dedicated sqlalchemy database session to use during this import instance;
+        # revert if necessary, commit as appropriate
         self._S = database_session
+        # where content flat files should be imported to within the workspace, omit this from content path
         self._cwd = workspace_cwd
 
     @classmethod
@@ -310,7 +306,8 @@ class aImporter(ABC):
             assert "scene" not in kwargs
             kwargs["scene"] = scn
 
-        return cls(paths, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
+        # TODO: ignore mypy error for now because in the future aImporter should be merged with SatpyImporter
+        return cls(paths, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)  # type: ignore
 
     @classmethod
     def _extract_paths_to_merge(cls, merge_target, paths, scn):
@@ -404,7 +401,7 @@ class aImporter(ABC):
             generator which yields status tuples as the content is imported
         """
         # FUTURE: this should be async def coroutine
-        return
+        pass
 
 
 class SatpyImporter(aImporter):
@@ -512,8 +509,9 @@ class SatpyImporter(aImporter):
                 products = list(res.product)
                 existing_ids.update({prod.info["_satpy_id"]: prod for prod in products})
             existing_prods = {x: existing_ids[x] for x in self.dataset_ids if x in existing_ids}
+            # FIXME: products may be unset in next line, its use is suspicious anyway
             if products and len(existing_prods) == len(self.dataset_ids):
-                products = existing_prods.values()
+                products = list(existing_prods.values())
                 LOG.debug("pre-existing products {}".format(repr(products)))
                 yield from products
                 return
@@ -797,7 +795,7 @@ class SatpyImporter(aImporter):
             attrs[Info.SCENE] = None
 
     def _stack_data_arrays(
-        self, datasets: List[DataArray], attrs: dict, name_prefix: str = None, axis: int = 1
+        self, datasets: List[DataArray], attrs: dict, name_prefix: str = "", axis: int = 1
     ) -> DataArray:
         """
         Merge multiple DataArrays into a single ``DataArray``. Use the
@@ -838,7 +836,7 @@ class SatpyImporter(aImporter):
 
         return DataArray(combined_data, attrs=attrs)
 
-    def _parse_style_attributes_config(self) -> Dict[str, List[str]]:
+    def _parse_style_attributes_config(self) -> Dict[str, Set[str]]:
         """
         Extract the ``style_attributes`` section from the reader config.
         This function doesn't validate whether the style attributes or the
@@ -1289,7 +1287,7 @@ class SatpyImporter(aImporter):
 
         segment_starts_stops = []
         image_starts_stops = []
-        visited_segments = []
+        visited_segments: List[int] = []
         for segment_num in segments_indices:
             curr_segment_height_idx = segment_num - 1
             curr_segment_height = segment_heights[curr_segment_height_idx]

@@ -54,8 +54,9 @@ version_str = open(version_pathname).readlines()[-1].split()[-1].strip("\"'")
 version_regex = re.compile(
     r"^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<micro>\d+)(?:(?P<dev_level>(a|b|rc))(?P<dev_version>\d))?$"
 )
-version_info = version_regex.match(version_str).groupdict()
-assert version_info is not None, "Invalid version in version.py: {}".format(version_str)
+version_match = version_regex.match(version_str)
+assert version_match is not None, "Invalid version in version.py: {}".format(version_str)
+version_info = version_match.groupdict()
 version_info["major"] = int(version_info["major"])
 version_info["minor"] = int(version_info["minor"])
 version_info["micro"] = int(version_info["micro"])

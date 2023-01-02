@@ -26,8 +26,8 @@ class WrappingDrivingPolicy(QObject):
         self._layers: List[LayerItem] = layers
         self._driving_idx = 0
         self._curr_t_sim = None
-        self._timeline = None
-        self._driving_layer = None
+        self._timeline: Optional[List[datetime]] = None
+        self._driving_layer: Optional[LayerItem] = None
         self._driving_layer_uuid = None
 
     def _get_dynamic_layers(self):
@@ -74,7 +74,7 @@ class WrappingDrivingPolicy(QObject):
     def driving_layer(self, layer: LayerItem):
         if not layer or not layer.dynamic:
             self._driving_layer = None
-            self._driving_idx = 1
+            self._driving_idx = 0
             self._timeline = None
         elif not self._driving_layer:
             self._driving_layer = layer
@@ -87,7 +87,7 @@ class WrappingDrivingPolicy(QObject):
             self.timeline = list(layer.timeline.keys())
             self._driving_layer = layer
             nearest_past_idx = self._find_nearest_past(self._curr_t_sim)
-            if nearest_past_idx:
+            if nearest_past_idx is not None:
                 self._driving_idx = nearest_past_idx
             else:
                 self._driving_idx = 0
@@ -101,11 +101,13 @@ class WrappingDrivingPolicy(QObject):
     def timeline(self, timeline: List[datetime]):
         self._timeline = timeline
 
-    def _find_nearest_past(self, tstamp: datetime) -> Optional[int]:
+    def _find_nearest_past(self, tstamp: Optional[datetime]) -> Optional[int]:
         """
         Upon driving layer change find the nearest past tstamp in the new driving
         layer and return its index.
         """
+        if tstamp is None:
+            return None
         old_tstamp_np = np.asarray([tstamp])
         other_timeline_np = np.asarray(self.timeline)
         past_idcs = other_timeline_np <= old_tstamp_np
@@ -141,7 +143,7 @@ class WrappingDrivingPolicy(QObject):
             raise e
         return t_sim
 
-    def compute_t_sim(self, tick_time: int, backwards: bool = False) -> datetime:
+    def compute_t_sim(self, tick_time: int, backwards: bool = False) -> Optional[datetime]:
         """
         Returns timestamp t_sim by:
 

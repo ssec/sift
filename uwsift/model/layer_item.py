@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 from types import MappingProxyType
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from uuid import UUID, uuid1
 
 from pyresample import AreaDefinition
@@ -47,7 +47,7 @@ class LayerItem:
 
         self._parent = parent
 
-        self._timeline = {}
+        self._timeline: Dict[datetime, ProductDataset] = {}
         self._presentation = presentation
         self.info = self.extract_layer_info(info)
 
@@ -57,13 +57,13 @@ class LayerItem:
 
         self.grouping_key = grouping_key
 
-        self._invariable_display_data = None
+        self._invariable_display_data: dict = {}
         self.update_invariable_display_data()
 
     @staticmethod
     def extract_layer_info(info: frozendict) -> frozendict:
 
-        layer_info = {}
+        layer_info: dict = {}
         unit_conversion = units_conversion(info)
         layer_info[Info.UNIT_CONVERSION] = unit_conversion
 
@@ -132,8 +132,8 @@ class LayerItem:
 
         name, wavelength, unit = LayerItem._get_dataset_info_labels(self.info)
 
-        platform = self.info.get(Info.PLATFORM)
-        instrument = self.info.get(Info.INSTRUMENT)
+        platform = self.info[Info.PLATFORM]
+        instrument = self.info[Info.INSTRUMENT]
         self._invariable_display_data = {
             LMC.SOURCE: f"{platform.value} {instrument.value}",
             LMC.NAME: name,
@@ -309,9 +309,9 @@ class LayerItem:
         self,
         presentation: Optional[Presentation],
         sched_time: datetime,
-        input_datasets_uuids: Optional[List[UUID]],
-        input_datasets_infos: Optional[List[frozendict]],
-    ) -> ProductDataset:
+        input_datasets_uuids: List[UUID],
+        input_datasets_infos: List[Optional[frozendict]],
+    ) -> Optional[ProductDataset]:
         """Add multichannel ProductDataset to Layer. If a Presentation is passed
         it overwrites the Presentation of the layer for the given dataset.
 
@@ -336,6 +336,9 @@ class LayerItem:
         product_dataset = ProductDataset.get_rgb_multichannel_product_dataset(
             self.uuid, presentation, input_datasets_uuids, self.kind, sched_time, input_datasets_infos
         )
+        if product_dataset is None:
+            return None
+
         self._timeline[sched_time] = product_dataset
         self._sort_timeline()
         return product_dataset
@@ -354,7 +357,7 @@ class LayerItem:
         presentation: Optional[Presentation],
         info: frozendict,
         sched_time: datetime,
-        input_datasets_uuids: Optional[List[UUID]],
+        input_datasets_uuids: List[UUID],
     ):
         if sched_time in self._timeline:
             LOG.warning(
@@ -386,7 +389,7 @@ class LayerItem:
     def get_actual_range_from_first_active_dataset(self) -> Tuple:
         """Returns the calculated actual range value of the first active dataset"""
         first_active_dataset = self.get_first_active_product_dataset()
-        return self._get_actual_range_from_dataset(first_active_dataset.uuid)
+        return self._get_actual_range_from_dataset(first_active_dataset.uuid) if first_active_dataset else (None, None)
 
     def get_actual_range_from_layer(self) -> Tuple:
         """Calculate on the fly the actual range of the layer.

@@ -48,6 +48,7 @@ class PsProfiler:
         return processes
 
     def run(self, out_file: str, interval: float = 0.2):
+        assert self.main_process is not None  # nosec B101 # suppress mypy [union-attr]
         start_time = perf_counter()
         self.file = open(out_file, "w")
         self.file.write("time,pid,uss,pss,lib,shared,vms,rss\n")
