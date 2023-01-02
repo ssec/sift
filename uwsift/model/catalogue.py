@@ -172,7 +172,7 @@ class GlobbingCreator:
         GlobbingCreator.now_utc = datetime.now(timezone.utc)
 
     @staticmethod
-    def _convert_to_relativedelta(value: int, code: str) -> Optional[relativedelta]:
+    def _convert_to_relativedelta(value: int, code: str) -> relativedelta:
         """
         Interpret *value* as relative time delta in the unit given by *code*
         according to the `datetime strftime() and strptime() Format Codes
@@ -181,18 +181,18 @@ class GlobbingCreator:
 
         if "S" == code:
             return relativedelta(seconds=value)
-        if "M" in code:
+        if "M" == code:
             return relativedelta(minutes=value)
-        if "H" in code:
+        if "H" == code:
             return relativedelta(hours=value)
-        if "d" in code:
+        if "d" == code:
             return relativedelta(days=value)
-        if "m" in code:
+        if "m" == code:
             return relativedelta(months=value)
-        if "Y" in code:
+        if "Y" == code:
             return relativedelta(years=value)
 
-        return None
+        raise ValueError(f"Unknown time format code '{code}'.")
 
     @staticmethod
     def _expand_datetime_pattern(field_name: str, format_spec: str) -> List[Tuple[str, str]]:
@@ -389,6 +389,13 @@ class GlobbingCreator:
                     f" Original message: {exc}"
                 )
                 raise TypeError(msg) from exc
+            except ValueError as exc:
+                msg = (
+                    f"Got incompatible time format code in constraint"
+                    f" '{field_name} / {given_code}'."
+                    f" Original message: {exc}"
+                )
+                raise ValueError(msg)
 
             dt = GlobbingCreator.now_utc + delta_dt
             expanded_dt_constraint = {}

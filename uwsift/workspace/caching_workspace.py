@@ -719,9 +719,11 @@ class CachingWorkspace(BaseWorkspace):
         for c in p.content:
             self._available.pop(c.id, None)
 
-    def _get_active_content_by_uuid(self, uuid: UUID):
+    def _get_active_content_by_uuid(self, uuid: UUID) -> Optional[ActiveContent]:
         with self._inventory as s:
             prod = self._product_with_uuid(s, uuid)
+            if prod is None:
+                return None
             content = s.query(Content).filter(Content.product_id == prod.id).one()
 
             return self._available.get(content.id)
