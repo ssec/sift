@@ -19,7 +19,7 @@ LOG = logging.getLogger(__name__)
 
 
 def _get_awips_colors(cmap_file):
-    from xml.etree import ElementTree
+    from defusedxml import ElementTree
 
     tree = ElementTree.parse(cmap_file)
     colors = np.array([(float(c.get("r")), float(c.get("g")), float(c.get("b"))) for c in tree.findall("color")])
