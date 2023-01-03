@@ -37,6 +37,7 @@ vispy=0.7.1
 # This is only for development
 cmake=3.19.4
 conda-build=3.21.6
+defusedxml
 git=2.30.1
 make=4.3
 pytest-mock=6.2.5

@@ -48,6 +48,8 @@ outputs:
         - pygrib
         - scikit-image
         - donfig
+	- defusexml
+
     test:
       commands:
         - python -c "from rasterio import Affine"
