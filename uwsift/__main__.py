@@ -396,7 +396,7 @@ class Main(QtWidgets.QMainWindow):
         self.scene_manager.change_tool(name)
 
     def update_recent_file_menu(self, *args, **kwargs):
-        assert isinstance(self.workspace, CachingWorkspace)
+        assert isinstance(self.workspace, CachingWorkspace)  # nosec B101
         uuid_to_name = self.workspace.recently_used_products()
         LOG.debug("recent uuids: {}".format(repr(uuid_to_name.keys())))
         self._recent_files_menu.clear()
@@ -1058,7 +1058,7 @@ class Main(QtWidgets.QMainWindow):
         self.workspace.close()
 
     def open_from_cache(self, *args, **kwargs):
-        assert isinstance(self.workspace, CachingWorkspace)
+        assert isinstance(self.workspace, CachingWorkspace)  # nosec B101
 
         def _activate_products_for_names(uuids):
             LOG.info("activating cached products with uuids: {}".format(repr(uuids)))
@@ -1295,7 +1295,7 @@ def set_default_geometry(window, desktop=-1):
     window.show()  # assures that the window has a windowHandle
 
     desktop_window: QtGui.QWindow = window.windowHandle()
-    assert desktop_window  # Only call this for windows, i.e. toplevel widgets
+    assert desktop_window  # Only call this for windows, i.e. toplevel widgets # nosec B101
     screen: QtGui.QScreen = desktop_window.screen()
     if desktop >= 0:
         screens = QtWidgets.QApplication.screens()

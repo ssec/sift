@@ -95,7 +95,7 @@ class LayerModel(QAbstractItemModel):
 
         self._document = document
         self._workspace = self._document._workspace
-        assert self._workspace  # Verify proper initialisation order
+        assert self._workspace  # Verify proper initialisation order  # nosec B101
 
         self._headers = LAYER_TREE_VIEW_HEADER
 
@@ -246,7 +246,7 @@ class LayerModel(QAbstractItemModel):
             parent = QModelIndex()
         if not self.hasIndex(row, col, parent):
             return QModelIndex()
-        assert not parent.isValid()
+        assert not parent.isValid()  # nosec B101
         layer = self.layers[row]
         return self.createIndex(row, col, layer)
 
@@ -268,8 +268,8 @@ class LayerModel(QAbstractItemModel):
         if not index.isValid():
             return False
 
-        assert role == Qt.EditRole, f"Unexpected role {role} for changing data."
-        assert index.column() == LMC.VISIBILITY, f"Attempt to edit immutable column {index.column()}."
+        assert role == Qt.EditRole, f"Unexpected role {role} for changing data."  # nosec B101
+        assert index.column() == LMC.VISIBILITY, f"Attempt to edit immutable column {index.column()}."  # nosec B101
 
         LOG.debug(f"Changing row {index.row()}, column {index.column()}" f" to {data}.")
 
@@ -365,7 +365,7 @@ class LayerModel(QAbstractItemModel):
         if row != -1:  # we may also interpret this as put to the end
             target_row = row
         elif parentIndex.isValid():
-            assert not parentIndex.isValid(), (
+            assert not parentIndex.isValid(), (  # nosec B101
                 "BUG: hierarchical layers not implemented," " dropping on a parent must not yet occur!"
             )
             # This case needs modification when hierarchical layers are
@@ -380,7 +380,7 @@ class LayerModel(QAbstractItemModel):
 
         # According to https://doc.qt.io/qt-5/qabstractitemmodel.html#beginMoveRows
         # now we can assert ...
-        assert not source_row <= target_row <= source_row + 1
+        assert not source_row <= target_row <= source_row + 1  # nosec B101
 
         if source_row < target_row:
             target_row -= 1
@@ -441,7 +441,7 @@ class LayerModel(QAbstractItemModel):
 
     def change_colormap_for_layer(self, uuid: UUID, colormap: object):
         layer = self.get_layer_by_uuid(uuid)
-        assert layer is not None
+        assert layer is not None  # nosec B101
         layer.presentation.colormap = colormap
         change_dict = self._build_presentation_change_dict(layer, colormap)
         self.didChangeColormap.emit(change_dict)
@@ -460,14 +460,14 @@ class LayerModel(QAbstractItemModel):
 
     def change_color_limits_for_layer(self, uuid: UUID, color_limits: object):
         layer = self.get_layer_by_uuid(uuid)
-        assert layer is not None
+        assert layer is not None  # nosec B101
         layer.presentation.climits = color_limits
         change_dict = self._build_presentation_change_dict(layer, color_limits)
         self.didChangeColorLimits.emit(change_dict)
 
     def change_gamma_for_layer(self, uuid: UUID, gamma: Union[float, List[float]]):
         layer = self.get_layer_by_uuid(uuid)
-        assert layer is not None
+        assert layer is not None  # nosec B101
         layer.presentation.gamma = gamma
         change_dict = self._build_presentation_change_dict(layer, gamma)
         self.didChangeGamma.emit(change_dict)
@@ -552,7 +552,7 @@ class LayerModel(QAbstractItemModel):
 
         for sched_time in datasets_to_remove:
             dataset: ProductDataset = layer.timeline.get(sched_time)
-            assert dataset
+            assert dataset  # nosec B101
             self._remove_dataset(layer, sched_time, dataset.uuid)
 
     def _remove_dataset(self, layer: LayerItem, sched_time: datetime, dataset_uuid: UUID):
@@ -666,7 +666,7 @@ class LayerModel(QAbstractItemModel):
         :param recipe: Recipe of the layer whose timeline is to be updated
         """
         recipe_layer: LayerItem = self._get_layer_of_recipe(recipe.id)
-        assert recipe_layer and recipe_layer.recipe
+        assert recipe_layer and recipe_layer.recipe  # nosec B101
 
         if isinstance(recipe, CompositeRecipe):
             self.update_rgb_layer_gamma(recipe)
@@ -848,7 +848,7 @@ class LayerModel(QAbstractItemModel):
     def _add_algebraic_datasets(
         self, sched_times: List[datetime], input_layers: List[LayerItem], algebraic_layer: LayerItem
     ):
-        assert isinstance(algebraic_layer.recipe, AlgebraicRecipe)
+        assert isinstance(algebraic_layer.recipe, AlgebraicRecipe)  # nosec B101
 
         for sched_time in sched_times:
             input_datasets_uuids = self._get_datasets_uuids_of_multichannel_dataset(sched_time, input_layers)
@@ -1019,7 +1019,7 @@ class LayerModel(QAbstractItemModel):
             return None
 
     def get_input_layers_info(self, recipe_layer: LayerItem) -> List[Optional[frozendict]]:
-        assert recipe_layer.recipe, "This method must only be called with 'recipe layers'"
+        assert recipe_layer.recipe, "This method must only be called with 'recipe layers'"  # nosec B101
         input_layer_infos: List[Optional[frozendict]] = []
         for layer_uuid in recipe_layer.recipe.input_layer_ids:
             input_layer = self.get_layer_by_uuid(layer_uuid)

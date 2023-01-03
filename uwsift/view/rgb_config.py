@@ -188,7 +188,7 @@ class RGBLayerConfigPane(QObject):
             valid_range = layer.valid_range
             # TODO: is the actual range really used correctly here?
             actual_range = layer.get_actual_range_from_layer()
-            assert actual_range != (None, None)
+            assert actual_range != (None, None)  # nosec B101
             clim = valid_range if valid_range else actual_range
 
         self.didChangeRGBInputLayers.emit(self.recipe, color, layer_uuid, clim, DEFAULT_GAMMA_VALUE)
@@ -375,7 +375,7 @@ class RGBLayerConfigPane(QObject):
             valid_range = layer.valid_range
             # TODO: is the actual range really used correctly here?
             actual_range = layer.get_actual_range_from_layer()
-            assert actual_range != (None, None)
+            assert actual_range != (None, None)  # nosec B101
             layer_range = valid_range if valid_range else actual_range
             self._valid_ranges[idx] = layer_range
 

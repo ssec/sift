@@ -115,7 +115,7 @@ class TaskQueue(QObject):
             self._last_status.append(None)
 
         global TheQueue
-        assert TheQueue is None
+        assert TheQueue is None  # nosec B101
         TheQueue = self
 
     @property

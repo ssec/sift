@@ -285,7 +285,7 @@ class LayerItem:
         items_for_uuid = [item for item in self.timeline.items() if item[1].uuid == uuid]
         if not items_for_uuid:
             return None
-        assert len(items_for_uuid) == 1
+        assert len(items_for_uuid) == 1  # nosec B101
         return items_for_uuid[0][1]
 
     def get_datasets_uuids(self) -> List[UUID]:
@@ -301,7 +301,7 @@ class LayerItem:
         #  but this is likely to change in the future (e.g. for Lightning
         #  products). Let's make sure that any change in this regard doesn't
         #  go unnoticed here, thus:
-        assert num_active_product_datasets <= 1
+        assert num_active_product_datasets <= 1  # nosec B101
 
         return None if num_active_product_datasets == 0 else active_product_datasets[0]
 

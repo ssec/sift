@@ -271,7 +271,7 @@ class aImporter(ABC):
 
         # Only Satpy readers / SatpyImporter still supported, thus:
         # There must be such a Scene and the prod must be from Satpy, we can
-        assert scn and "_satpy_id" in prod.info
+        assert scn and "_satpy_id" in prod.info  # nosec B101
 
         merge_target = kwargs.get("merge_target")
         if merge_target:
@@ -303,7 +303,6 @@ class aImporter(ABC):
         # this Importer data reading magic is too confused.
         if prod.info[Info.KIND] in (Kind.POINTS, Kind.LINES, Kind.VECTORS):
             del kwargs["scenes"]
-            assert "scene" not in kwargs
             kwargs["scene"] = scn
 
         # TODO: ignore mypy error for now because in the future aImporter should be merged with SatpyImporter
@@ -537,10 +536,10 @@ class SatpyImporter(aImporter):
             )
             prod.resource.extend(resources)
 
-            assert Info.OBS_TIME in meta
-            assert Info.OBS_DURATION in meta
+            assert Info.OBS_TIME in meta  # nosec B101
+            assert Info.OBS_DURATION in meta  # nosec B101
             prod.update(meta)  # sets fields like obs_duration and obs_time transparently
-            assert prod.info[Info.OBS_TIME] is not None and prod.obs_time is not None
+            assert prod.info[Info.OBS_TIME] is not None and prod.obs_time is not None  # nosec B101
             LOG.debug("new product: {}".format(repr(prod)))
             if self.use_inventory_db:
                 self._S.add(prod)
@@ -1124,7 +1123,7 @@ class SatpyImporter(aImporter):
     def _get_products_from_inventory_db(self, product_ids):
         if product_ids:
             products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
-            assert products
+            assert products  # nosec B101
         else:
             products = list(
                 self._S.query(Resource, Product)
@@ -1132,7 +1131,7 @@ class SatpyImporter(aImporter):
                 .filter(Product.resource_id == Resource.id)
                 .all()
             )
-            assert products
+            assert products  # nosec B101
         return products
 
     def _create_mc_image_dataset_content(self, dataset, now, prod, area_info, grid_info):

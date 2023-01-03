@@ -119,9 +119,9 @@ class WrappingDrivingPolicy(QObject):
 
     def curr_t_sim(self):
         if not self.timeline:
-            assert self._curr_t_sim is None
+            assert self._curr_t_sim is None  # nosec B101
         else:
-            assert self._curr_t_sim == self.timeline[self._driving_idx]
+            assert self._curr_t_sim == self.timeline[self._driving_idx]  # nosec B101
         return self._curr_t_sim
 
     def curr_timeline_index(self):

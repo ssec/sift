@@ -193,7 +193,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         model.change_color_limits_for_layer(self._current_selected_layer.uuid, actual_range)
         valid_range = self._current_selected_layer.valid_range
 
-        assert actual_range != (None, None)
+        assert actual_range != (None, None)  # nosec B101
         self._valid_min, self._valid_max = range_hull_no_fail(actual_range, valid_range, actual_range)
 
         self._update_vmin()
@@ -208,7 +208,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
             valid_range = self._current_selected_layer.valid_range
 
-            assert actual_range != (None, None)
+            assert actual_range != (None, None)  # nosec B101
             self._valid_min, self._valid_max = range_hull_no_fail(actual_range, valid_range, actual_range)
 
             self._update_vmin()
@@ -219,7 +219,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         model.change_gamma_for_layer(self._current_selected_layer.uuid, val)
 
     def _get_multichannel_clims_str(self, clims, input_layers_info):
-        assert len(input_layers_info) == len(clims)
+        assert len(input_layers_info) == len(clims)  # nosec B101
         multichannel_clims_strs = []
         for idx in range(len(clims)):
             curr_clims = clims[idx]

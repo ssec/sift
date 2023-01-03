@@ -787,9 +787,9 @@ class BaseWorkspace(QObject):
         Falls back to calculate these values if the minimum and maximum are not stored.
         The UUID must identify an existing dataset.
         """
-        assert uuid is not None
+        assert uuid is not None  # nosec B101
         ac = self._get_active_content_by_uuid(uuid)
-        assert ac is not None
+        assert ac is not None  # nosec B101
         stats = ac.statistics
 
         if not stats:

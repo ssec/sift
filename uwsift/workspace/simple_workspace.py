@@ -104,7 +104,7 @@ class SimpleWorkspace(BaseWorkspace):
 
     def _overview_content_for_uuid(self, uuid: UUID, kind: Kind = Kind.IMAGE) -> np.memmap:
         ovc = self._product_overview_content(None, uuid=uuid, kind=kind)
-        assert ovc is not None
+        assert ovc is not None  # nosec B101
         arrays = self._cached_arrays_for_content(ovc)
         return arrays.data
 
@@ -151,7 +151,8 @@ class SimpleWorkspace(BaseWorkspace):
             # specifically a lot of client code assumes that resource
             # == product == content and
             # that singular navigation (e.g. cell_size) is norm
-            assert kind in [Kind.LINES, Kind.POINTS] or native_content.info[Info.CELL_WIDTH] is not None  # FIXME DEBUG
+            # FIXME DEBUG <- since commit 3576ff0122bd534f83422ce19479d40b7dc9e5b0
+            assert kind in [Kind.LINES, Kind.POINTS] or native_content.info[Info.CELL_WIDTH] is not None  # nosec B101
             return frozendict(ChainMap(native_content.info, prod.info))
         # mapping semantics for database fields, as well as key-value fields;
         # flatten to one namespace and read-only
@@ -212,7 +213,7 @@ class SimpleWorkspace(BaseWorkspace):
 
         for hauler in importers:
             for prod in hauler.merge_products():
-                assert prod is not None
+                assert prod is not None  # nosec B101
                 # add to-be-imported filenames to check for possible merge targets but
                 # do not include these filenames in the product info
                 extended_prod_info = dict(prod.info)
@@ -251,7 +252,7 @@ class SimpleWorkspace(BaseWorkspace):
         if merge_target_uuid and len(prod.content):
             LOG.info("product already has content available, using that " "rather than re-importing")
             ovc = self._product_overview_content(None, uuid=uuid, kind=default_prod_kind)
-            assert ovc is not None
+            assert ovc is not None  # nosec B101
             arrays = self._cached_arrays_for_content(ovc)
             return arrays.data
 

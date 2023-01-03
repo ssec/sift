@@ -110,7 +110,7 @@ class CachingWorkspace(BaseWorkspace):
         self._inventory = Metadatabase("sqlite:///" + self._inventory_path, create_tables=should_init)
         if should_init:
             with self._inventory as s:
-                assert 0 == s.query(Content).count()
+                assert 0 == s.query(Content).count()  # nosec B101
         LOG.info("done with init")
 
     def clear_workspace_content(self):
@@ -313,7 +313,7 @@ class CachingWorkspace(BaseWorkspace):
         # assert(prod is not None)
         with self._inventory as s:
             ovc = self._product_overview_content(s, uuid=uuid, kind=kind)
-            assert ovc is not None
+            assert ovc is not None  # nosec B101
             arrays = self._cached_arrays_for_content(ovc)
             return arrays.data
 
@@ -372,9 +372,10 @@ class CachingWorkspace(BaseWorkspace):
                 # if content is available, we want to provide native content metadata along with the product metadata
                 # specifically a lot of client code assumes that resource == product == content and
                 # that singular navigation (e.g. cell_size) is norm
-                assert (
+                # FIXME DEBUG <- since commit 3576ff0122bd534f83422ce19479d40b7dc9e5b0
+                assert (  # nosec B101
                     kind in [Kind.LINES, Kind.POINTS] or native_content.info[Info.CELL_WIDTH] is not None
-                )  # FIXME DEBUG
+                )
                 return frozendict(ChainMap(native_content.info, prod.info))
             # mapping semantics for database fields, as well as key-value fields;
             # flatten to one namespace and read-only
@@ -552,7 +553,7 @@ class CachingWorkspace(BaseWorkspace):
 
             for hauler in importers:
                 for prod in hauler.merge_products():
-                    assert prod is not None
+                    assert prod is not None  # nosec B101
                     # merge the product into our database session, since it may belong to import_session
                     zult = frozendict(prod.info)
                     yield num_products, zult
@@ -575,7 +576,7 @@ class CachingWorkspace(BaseWorkspace):
             if len(prod.content):
                 LOG.info("product already has content available, using that rather than re-importing")
                 ovc = self._product_overview_content(S, uuid=uuid, kind=default_prod_kind)
-                assert ovc is not None
+                assert ovc is not None  # nosec B101
                 arrays = self._cached_arrays_for_content(ovc)
                 return arrays.data
 
