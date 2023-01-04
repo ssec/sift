@@ -98,7 +98,7 @@ class HeapAnalyzer:
                 self._combined_snapshot_count = len(allocs)
             else:
                 # the lists must have the same length for the stacked plot
-                assert self._combined_snapshot_count == len(allocs)
+                assert self._combined_snapshot_count == len(allocs)  # nosec B101
 
     def _get_sorted_allocations(self, sort_key: str = "size") -> OrderedDict:
         if sort_key not in ["size", "count"]:

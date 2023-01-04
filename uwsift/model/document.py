@@ -120,7 +120,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def change_projection(self, area_def_name=None):
         if area_def_name is None:
             area_def_name = self.default_area_def_name
-        assert area_def_name in AreaDefinitionsManager.available_area_def_names()
+        assert area_def_name in AreaDefinitionsManager.available_area_def_names()  # nosec B101
         if area_def_name != self.current_area_def_name:
             LOG.debug(
                 f"Changing projection (area definition) from" f" '{self.current_area_def_name}' to '{area_def_name}'"
@@ -196,7 +196,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # updated metadata with content information (most importantly navigation
         # information)
         frozen_info = self._workspace.get_info(uuid)
-        assert frozen_info is not None
+        assert frozen_info is not None  # nosec B101
         info = dict(frozen_info)  # make a copy to which stuff can be added
         LOG.debug("cell_width: {}".format(repr(info[Info.CELL_WIDTH])))
 
@@ -266,8 +266,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         merge_target_uuids = {}  # map new files uuids to merge target uuids
         total_products = 0
         for dex, (num_prods, info) in enumerate(infos):
-            assert info is not None
-
             uuid = info[Info.UUID]
             merge_target_uuid = uuid
             if do_merge_with_existing:
@@ -318,7 +316,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             }
 
     def sort_product_uuids(self, uuids: typ.Iterable[UUID]) -> typ.List[UUID]:
-        assert isinstance(self._workspace, CachingWorkspace)
+        assert isinstance(self._workspace, CachingWorkspace)  # nosec B101
         uuidset = set(str(x) for x in uuids)
         if not uuidset:
             return []

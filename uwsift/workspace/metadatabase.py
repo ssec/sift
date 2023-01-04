@@ -155,7 +155,7 @@ class ChainRecordWithDict(MutableMapping):
     def __getitem__(self, key):
         fieldname = self._field_keys.get(key)
         if fieldname is not None:
-            assert isinstance(fieldname, str)
+            assert isinstance(fieldname, str)  # nosec B101
             return getattr(self._obj, fieldname)
         return self._more[key]
 
@@ -828,8 +828,8 @@ class Metadatabase(object):
         return zult
 
     def connect(self, uri, create_tables=False, **kwargs):
-        assert self.engine is None
-        assert self.connection is None
+        assert self.engine is None  # nosec B101
+        assert self.connection is None  # nosec B101
         self.engine = create_engine(uri, **kwargs)
         LOG.info("attaching database at {}".format(uri))
         if create_tables or not self._all_tables_present():

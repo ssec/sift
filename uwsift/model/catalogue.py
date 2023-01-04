@@ -231,7 +231,8 @@ class GlobbingCreator:
 
         **See also:** https://docs.python.org/3/library/string.html#formatstrings
         """
-        assert is_datetime_format(format_spec)  # TODO does not guarantee *pureness*!
+        if not is_datetime_format(format_spec):  # TODO passing this test does not guarantee *pureness*!
+            raise ValueError(f"Given format '{format_spec}' is not a recognized datetime format.")
 
         single_directive_patterns: List[Tuple[str, str]] = []
 

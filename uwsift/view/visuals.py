@@ -217,7 +217,7 @@ class SIFTTiledGeolocatedMixin:
         self._latest_tile_box = None
         self.wrap_lon = wrap_lon
         self._tiles = {}
-        assert shape or data is not None, "`data` or `shape` must be provided"
+        assert shape or data is not None, "`data` or `shape` must be provided"  # nosec B101
         self.shape = shape or data.shape
         self.ndim = len(self.shape) or data.ndim
 
@@ -592,7 +592,7 @@ class SIFTMultiChannelTiledGeolocatedMixin(SIFTTiledGeolocatedMixin):
         )
 
     def set_channels(self, data_arrays, shape=None, cell_width=None, cell_height=None, origin_x=None, origin_y=None):
-        assert shape or data_arrays is not None, "`data` or `shape` must be provided"
+        assert shape or data_arrays is not None, "`data` or `shape` must be provided"  # nosec B101
         if cell_width is not None:
             self.cell_width = cell_width
         if cell_height:
@@ -602,7 +602,7 @@ class SIFTMultiChannelTiledGeolocatedMixin(SIFTTiledGeolocatedMixin):
         if origin_y:
             self.origin_y = origin_y
         self.shape = self._compute_shape(shape, data_arrays)
-        assert None not in (self.cell_width, self.cell_height, self.origin_x, self.origin_y, self.shape)
+        assert None not in (self.cell_width, self.cell_height, self.origin_x, self.origin_y, self.shape)  # nosec B101
         # how many of the higher resolution channel tiles (smaller geographic area) make
         # up a low resolution channel tile
         self._channel_factors = tuple(
@@ -1020,7 +1020,7 @@ class PrecomputedIsocurveVisual(IsocurveVisual):
 
     @clim.setter
     def clim(self, val):
-        assert len(val) == 2
+        assert len(val) == 2  # nosec B101
         self._clim = val
         self._need_level_update = True
         self._need_color_update = True

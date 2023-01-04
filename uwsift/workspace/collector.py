@@ -41,7 +41,7 @@ LOG = logging.getLogger(__name__)
 
 class _workspace_test_proxy(object):
     def __init__(self):
-        self.cwd = "/tmp" if os.path.isdir("/tmp") else os.getcwd()
+        self.cwd = "/tmp" if os.path.isdir("/tmp") else os.getcwd()  # nosec B108
 
     def collect_product_metadata_for_paths(self, paths):
         LOG.debug("import metadata for files: {}".format(repr(paths)))

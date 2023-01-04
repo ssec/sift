@@ -555,7 +555,7 @@ class ProbeGraphDisplay(object):
     def setRegion(self, polygon_points=None, select_full_data=False):
         """Set the region for this graph as polygon selection or full data."""
 
-        assert polygon_points is None or not select_full_data, (
+        assert polygon_points is None or not select_full_data, (  # nosec B101
             "Must not give both 'polygon_points' and True for 'select_full_data':"
             " Defining region by polygon and as full data are mutually exclusive."
         )

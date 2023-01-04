@@ -55,7 +55,7 @@ version_regex = re.compile(
     r"^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<micro>\d+)(?:(?P<dev_level>(a|b|rc))(?P<dev_version>\d))?$"
 )
 version_match = version_regex.match(version_str)
-assert version_match is not None, "Invalid version in version.py: {}".format(version_str)
+assert version_match is not None, "Invalid version in version.py: {}".format(version_str)  # nosec B101
 version_info = version_match.groupdict()
 version_info["major"] = int(version_info["major"])
 version_info["minor"] = int(version_info["minor"])
@@ -98,7 +98,7 @@ class BumpCommand(Command):
         new_version = current_version.copy()
         if self.new_version is not None:
             new_version_str = self.new_version
-            assert version_regex.match(new_version_str) is not None
+            assert version_regex.match(new_version_str) is not None  # nosec B101
         else:
             if self.bump_level == "micro":
                 new_version["micro"] += 1

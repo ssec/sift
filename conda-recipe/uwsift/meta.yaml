@@ -53,6 +53,7 @@ requirements:
     - pygrib  # [not win]
     - scikit-image
     - donfig
+    - defusedxml
 
 test:
   commands:

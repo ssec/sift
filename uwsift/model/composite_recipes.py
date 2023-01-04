@@ -279,7 +279,7 @@ class RecipeManager(QObject):
         """
         channel_idx = RGBA2IDX.get(channel)
 
-        assert channel_idx is not None, f"Given channel '{channel}' is invalid"
+        assert channel_idx is not None, f"Given channel '{channel}' is invalid"  # nosec B101
 
         recipe.input_layer_ids[channel_idx] = layer_uuid
         recipe.color_limits[channel_idx] = clims
@@ -292,7 +292,7 @@ class RecipeManager(QObject):
         """Update the gamma value of the given channel"""
         channel_idx = RGBA2IDX.get(channel)
 
-        assert channel_idx is not None, f"Given channel '{channel}' is invalid"
+        assert channel_idx is not None, f"Given channel '{channel}' is invalid"  # nosec B101
 
         recipe.gammas[channel_idx] = gamma
 
@@ -303,7 +303,7 @@ class RecipeManager(QObject):
         """Update the color limit value of the given channel"""
         channel_idx = RGBA2IDX.get(channel)
 
-        assert channel_idx is not None, f"Given channel '{channel}' is invalid"
+        assert channel_idx is not None, f"Given channel '{channel}' is invalid"  # nosec B101
 
         recipe.color_limits[channel_idx] = clim
 
@@ -344,7 +344,7 @@ class RecipeManager(QObject):
     ):
         channel_idx = XYZ2IDX.get(channel)
 
-        assert channel_idx is not None, f"Given channel '{channel}' is invalid"
+        assert channel_idx is not None, f"Given channel '{channel}' is invalid"  # nosec B101
 
         recipe.input_layer_ids[channel_idx] = layer_uuid
         recipe.modified = True

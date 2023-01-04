@@ -243,7 +243,7 @@ class TimeManager(QObject):
             self.update_qml_timeline(None)
             return
 
-        assert 0 <= index < len(dynamic_layers)
+        assert 0 <= index < len(dynamic_layers)  # nosec B101
 
         layer = self._layer_model.get_dynamic_layers()[index]
         self.current_timebase_uuid = layer.uuid
