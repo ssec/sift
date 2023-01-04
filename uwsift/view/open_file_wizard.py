@@ -574,9 +574,9 @@ class OpenFileWizard(QtWidgets.QWizard):
             self.file_groups = {}
             return True
 
-        scenes = {}  # recreate Scene dictionary
+        scenes: dict = {}  # recreate Scene dictionary
         file_group_map = {}
-        known_files = set()
+        known_files: set = set()
         for file_group in file_groups:
             # file_group includes what reader to use
             # NOTE: We only allow a single reader at a time

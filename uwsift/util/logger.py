@@ -35,20 +35,20 @@ def configure_loggers() -> None:
     __configure_available_loggers(loggers_all_level)
 
 
-def __configure_handler(file_path: str):
+def __configure_handler(file_path: Optional[str]):
     """
     If an absolute `file_path` to a writable file is given, return a FileHandler
     writing to that file, otherwise a StreamHandler to log to the console.
     Warn by popping up a message box if a given `file_path` is not absolute or
     doesn't point to a not writable file. `file_path` can be `None`.
     """
-    handler: logging.StreamHandler = logging.StreamHandler(sys.stderr)
+    handler: logging.Handler = logging.StreamHandler(sys.stderr)
 
     if file_path is None:
         return handler
 
     if not PurePath(file_path).is_absolute():
-        err_msg: str = (
+        err_msg = (
             f"Logging to file '{file_path}' is not possible."
             f"\nThe given path is not absolute."
             f"\nLogging to console instead."
@@ -57,9 +57,9 @@ def __configure_handler(file_path: str):
         return handler
 
     try:
-        handler: logging.FileHandler = logging.FileHandler(file_path)
+        handler = logging.FileHandler(file_path)
     except OSError as e:
-        err_msg: str = f"Logging to file '{file_path}' is not possible." f"\n{e}" f"\nLogging to console instead."
+        err_msg = f"Logging to file '{file_path}' is not possible." f"\n{e}" f"\nLogging to console instead."
         QMessageBox.warning(None, "Error in Logging Configuration", err_msg)
 
     return handler

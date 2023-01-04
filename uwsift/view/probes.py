@@ -33,7 +33,6 @@ from uwsift.queue import TASK_DOING, TASK_PROGRESS
 # Stuff for custom toolbars
 try:
     import matplotlib.backends.qt_editor.figureoptions as figureoptions
-    import six
 except ImportError:
     figureoptions = None
 
@@ -41,12 +40,12 @@ LOG = logging.getLogger(__name__)
 DEFAULT_POINT_PROBE = "default_probe_name"
 
 
-class NavigationToolbar(NavigationToolbar):
+class CustomNavigationToolbar(NavigationToolbar):
     """Custom matplotlib toolbar."""
 
     def __init__(self, *args, **kwargs):
         self.__include_colorbar = kwargs.get("include_colorbar", False)
-        super(NavigationToolbar, self).__init__(*args, **kwargs)
+        super(CustomNavigationToolbar, self).__init__(*args, **kwargs)
 
     def edit_parameters(self):
         allaxes = self.canvas.figure.get_axes()
@@ -73,7 +72,7 @@ class NavigationToolbar(NavigationToolbar):
             else:
                 item, ok = QtWidgets.QInputDialog.getItem(self.parent, "Customize", "Select axes:", titles, 0, False)
                 if ok:
-                    axes = allaxes[titles.index(six.text_type(item))]
+                    axes = allaxes[titles.index(str(item))]
                 else:
                     return
 
@@ -123,10 +122,10 @@ class ProbeGraphManager(QObject):
         self.auto_update_checkbox = auto_update_checkbox
         self.update_button = update_button
         # hold on to point probe locations (point probes are shared across tabs)
-        self.point_probes = {}
+        self.point_probes: dict = {}
 
         # set up the first tab
-        self.graphs = []
+        self.graphs: list = []
         self.selected_graph_index = 0
         self.max_tab_letter = "A"
         self.set_up_tab(self.selected_graph_index, do_increment_tab_letter=False)
@@ -378,7 +377,7 @@ class ProbeGraphDisplay(object):
         self.clearPlot()
 
         # make a matplotlib toolbar to attach to the graph
-        self.toolbar = NavigationToolbar(self.canvas, qt_parent)
+        self.toolbar = CustomNavigationToolbar(self.canvas, qt_parent)
 
         # create our selection controls
 
@@ -556,7 +555,7 @@ class ProbeGraphDisplay(object):
     def setRegion(self, polygon_points=None, select_full_data=False):
         """Set the region for this graph as polygon selection or full data."""
 
-        assert polygon_points is None or not select_full_data, (
+        assert polygon_points is None or not select_full_data, (  # nosec B101
             "Must not give both 'polygon_points' and True for 'select_full_data':"
             " Defining region by polygon and as full data are mutually exclusive."
         )

@@ -53,5 +53,5 @@ USER_DESKTOP_DIRECTORY = _desktop_directory()
 # the default in Linux is /tmp, but we can clean up these temp files better if we use a custom subdirectory
 Path(WORKSPACE_TEMP_DIR).mkdir(parents=True, exist_ok=True)
 os.environ["TMPDIR"] = WORKSPACE_TEMP_DIR
+# This 'configures' the tempfile module to create temporary files in WORKSPACE_TEMP_DIR:
 tempfile.tempdir = WORKSPACE_TEMP_DIR
-assert tempfile.gettempdir() == WORKSPACE_TEMP_DIR

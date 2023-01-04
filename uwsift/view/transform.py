@@ -57,7 +57,7 @@ class GLSL_Adapter(TextExpression):
         Actual .glsl code string.
     """
 
-    _expr_list = []
+    _expr_list: list = []
 
     def __init__(self, text: str) -> None:
         # Regular expression for parsing possibly include-guarded macro definitions from .glsl
@@ -106,7 +106,7 @@ class GLSL_FileAdapter(GLSL_Adapter):
         super(GLSL_FileAdapter, self).__init__(text)
 
 
-COMMON_VALUES = """const float SPI = 3.14159265359;
+COMMON_VALUES_DEF = """const float SPI = 3.14159265359;
 const float TWOPI = 6.2831853071795864769;
 const float ONEPI = 3.14159265358979323846;
 const float M_FORTPI = M_PI_4;                      /* pi/4 */
@@ -118,7 +118,7 @@ const float M_TWOPI_HALFPI = 2.5 / M_PI;            /* 2.5*pi */
 """
 
 math_consts = GLSL_FileAdapter("math/constants.glsl").expr_list
-COMMON_VALUES = GLSL_Adapter(COMMON_VALUES).expr_list
+COMMON_VALUES = GLSL_Adapter(COMMON_VALUES_DEF).expr_list
 M_FORTPI = M_PI_4 = 0.78539816339744828
 M_HALFPI = M_PI_2 = 1.57079632679489660
 

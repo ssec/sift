@@ -43,7 +43,7 @@ from abc import abstractmethod
 from collections import defaultdict
 from collections.abc import Mapping as ReadOnlyMapping
 from datetime import timedelta
-from typing import Dict, Generator, Mapping, Optional, Tuple
+from typing import Generator, Mapping, Optional, Tuple
 from uuid import UUID
 from uuid import uuid1 as uuidgen
 
@@ -63,7 +63,6 @@ from .metadatabase import (
     ContentImage,
     ContentMultiChannelImage,
     ContentUnstructuredPoints,
-    Metadatabase,
     Product,
 )
 from .statistics import dataset_statistical_analysis
@@ -104,33 +103,23 @@ class ActiveContent(QObject):
     Workspace instantiates ActiveContent from metadatabase Content entries
     """
 
-    _cid = None  # Content.id database entry I belong to
-    _wsd = None  # full path of workspace
-    _rcl = None
-    _y = None
-    _x = None
-    _z = None
-    _data = None
-    _coverage = None
-    _sparsity = None
-    statistics = None
-
     def __init__(self, workspace_cwd: str, C: Content, info):
         super(ActiveContent, self).__init__()
-        self._cid = C.id
-        self._wsd = workspace_cwd
+        self._cid = C.id  # Content.id database entry I belong to
+        self._wsd = workspace_cwd  # full path of workspace
         if workspace_cwd is None and C is None:
             LOG.warning("test initialization of ActiveContent")
             self._test_init()
         else:
-            self._attach(C)
+            self._attach(C)  # initializes self._data
 
         # Needed for the calculation of the correct statistics
         # we need a dict not a frozendict so convert it everytime to a dict
         attrs = dict(info)
-        attrs = attrs.update({"algebraic": info.get(Info.ALGEBRAIC)}) if info.get(Info.ALGEBRAIC) else attrs
+        if info.get(Info.ALGEBRAIC):
+            attrs.update({"algebraic": info[Info.ALGEBRAIC]})
 
-        # exclude multi-channel images out of statistics calculation
+        # exclude multichannel images from statistics calculation:
         if info.get(Info.KIND) != Kind.MC_IMAGE:
             data_array = xarray.DataArray(self._data, attrs=attrs)
             self.statistics = dataset_statistical_analysis(data_array)
@@ -248,17 +237,6 @@ class BaseWorkspace(QObject):
 
     """
 
-    cwd = None  # directory we work in
-    _own_cwd = None  # whether or not we created the cwd - which is also whether or not we're allowed to destroy it
-    _pool = None  # process pool that importers can use for background activities, if any
-    # _importers = None  # list of importers to consult when asked to start an import
-    _available: Mapping[int, ActiveContent] = None  # dictionary of {Content.id : ActiveContent object}
-    _inventory: Metadatabase = None  # metadatabase instance, sqlalchemy
-    _inventory_path = None  # filename to store and load inventory information (simple cache)
-    _tempdir = None  # TemporaryDirectory, if it's needed (i.e. a directory name was not given)
-    _max_size_gb = None  # maximum size in gigabytes of flat files we cache in the workspace
-    _queue = None
-
     # signals
     # a dataset started importing; generated after overview level of detail is available
     # didStartImport = pyqtSignal(dict)
@@ -267,8 +245,6 @@ class BaseWorkspace(QObject):
     # didFinishImport = pyqtSignal(dict)  # all loading activities for a dataset have completed
     # didDiscoverExternalDataset = pyqtSignal(dict)  # a new dataset was added to the workspace from an external agent
     didChangeProductState = pyqtSignal(UUID, Flags)  # a product changed state, e.g. an importer started working on it
-
-    _state: Mapping[UUID, Flags] = None
 
     def set_product_state_flag(self, uuid: UUID, flag):
         """primarily used by Importers to signal work in progress"""
@@ -286,38 +262,40 @@ class BaseWorkspace(QObject):
     def _S(self):
         pass
 
-    @property
-    @abstractmethod
-    def metadatabase(self) -> Metadatabase:
-        pass
-
-    def __init__(self, directory_path: str = None):
+    def __init__(self, directory_path: str, queue=None):
         """
         Initialize a new or attach an existing workspace, creating any necessary bookkeeping.
         """
         super(BaseWorkspace, self).__init__()
 
+        self._queue = queue
+        self.cache_dir = ""
+        self.cwd = ""  # directory we work in
+        self._own_cwd = (
+            False  # whether or not we created the cwd - which is also whether or not we're allowed to destroy it
+        )
+
         # HACK: handle old workspace command line flag
         if isinstance(directory_path, (list, tuple)):
-            self.cache_dir = cache_path = os.path.abspath(directory_path[1])
-            self.cwd = directory_path = os.path.abspath(directory_path[0])
+            self.cache_dir = os.path.abspath(directory_path[1])
+            self.cwd = os.path.abspath(directory_path[0])
         else:
-            self.cwd = directory_path = os.path.abspath(directory_path)
-            self.cache_dir = cache_path = os.path.join(self.cwd, "data_cache")
+            self.cwd = os.path.abspath(directory_path)
+            self.cache_dir = os.path.join(self.cwd, "data_cache")
 
-        self._available = {}
+        self._available: dict[int, ActiveContent] = {}  # dictionary of {Content.id : ActiveContent object}
         self._importers = IMPORT_CLASSES.copy()
-        self._state = defaultdict(Flags)
+        self._state: defaultdict = defaultdict(Flags)
         global TheWorkspace  # singleton
         if TheWorkspace is None:
             TheWorkspace = self
 
-        if not os.path.isdir(cache_path):
-            LOG.info("creating new workspace cache at {}".format(cache_path))
-            os.makedirs(cache_path)
-        if not os.path.isdir(directory_path):
-            LOG.info("creating new workspace at {}".format(directory_path))
-            os.makedirs(directory_path)
+        if not os.path.isdir(self.cache_dir):
+            LOG.info("creating new workspace cache at {}".format(self.cache_dir))
+            os.makedirs(self.cache_dir)
+        if not os.path.isdir(self.cwd):
+            LOG.info("creating new workspace at {}".format(self.cwd))
+            os.makedirs(self.cwd)
             self._own_cwd = True
             self._init_create_workspace()
 
@@ -345,7 +323,7 @@ class BaseWorkspace(QObject):
         pass
 
     @abstractmethod
-    def _deactivate_content_for_product(self, p: Product):
+    def _deactivate_content_for_product(self, p: Optional[Product]):
         pass
 
     #
@@ -353,18 +331,18 @@ class BaseWorkspace(QObject):
     #
 
     @abstractmethod
-    def _product_with_uuid(self, session, uuid: UUID) -> Product:
+    def _product_with_uuid(self, session, uuid: UUID) -> Optional[Product]:
         pass
 
     @abstractmethod
     def _product_overview_content(
-        self, session, prod: Product = None, uuid: UUID = None, kind: Kind = Kind.IMAGE
+        self, session, prod: Optional[Product] = None, uuid: Optional[UUID] = None, kind: Kind = Kind.IMAGE
     ) -> Optional[Content]:
         pass
 
     @abstractmethod
     def _product_native_content(
-        self, session, prod: Product = None, uuid: UUID = None, kind: Kind = Kind.IMAGE
+        self, session, prod: Optional[Product] = None, uuid: Optional[UUID] = None, kind: Kind = Kind.IMAGE
     ) -> Optional[Content]:
         pass
 
@@ -396,19 +374,6 @@ class BaseWorkspace(QObject):
         :param lod: desired level of detail to focus
         :return: metadata access with mapping semantics, to be treated as read-only
         """
-        pass
-
-    @property
-    @abstractmethod
-    def product_names_available_in_cache(self) -> dict:
-        """
-        Returns: dictionary of {UUID: product name,...}
-        typically used for add-from-cache dialog
-        """
-        pass
-
-    @abstractmethod
-    def recently_used_products(self, n=32) -> Dict[UUID, str]:
         pass
 
     @abstractmethod
@@ -466,8 +431,8 @@ class BaseWorkspace(QObject):
     @abstractmethod
     def import_product_content(
         self,
-        uuid: UUID = None,
-        prod: Product = None,
+        uuid: UUID,
+        prod: Optional[Product] = None,
         allow_cache=True,
         merge_target_uuid: Optional[UUID] = None,
         **importer_kwargs,
@@ -583,11 +548,11 @@ class BaseWorkspace(QObject):
                 content[k] = v
 
         # Run the code: code_object, no globals, copy of locals
-        exec(ops, None, valids_namespace)
+        exec(ops, None, valids_namespace)  # nosec B102
         if result_name not in valids_namespace:
             raise RuntimeError("Unable to retrieve result '{}' from code execution".format(result_name))
 
-        exec(ops, None, content)
+        exec(ops, None, content)  # nosec B102
         if result_name not in content:
             raise RuntimeError("Unable to retrieve result '{}' from code execution".format(result_name))
         info = self._get_composite_metadata(info, list(dep_metadata.values()), valids_namespace[result_name])
@@ -619,7 +584,7 @@ class BaseWorkspace(QObject):
 
     @abstractmethod
     def _create_product_from_array(
-        self, info: Info, data, namespace=None, codeblock=None
+        self, info: Mapping, data, namespace=None, codeblock=None
     ) -> Tuple[UUID, Optional[frozendict], np.memmap]:
         pass
 
@@ -660,7 +625,7 @@ class BaseWorkspace(QObject):
         )
         return affine
 
-    def _position_to_data_index(self, info_or_uuid, xy_pos) -> Tuple[int, int]:
+    def _position_to_data_index(self, info_or_uuid, xy_pos) -> Tuple[Optional[int], Optional[int]]:
         """Calculate the sift-internal data index from lon/lat values"""
         info = self.get_info(info_or_uuid)
         if info is None:
@@ -675,7 +640,7 @@ class BaseWorkspace(QObject):
         row = np.int64(np.floor((y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT]))
         return row, column
 
-    def position_to_grid_index(self, info_or_uuid, xy_pos) -> Tuple[int, int]:
+    def position_to_grid_index(self, info_or_uuid, xy_pos) -> Tuple[Optional[int], Optional[int]]:
         """Calculate the satellite grid index from lon/lat values"""
         info = self.get_info(info_or_uuid)
         if info is None:
@@ -742,6 +707,7 @@ class BaseWorkspace(QObject):
 
     def get_content_coordinate_mask(self, uuid: UUID, coords_mask):
         data = self.get_content(uuid)
+        assert data is not None  # nosec B101 # suppress mypy [index]
         trans = self._create_dataset_affine(uuid)
         p = self.dataset_proj(uuid)
         # coords_mask is (Y, X) like a numpy array
@@ -760,7 +726,7 @@ class BaseWorkspace(QObject):
         """
         pass
 
-    def find_merge_target(self, uuid: UUID, info) -> Optional[Product]:
+    def find_merge_target(self, uuid: UUID, paths, info) -> Optional[Product]:
         pass
 
     def get_points_arrays(self, uuid: UUID) -> Tuple[Optional[np.array], Optional[np.array]]:
@@ -808,7 +774,7 @@ class BaseWorkspace(QObject):
         pass
 
     def get_statistics_for_dataset_by_uuid(self, uuid: UUID) -> dict:
-        ac: ActiveContent = self._get_active_content_by_uuid(uuid)
+        ac = self._get_active_content_by_uuid(uuid)
         if ac:
             stats = ac.statistics
         else:
@@ -821,9 +787,9 @@ class BaseWorkspace(QObject):
         Falls back to calculate these values if the minimum and maximum are not stored.
         The UUID must identify an existing dataset.
         """
-        assert uuid is not None
-        ac: ActiveContent = self._get_active_content_by_uuid(uuid)
-        assert ac is not None
+        assert uuid is not None  # nosec B101
+        ac = self._get_active_content_by_uuid(uuid)
+        assert ac is not None  # nosec B101
         stats = ac.statistics
 
         if not stats:

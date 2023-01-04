@@ -8,7 +8,7 @@ import subprocess
 from datetime import datetime, timedelta, timezone
 from socket import gethostname
 from time import sleep
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 
 import appdirs
 from donfig import Config
@@ -27,7 +27,7 @@ APPLICATION_AUTHOR = "CIMSS-SSEC"
 WATCHDOG_DATETIME_FORMAT_STORE = "%Y-%m-%d %H:%M:%S %z"
 
 
-def get_config_value(config: Config, key: str) -> Union[str, dict]:
+def get_config_value(config: Config, key: str) -> str:
     """
     Wrapper for the `get` method from the donfig library, which provides
     a more friendly error message if the key doesn't exist.
@@ -97,7 +97,7 @@ class Watchdog:
         self.sent_restart_request = False
 
     @staticmethod
-    def _parse_byte_count(byte_count: str) -> int:
+    def _parse_byte_count(byte_count_str: str) -> int:
         """
         Parses the str representation of a byte count and converts the units
         `M` (*Mebibytes*) and `G` (*Gibibytes*) into the appropriate byte count.
@@ -110,9 +110,9 @@ class Watchdog:
         :param byte_count: str of the byte count with unit suffix
         :return: number of bytes as int
         """
-        if not byte_count:
+        if not byte_count_str:
             raise ValueError("expected a unit like `M` or `G`")
-        byte_count, unit = int(byte_count[:-1]), byte_count[-1]
+        byte_count, unit = int(byte_count_str[:-1]), byte_count_str[-1]
 
         MEBIBYTE_BYTES = 1024**2
         GIBIBYTE_BYTES = 1024**3

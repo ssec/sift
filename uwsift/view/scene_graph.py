@@ -243,21 +243,12 @@ class SceneGraphManager(QObject):
 
     # TODO(ar) REVIEW: distinction between class and member/instance
     #  variables seems random (see below)
-    document = None  # Document object we work with
-    workspace = None  # where we get data arrays from
     queue = None  # background jobs go here
 
-    borders_shapefiles = None  # political map overlay
     texture_shape = None
-    polygon_probes = None
-    point_probes = None
 
-    layer_nodes = None  # {layer_uuid: layer_node}
-    dataset_nodes = None  # {dataset_uuid: dataset_node}
-    composite_element_dependencies = None  # {dataset_uuid:set-of-dependent-uuids}
     datasets = None
     colormaps = None
-    animation_controller = None
 
     _current_tool = None
     _color_choices = None
@@ -276,7 +267,7 @@ class SceneGraphManager(QObject):
         doc,
         workspace,
         queue,
-        borders_shapefiles: list = None,
+        borders_shapefiles: Optional[list] = None,
         states_shapefile=None,
         parent=None,
         texture_shape=(4, 16),
@@ -286,20 +277,20 @@ class SceneGraphManager(QObject):
         self.didRetilingCalcs.connect(self._set_retiled)
 
         # Parent should be the Qt widget that this GLCanvas belongs to
-        self.document = doc
-        self.workspace = workspace
+        self.document = doc  # Document object we work with
+        self.workspace = workspace  # where we get data arrays from
         self.queue = queue
         self.borders_shapefiles = borders_shapefiles or [DEFAULT_SHAPE_FILE, DEFAULT_STATES_SHAPE_FILE]
         self.texture_shape = texture_shape
-        self.polygon_probes = {}
-        self.point_probes = {}
+        self.polygon_probes: dict = {}
+        self.point_probes: dict = {}
 
-        self.layer_nodes = {}
-        self.dataset_nodes = {}
-        self.latlon_grid_node = None  # noqa
-        self.borders_nodes = []
+        self.layer_nodes: dict = {}  # {layer_uuid: layer_node}
+        self.dataset_nodes: dict = {}  # {dataset_uuid: dataset_node}
+        self.latlon_grid_node: Optional[Line] = None
+        self.borders_nodes: list = []
 
-        self.composite_element_dependencies = {}
+        self.composite_element_dependencies: dict = {}  # {dataset_uuid:set-of-dependent-uuids}
         self.animation_controller = AnimationController()
 
         self._current_tool = None
@@ -316,15 +307,6 @@ class SceneGraphManager(QObject):
         ]
         self._latlon_grid_color_idx = 1
         self._borders_color_idx = 0
-
-        # TODO(ar) REVIEW: distinction between class and member/instance
-        # variables seems random (see above)
-        # These following three were initialized in self.setup_initial_canvas()
-        # thus indirectly as instance/member variables.
-        # Why aren't they class variables like 'document', 'workspace', ...?
-        self.main_view = None
-        self.main_canvas = None
-        self.pz_camera = None
 
         self.setup_initial_canvas(center)
         self.pending_polygon = PendingPolygon(self.main_map)
@@ -422,7 +404,7 @@ class SceneGraphManager(QObject):
 
     def set_projection(self, area_display_name: str, center=None):
         area_def = AreaDefinitionsManager.area_def_by_name(area_display_name)
-        assert area_def is not None
+        assert area_def is not None  # nosec B101
         self._set_projection(area_def, center)
 
         for dataset_node in self.dataset_nodes.values():
@@ -444,13 +426,14 @@ class SceneGraphManager(QObject):
         #  revising the application setup process.  For the moment, we assume
         #  that no one wants to use 'center' already when the application is
         #  started and therefore we ...
-        assert center is None or self.latlon_grid_node is not None
+        assert center is None or self.latlon_grid_node is not None  # nosec B101
 
         if center:
             # FIXME: We should be able to use the main_map object to do the
             #  transform but it doesn't work (waiting on vispy developers)
             # mapped_center = self.main_map.transforms\
             #    .get_transform(map_to="scene").map([center])[0][:2]
+            assert self.latlon_grid_node is not None  # nosec B101 # suppress mypy [union-attr]
             mapped_center = self.latlon_grid_node.transforms.get_transform(map_to="scene").map([center])[0][:2]
             ll_xy += mapped_center
             ur_xy += mapped_center
@@ -886,8 +869,8 @@ class SceneGraphManager(QObject):
             image.opacity = presentation.opacity
 
     def add_node_for_image_dataset(self, layer: LayerItem, product_dataset: ProductDataset):
-        assert self.layer_nodes[layer.uuid] is not None
-        assert product_dataset.kind in [Kind.IMAGE, Kind.COMPOSITE]
+        assert self.layer_nodes[layer.uuid] is not None  # nosec B101
+        assert product_dataset.kind in [Kind.IMAGE, Kind.COMPOSITE]  # nosec B101
 
         image_data = self.workspace.get_content(product_dataset.uuid, kind=product_dataset.kind)
 
@@ -940,8 +923,8 @@ class SceneGraphManager(QObject):
         :param layer: LayerItem which owns the ProductDataset
         :param product_dataset: ProductDataset to create the multichannel image for
         """
-        assert self.layer_nodes[layer.uuid] is not None
-        assert product_dataset.kind == Kind.MC_IMAGE
+        assert self.layer_nodes[layer.uuid] is not None  # nosec B101
+        assert product_dataset.kind == Kind.MC_IMAGE  # nosec B101
 
         img_data = self.workspace.get_content(product_dataset.uuid, kind=product_dataset.kind)
 
@@ -986,8 +969,9 @@ class SceneGraphManager(QObject):
         LOG.debug(self.main_view.describe_tree(with_transform=True))
 
     def add_node_for_composite_dataset(self, layer: LayerItem, product_dataset: ProductDataset):
-        assert self.layer_nodes[layer.uuid] is not None
-        assert product_dataset.kind == Kind.RGB
+        assert self.layer_nodes[layer.uuid] is not None  # nosec B101
+        assert product_dataset.kind == Kind.RGB  # nosec B101
+        assert product_dataset.input_datasets_uuids is not None  # nosec B101 # suppress mypy [union-attr]
 
         images_data = list(
             self.workspace.get_content(curr_input_uuid, Kind.IMAGE)
@@ -1036,8 +1020,8 @@ class SceneGraphManager(QObject):
         LOG.debug(self.main_view.describe_tree(with_transform=True))
 
     def add_node_for_lines_dataset(self, layer: LayerItem, product_dataset: ProductDataset) -> scene.VisualNode:
-        assert self.layer_nodes[layer.uuid] is not None
-        assert product_dataset.kind == Kind.LINES
+        assert self.layer_nodes[layer.uuid] is not None  # nosec B101
+        assert product_dataset.kind == Kind.LINES  # nosec B101
 
         content, _ = self.workspace.get_lines_arrays(product_dataset.uuid)
         if content is None:
@@ -1054,8 +1038,8 @@ class SceneGraphManager(QObject):
         LOG.debug(self.main_view.describe_tree(with_transform=True))
 
     def add_node_for_points_dataset(self, layer: LayerItem, product_dataset: ProductDataset) -> scene.VisualNode:
-        assert self.layer_nodes[layer.uuid] is not None
-        assert product_dataset.kind == Kind.POINTS
+        assert self.layer_nodes[layer.uuid] is not None  # nosec B101
+        assert product_dataset.kind == Kind.POINTS  # nosec B101
 
         pos, values = self.workspace.get_points_arrays(product_dataset.uuid)
         if pos is None:
@@ -1065,7 +1049,7 @@ class SceneGraphManager(QObject):
         kwargs = map_point_style_to_marker_kwargs(get_point_style_by_name(layer.presentation.style))
 
         if values is not None:
-            assert len(pos) == len(values)
+            assert len(pos) == len(values)  # nosec B101
             # TODO use climits of the presentation instead of autoscaling?
             colormap = self.document.find_colormap(layer.presentation.colormap)
             kwargs["face_color"] = self.map_to_colors_autoscaled(colormap, values)
@@ -1112,6 +1096,7 @@ class SceneGraphManager(QObject):
                     f" {product_dataset.uuid}"
                 )
 
+                assert product_dataset.input_datasets_uuids is not None  # nosec B101 # suppress mypy [union-attr]
                 images_data = list(
                     self.workspace.get_content(curr_input_id, Kind.IMAGE)
                     for curr_input_id in product_dataset.input_datasets_uuids

@@ -19,7 +19,7 @@ LOG = logging.getLogger(__name__)
 
 
 def _get_awips_colors(cmap_file):
-    from xml.etree import ElementTree
+    from defusedxml import ElementTree
 
     tree = ElementTree.parse(cmap_file)
     colors = np.array([(float(c.get("r")), float(c.get("g")), float(c.get("b"))) for c in tree.findall("color")])
@@ -72,7 +72,7 @@ class AWIPSColormap(Colormap):
         colors = _get_awips_colors(awips_file)
         if flipped:
             colors = colors[::-1]
-        assert isinstance(colors, np.ndarray)
+        assert isinstance(colors, np.ndarray)  # nosec B101
         super(AWIPSColormap, self).__init__(colors, interpolation=interpolation)
 
 
@@ -1271,7 +1271,7 @@ class LazyColormap(object):
         self.cmap_class = cmap_class
         self.cmap_file = cmap_file
         self.kwargs = kwargs
-        assert os.path.isfile(self.cmap_file)
+        assert os.path.isfile(self.cmap_file)  # nosec B101
 
     def load(self):
         LOG.debug("Loading colormap from file: {}".format(self.cmap_file))
@@ -1468,9 +1468,9 @@ OTHER_COLORMAPS = OrderedDict(
     ]
 )
 
-USER_COLORMAPS = OrderedDict()
+USER_COLORMAPS: OrderedDict = OrderedDict()
 USER_CATEGORY = "User"
-SITE_COLORMAPS = OrderedDict()
+SITE_COLORMAPS: OrderedDict = OrderedDict()
 SITE_CATEGORY = "Site"
 useable_vispy_cmaps = {k: v for k, v in _colormaps.items() if isinstance(v, BaseColormap)}
 CATEGORIZED_COLORMAPS = OrderedDict(
@@ -1524,7 +1524,7 @@ class ColormapManager(OrderedDict):
                 raise ValueError("ColormapManager expects dictionary of " "categories, not colormaps.")
             self._category_dict[key] = list(val.keys())
             for k, v in val.items():
-                assert isinstance(v, (LazyColormap, BaseColormap))
+                assert isinstance(v, (LazyColormap, BaseColormap))  # nosec B101
                 super(ColormapManager, self).__setitem__(k, v)
 
     def __iter__(self):
@@ -1582,7 +1582,7 @@ class ColormapManager(OrderedDict):
         return name in self._writeable_cmaps
 
     def add_colormap(self, name, colormap, category=USER_CATEGORY, read_only=True):
-        assert isinstance(colormap, (LazyColormap, BaseColormap))
+        assert isinstance(colormap, (LazyColormap, BaseColormap))  # nosec B101
         cat_dict = self._category_dict.setdefault(category, [])
         if name not in cat_dict:
             cat_dict.append(name)

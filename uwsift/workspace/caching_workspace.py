@@ -3,7 +3,7 @@ import os
 import shutil
 from collections import OrderedDict
 from datetime import datetime
-from typing import Dict, Generator, Optional, Tuple
+from typing import Dict, Generator, Mapping, Optional, Tuple
 from uuid import UUID
 
 import numpy as np
@@ -62,23 +62,31 @@ class CachingWorkspace(BaseWorkspace):
     def metadatabase(self) -> Metadatabase:
         return self._inventory
 
-    def __init__(self, directory_path=None, process_pool=None, max_size_gb=None, queue=None, initial_clear=False):
+    def __init__(
+        self,
+        directory_path: str,
+        process_pool=None,
+        max_size_gb=DEFAULT_WORKSPACE_SIZE,
+        queue=None,
+        initial_clear=False,
+    ):
         super(
             CachingWorkspace,
             self,
-        ).__init__(directory_path)
-        self._queue = queue
-        self._max_size_gb = max_size_gb if max_size_gb is not None else DEFAULT_WORKSPACE_SIZE
+        ).__init__(directory_path, queue=queue)
+        self._max_size_gb = max_size_gb  # maximum size in gigabytes of flat files we cache in the workspace
         if self._max_size_gb < MIN_WORKSPACE_SIZE:
             self._max_size_gb = MIN_WORKSPACE_SIZE
             LOG.warning("setting workspace size to %dGB" % self._max_size_gb)
         if directory_path is None:
+            # a directory name was not given, we need a temporary directory
             import tempfile
 
             self._tempdir = tempfile.TemporaryDirectory()
             directory_path = str(self._tempdir)
             LOG.info("using temporary directory {}".format(directory_path))
 
+        # filename to store and load inventory information (simple cache)
         self._inventory_path = os.path.join(self.cwd, "_inventory.db")
         if initial_clear:
             self.clear_workspace_content()
@@ -98,10 +106,11 @@ class CachingWorkspace(BaseWorkspace):
         if not os.path.isdir(dn):
             raise EnvironmentError("workspace directory {} does not exist".format(dn))
         LOG.info("{} database at {}".format("initializing" if should_init else "attaching", self._inventory_path))
+        # metadatabase instance, sqlalchemy:
         self._inventory = Metadatabase("sqlite:///" + self._inventory_path, create_tables=should_init)
         if should_init:
             with self._inventory as s:
-                assert 0 == s.query(Content).count()
+                assert 0 == s.query(Content).count()  # nosec B101
         LOG.info("done with init")
 
     def clear_workspace_content(self):
@@ -248,7 +257,7 @@ class CachingWorkspace(BaseWorkspace):
         return session.query(Product).filter_by(uuid_str=str(uuid)).first()
 
     def _product_overview_content(
-        self, session, prod: Product = None, uuid: UUID = None, kind: Kind = Kind.IMAGE
+        self, session, prod: Optional[Product] = None, uuid: Optional[UUID] = None, kind: Kind = Kind.IMAGE
     ) -> Optional[Content]:
         if prod is None and uuid is not None:
             # Get Product object
@@ -257,6 +266,8 @@ class CachingWorkspace(BaseWorkspace):
             except NoResultFound:
                 LOG.error("No product with UUID {} found".format(uuid))
                 return None
+        assert prod  # nosec B101 # suppress mypy [union-attr]
+
         if kind == Kind.IMAGE:
             contents = (
                 session.query(ContentImage).filter(ContentImage.product_id == prod.id).order_by(ContentImage.lod).all()
@@ -267,7 +278,7 @@ class CachingWorkspace(BaseWorkspace):
         return None if 0 == len(contents) else contents[0]
 
     def _product_native_content(
-        self, session, prod: Product = None, uuid: UUID = None, kind: Kind = Kind.IMAGE
+        self, session, prod: Optional[Product] = None, uuid: Optional[UUID] = None, kind: Kind = Kind.IMAGE
     ) -> Optional[Content]:
         # NOTE: This assumes the last Content object is the best resolution,
         #       but it is untested
@@ -278,6 +289,7 @@ class CachingWorkspace(BaseWorkspace):
             except NoResultFound:
                 LOG.error("No product with UUID {} found".format(uuid))
                 return None
+        assert prod  # nosec B101 # suppress mypy [union-attr]
 
         if kind == Kind.IMAGE:
             contents = (
@@ -301,7 +313,7 @@ class CachingWorkspace(BaseWorkspace):
         # assert(prod is not None)
         with self._inventory as s:
             ovc = self._product_overview_content(s, uuid=uuid, kind=kind)
-            assert ovc is not None
+            assert ovc is not None  # nosec B101
             arrays = self._cached_arrays_for_content(ovc)
             return arrays.data
 
@@ -360,9 +372,10 @@ class CachingWorkspace(BaseWorkspace):
                 # if content is available, we want to provide native content metadata along with the product metadata
                 # specifically a lot of client code assumes that resource == product == content and
                 # that singular navigation (e.g. cell_size) is norm
-                assert (
+                # FIXME DEBUG <- since commit 3576ff0122bd534f83422ce19479d40b7dc9e5b0
+                assert (  # nosec B101
                     kind in [Kind.LINES, Kind.POINTS] or native_content.info[Info.CELL_WIDTH] is not None
-                )  # FIXME DEBUG
+                )
                 return frozendict(ChainMap(native_content.info, prod.info))
             # mapping semantics for database fields, as well as key-value fields;
             # flatten to one namespace and read-only
@@ -540,15 +553,15 @@ class CachingWorkspace(BaseWorkspace):
 
             for hauler in importers:
                 for prod in hauler.merge_products():
-                    assert prod is not None
+                    assert prod is not None  # nosec B101
                     # merge the product into our database session, since it may belong to import_session
                     zult = frozendict(prod.info)
                     yield num_products, zult
 
     def import_product_content(
         self,
-        uuid: UUID = None,
-        prod: Product = None,
+        uuid: UUID,
+        prod: Optional[Product] = None,
         allow_cache=True,
         merge_target_uuid: Optional[UUID] = None,
         **importer_kwargs,
@@ -563,7 +576,7 @@ class CachingWorkspace(BaseWorkspace):
             if len(prod.content):
                 LOG.info("product already has content available, using that rather than re-importing")
                 ovc = self._product_overview_content(S, uuid=uuid, kind=default_prod_kind)
-                assert ovc is not None
+                assert ovc is not None  # nosec B101
                 arrays = self._cached_arrays_for_content(ovc)
                 return arrays.data
 
@@ -599,7 +612,7 @@ class CachingWorkspace(BaseWorkspace):
         return ac.data
 
     def _create_product_from_array(
-        self, info: Info, data, namespace=None, codeblock=None
+        self, info: Mapping, data, namespace=None, codeblock=None
     ) -> Tuple[UUID, Optional[frozendict], np.memmap]:
         """
         update metadatabase to include Product and Content entries for this new dataset we've calculated
@@ -713,7 +726,7 @@ class CachingWorkspace(BaseWorkspace):
             active_content = self._cached_arrays_for_content(content)
             return active_content.data
 
-    def _deactivate_content_for_product(self, p: Product):
+    def _deactivate_content_for_product(self, p: Optional[Product]):
         if p is None:
             return
         for c in p.content:

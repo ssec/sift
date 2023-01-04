@@ -22,7 +22,7 @@ def test_multiband_visual():
         r_result = result[..., 0]
         g_result = result[..., 1]
         b_result = result[..., 2]
-        assert not np.allclose(r_result, 0)
+        assert not np.allclose(r_result, 0)  # nosec B101
         np.testing.assert_allclose(g_result, 0)
         np.testing.assert_allclose(b_result, 0)
 
@@ -33,9 +33,9 @@ def test_multiband_visual():
         r_result = result[..., 0]
         g_result = result[..., 1]
         b_result = result[..., 2]
-        assert not np.allclose(r_result, 0)
+        assert not np.allclose(r_result, 0)  # nosec B101
         np.testing.assert_allclose(g_result, 0)
-        assert not np.allclose(b_result, 0)
+        assert not np.allclose(b_result, 0)  # nosec B101
 
         # Unset R, add G
         image.set_data([None, g_data, b_data])
@@ -45,8 +45,8 @@ def test_multiband_visual():
         g_result = result[..., 1]
         b_result = result[..., 2]
         np.testing.assert_allclose(r_result, 0)
-        assert not np.allclose(g_result, 0)
-        assert not np.allclose(b_result, 0)
+        assert not np.allclose(g_result, 0)  # nosec B101
+        assert not np.allclose(b_result, 0)  # nosec B101
 
 
 run_tests_if_main()

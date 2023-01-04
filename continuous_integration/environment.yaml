@@ -3,6 +3,7 @@ channels:
   - conda-forge
 dependencies:
   - appdirs
+  - defusedxml
   - Cython
   - imageio
   - imageio-ffmpeg

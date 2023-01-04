@@ -1,6 +1,6 @@
 import logging
 from functools import partial
-from typing import Tuple
+from typing import Optional, Tuple
 
 from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtWidgets import QComboBox
@@ -40,8 +40,8 @@ class AlgebraicLayerConfigPane(QObject):
     def __init__(self, ui, parent, model: LayerModel):
         super(AlgebraicLayerConfigPane, self).__init__(parent)
         self.ui = ui
-        self._layer_uuids = []
-        self.recipe = None
+        self._layer_uuids: list = []
+        self.recipe: Optional[AlgebraicRecipe] = None
         self.model = model
 
         [
@@ -108,7 +108,7 @@ class AlgebraicLayerConfigPane(QObject):
         """Change UI elements to reflect the provided recipe"""
         if layers is not None and len(layers) == 1:
             layer = layers[0]
-            self.recipe = layer.recipe if layer.recipe else None
+            self.recipe = layer.recipe if isinstance(layer.recipe, AlgebraicRecipe) else None
             self._show_settings_for_layer(self.recipe)
 
     def _show_settings_for_layer(self, recipe=None):

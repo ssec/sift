@@ -2,7 +2,7 @@ import logging
 import os
 from collections import ChainMap
 from datetime import datetime
-from typing import Dict, Generator, Optional, Tuple
+from typing import Generator, Mapping, Optional, Tuple
 from uuid import UUID
 
 import numpy as np
@@ -12,7 +12,7 @@ from uwsift import CLEANUP_FILE_CACHE, config
 from uwsift.common import Info, Kind, State
 
 from .importer import SatpyImporter, aImporter
-from .metadatabase import Content, ContentImage, Metadatabase, Product
+from .metadatabase import Content, ContentImage, Product
 from .workspace import ActiveContent, BaseWorkspace, frozendict
 
 LOG = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ class SimpleWorkspace(BaseWorkspace):
     one dictionary for saving the Content objects for a specific UUID.
     """
 
-    def __init__(self, directory_path: str = None):
+    def __init__(self, directory_path: str):
         super(SimpleWorkspace, self).__init__(directory_path)
 
         self.products: dict = {}
@@ -42,10 +42,6 @@ class SimpleWorkspace(BaseWorkspace):
 
     @property
     def _S(self):
-        return None
-
-    @property
-    def metadatabase(self) -> Metadatabase:
         return None
 
     def clear_workspace_content(self):
@@ -93,12 +89,12 @@ class SimpleWorkspace(BaseWorkspace):
         return self.products.get(uuid, None)
 
     def _product_overview_content(
-        self, session, prod: Product = None, uuid: UUID = None, kind: Kind = Kind.IMAGE
+        self, session, prod: Optional[Product] = None, uuid: Optional[UUID] = None, kind: Kind = Kind.IMAGE
     ) -> Optional[Content]:
         return self.contents.get(uuid, None)
 
     def _product_native_content(
-        self, session, prod: Product = None, uuid: UUID = None, kind: Kind = Kind.IMAGE
+        self, session, prod: Optional[Product] = None, uuid: Optional[UUID] = None, kind: Kind = Kind.IMAGE
     ) -> Optional[Content]:
         return self.contents.get(uuid, None)
 
@@ -108,7 +104,7 @@ class SimpleWorkspace(BaseWorkspace):
 
     def _overview_content_for_uuid(self, uuid: UUID, kind: Kind = Kind.IMAGE) -> np.memmap:
         ovc = self._product_overview_content(None, uuid=uuid, kind=kind)
-        assert ovc is not None
+        assert ovc is not None  # nosec B101
         arrays = self._cached_arrays_for_content(ovc)
         return arrays.data
 
@@ -155,18 +151,12 @@ class SimpleWorkspace(BaseWorkspace):
             # specifically a lot of client code assumes that resource
             # == product == content and
             # that singular navigation (e.g. cell_size) is norm
-            assert kind in [Kind.LINES, Kind.POINTS] or native_content.info[Info.CELL_WIDTH] is not None  # FIXME DEBUG
+            # FIXME DEBUG <- since commit 3576ff0122bd534f83422ce19479d40b7dc9e5b0
+            assert kind in [Kind.LINES, Kind.POINTS] or native_content.info[Info.CELL_WIDTH] is not None  # nosec B101
             return frozendict(ChainMap(native_content.info, prod.info))
         # mapping semantics for database fields, as well as key-value fields;
         # flatten to one namespace and read-only
         return frozendict(prod.info)
-
-    @property
-    def product_names_available_in_cache(self) -> dict:
-        return None
-
-    def recently_used_products(self, n=32) -> Dict[UUID, str]:
-        pass
 
     def purge_content_for_product_uuids(self, uuids: list, also_products=False):
         pass
@@ -223,7 +213,7 @@ class SimpleWorkspace(BaseWorkspace):
 
         for hauler in importers:
             for prod in hauler.merge_products():
-                assert prod is not None
+                assert prod is not None  # nosec B101
                 # add to-be-imported filenames to check for possible merge targets but
                 # do not include these filenames in the product info
                 extended_prod_info = dict(prod.info)
@@ -239,14 +229,15 @@ class SimpleWorkspace(BaseWorkspace):
 
     def import_product_content(
         self,
-        uuid: UUID = None,
-        prod: Product = None,
+        uuid: UUID,
+        prod: Optional[Product] = None,
         allow_cache=True,
         merge_target_uuid: Optional[UUID] = None,
         **importer_kwargs,
     ) -> np.memmap:
         if prod is None and uuid is not None:
             prod = self._product_with_uuid(None, uuid)
+        assert prod  # nosec B101 # suppress mypy [union-attr]
 
         if merge_target_uuid:
             merge_target = self._product_with_uuid(None, merge_target_uuid)
@@ -261,7 +252,7 @@ class SimpleWorkspace(BaseWorkspace):
         if merge_target_uuid and len(prod.content):
             LOG.info("product already has content available, using that " "rather than re-importing")
             ovc = self._product_overview_content(None, uuid=uuid, kind=default_prod_kind)
-            assert ovc is not None
+            assert ovc is not None  # nosec B101
             arrays = self._cached_arrays_for_content(ovc)
             return arrays.data
 
@@ -348,7 +339,7 @@ class SimpleWorkspace(BaseWorkspace):
         return None
 
     def _create_product_from_array(
-        self, info: Info, data, namespace=None, codeblock=None
+        self, info: Mapping, data, namespace=None, codeblock=None
     ) -> Tuple[UUID, Optional[frozendict], np.memmap]:
         """
         Puts created image array into resp. data structures within workspace and returns
@@ -463,7 +454,7 @@ class SimpleWorkspace(BaseWorkspace):
         active_content = self._cached_arrays_for_content(content)
         return active_content.data
 
-    def _deactivate_content_for_product(self, p: Product):
+    def _deactivate_content_for_product(self, p: Optional[Product]):
         if p is None:
             return
         for c in p.content:

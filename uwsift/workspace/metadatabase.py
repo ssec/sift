@@ -79,7 +79,7 @@ ProductsFromResources = Table(
 )
 
 
-class Resource(Base):
+class Resource(Base):  # type: ignore
     """
     held metadata regarding a file that we can access and import data into the workspace from
     resources are external to the workspace, but the workspace can keep track of them in its database
@@ -155,7 +155,7 @@ class ChainRecordWithDict(MutableMapping):
     def __getitem__(self, key):
         fieldname = self._field_keys.get(key)
         if fieldname is not None:
-            assert isinstance(fieldname, str)
+            assert isinstance(fieldname, str)  # nosec B101
             return getattr(self._obj, fieldname)
         return self._more[key]
 
@@ -176,7 +176,7 @@ class ChainRecordWithDict(MutableMapping):
         del self._more[key]
 
 
-class Product(Base):
+class Product(Base):  # type: ignore
     """
     Primary entity being tracked in metadatabase
     One or more StoredProduct are held in a single File
@@ -469,7 +469,7 @@ class Product(Base):
         [x.touch(when) for x in self.resource]
 
 
-class ProductKeyValue(Base):
+class ProductKeyValue(Base):  # type: ignore
     """
     key-value pairs associated with a product
     """
@@ -483,7 +483,7 @@ class ProductKeyValue(Base):
     value = Column(PickleType)
 
 
-class SymbolKeyValue(Base):
+class SymbolKeyValue(Base):  # type: ignore
     """
     datasets of derived layers have a symbol table which becomes namespace used by expression
     """
@@ -495,7 +495,7 @@ class SymbolKeyValue(Base):
     value = Column(PickleType, nullable=True)  # UUID object typically
 
 
-class Content(Base):
+class Content(Base):  # type: ignore
     """
     represent flattened product data files in cache (i.e. cache content)
     typically memory-map ready data (np.memmap)
@@ -766,7 +766,7 @@ class ContentLines(Content):
         return Content.__table__.c.get("n_dimensions", Column(Integer))
 
 
-class ContentKeyValue(Base):
+class ContentKeyValue(Base):  # type: ignore
     """
     key-value pairs associated with a product
     """
@@ -828,8 +828,8 @@ class Metadatabase(object):
         return zult
 
     def connect(self, uri, create_tables=False, **kwargs):
-        assert self.engine is None
-        assert self.connection is None
+        assert self.engine is None  # nosec B101
+        assert self.connection is None  # nosec B101
         self.engine = create_engine(uri, **kwargs)
         LOG.info("attaching database at {}".format(uri))
         if create_tables or not self._all_tables_present():
@@ -845,6 +845,7 @@ class Metadatabase(object):
 
     def __enter__(self) -> Session:
         ses = self.SessionRegistry()
+        assert self.session_nesting is not None  # nosec B101 # suppress mypy [index]
         self.session_nesting[id(ses)] += 1
         return ses
 

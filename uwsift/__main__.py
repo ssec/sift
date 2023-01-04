@@ -244,11 +244,6 @@ class UserControlsAnimation(QtCore.QObject):
     - start/stop animation
     """
 
-    ui = None
-    document: Document = None
-    scene_manager: SceneGraphManager = None
-    _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
-
     def __init__(self, ui, scene_manager: SceneGraphManager):
         """
         Args:
@@ -258,6 +253,8 @@ class UserControlsAnimation(QtCore.QObject):
         super(UserControlsAnimation, self).__init__()
         self.ui = ui
         self.scene_manager = scene_manager
+        # window we'll show temporarily with animation speed popup
+        self._animation_speed_popup: typ.Optional[AnimationSpeedPopupWindow] = None
 
         self.ui.animPlayPause.clicked.connect(self.toggle_animation)
         self.ui.animPlayPause.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -302,21 +299,19 @@ class UserControlsAnimation(QtCore.QObject):
 class Main(QtWidgets.QMainWindow):
     # TODO: the following settings, is this actually the best place to store
     #  them here?
-    _last_open_dir: str = None  # directory to open files in (preselection)
-    _last_reader: str = None  # reader to open files with (preselection)
+    _last_open_dir: str = ""  # directory to open files in (preselection)
+    _last_reader: str = ""  # reader to open files with (preselection)
 
     _recent_files_menu: QtWidgets.QMenu = None  # QMenu
     _open_cache_dialog: QtWidgets.QDialog = None
     _screenshot_dialog: QtWidgets.QDialog = None
     _cmap_editor = None  # Gradient editor widget
-    _resource_collector: ResourceSearchPathCollector = None
     _resource_collector_timer: QtCore.QTimer = None
     _last_imported_dataset_uuid: typ.Optional[UUID] = None
     _palette_text_green: QtGui.QPalette = None
     _palette_text_red: QtGui.QPalette = None
     _max_tolerable_idle_time: float = -1
     _max_tolerable_dataset_age: float = -1
-    _heartbeat_file = None
 
     didFinishLoading = QtCore.pyqtSignal(list)
 
@@ -401,6 +396,7 @@ class Main(QtWidgets.QMainWindow):
         self.scene_manager.change_tool(name)
 
     def update_recent_file_menu(self, *args, **kwargs):
+        assert isinstance(self.workspace, CachingWorkspace)  # nosec B101
         uuid_to_name = self.workspace.recently_used_products()
         LOG.debug("recent uuids: {}".format(repr(uuid_to_name.keys())))
         self._recent_files_menu.clear()
@@ -488,7 +484,7 @@ class Main(QtWidgets.QMainWindow):
 
         :param dataset: recently loaded dataset
         """
-        dataset_sched_time_utc = dataset.info.get(Info.SCHED_TIME).replace(tzinfo=timezone.utc)
+        dataset_sched_time_utc = dataset.info[Info.SCHED_TIME].replace(tzinfo=timezone.utc)
         fmt_time = dataset_sched_time_utc.strftime(WATCHDOG_DATETIME_FORMAT_STORE).rstrip()
 
         journal_path = self._heartbeat_file + "-journal"
@@ -514,7 +510,7 @@ class Main(QtWidgets.QMainWindow):
 
         self._last_imported_dataset_uuid = dataset.uuid
 
-        dataset_sched_time_utc = dataset.info.get(Info.SCHED_TIME).replace(tzinfo=timezone.utc)
+        dataset_sched_time_utc = dataset.info[Info.SCHED_TIME].replace(tzinfo=timezone.utc)
         self.ui.timeLastDatasetCreationLineEdit.setText(
             dataset_sched_time_utc.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY)
         )
@@ -561,64 +557,6 @@ class Main(QtWidgets.QMainWindow):
             else:
                 palette = self._palette_text_green
             self.ui.timeLastDatasetImportLineEdit.setPalette(palette)
-
-    def _restart_handler(self, signal: int, frame: FrameType):
-        if self._restart_handler_active:
-            return
-        self._restart_handler_active = True
-
-        if self._restart_ask_again_interval is not None:
-            if self._last_restart_request is None:
-                self._last_restart_request = datetime.now()
-            else:
-                since_last_restart = datetime.now() - self._last_restart_request
-                if since_last_restart < self._restart_ask_again_interval:
-                    LOG.debug("Ignoring restart request because last restart " "request was denied recently")
-                    return
-
-        msg_box = QtWidgets.QMessageBox()
-        msg_box.setIcon(QtWidgets.QMessageBox.Information)
-        msg_box.setText("Do you want to perform the requested restart?")
-        msg_box.setWindowTitle("Restart Request")
-        msg_box.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
-
-        def force_restart():
-            msg_box.close()
-            LOG.info("forced shutdown after restart request")
-            sys.exit(EXIT_FORCED_SHUTDOWN)
-
-        if self._restart_popup_deadline is not None:
-            timer = QtCore.QTimer()
-            timer.setSingleShot(True)
-            timer.timeout.connect(force_restart)
-            timer.start(self._restart_popup_deadline * 1000)
-
-        if msg_box.exec() == QtWidgets.QMessageBox.Yes:
-            LOG.info("shutdown in order to comply with restart request")
-            sys.exit(EXIT_CONFIRMED_SHUTDOWN)
-        else:
-            LOG.info("ignored restart request")
-            self._last_restart_request = datetime.now()
-            self._restart_handler_active = False
-
-    def _init_auto_restart(self):
-        restart_popup_deadline = config.get("watchdog.auto_restart_popup_deadline", 0)
-        if restart_popup_deadline == 0:
-            LOG.warning("deadline for the auto restart is disabled")
-            self._restart_popup_deadline = None
-        else:
-            self._restart_popup_deadline = int(restart_popup_deadline)
-
-        restart_ask_again_interval = config.get("watchdog.auto_restart_ask_again_interval", 0)
-        if restart_ask_again_interval == 0:
-            LOG.warning("User won't be asked again to restart")
-            self._restart_ask_again_interval = None
-        else:
-            self._restart_ask_again_interval = timedelta(seconds=int(restart_ask_again_interval))
-
-        self._restart_handler_active = False
-        self._last_restart_request = None
-        signal.signal(signal.SIGUSR1, self._restart_handler)
 
     def __init__(
         self,
@@ -718,6 +656,25 @@ class Main(QtWidgets.QMainWindow):
             self._init_metadata_background_collection(search_paths)
 
         # FIXME: make sure sync of metadata signals sync of document potentials and track display
+
+    def _init_auto_restart(self):
+        restart_popup_deadline = config.get("watchdog.auto_restart_popup_deadline", 0)
+        if restart_popup_deadline == 0:
+            LOG.warning("deadline for the auto restart is disabled")
+            self._restart_popup_deadline = None
+        else:
+            self._restart_popup_deadline = int(restart_popup_deadline)
+
+        restart_ask_again_interval = config.get("watchdog.auto_restart_ask_again_interval", 0)
+        if restart_ask_again_interval == 0:
+            LOG.warning("User won't be asked again to restart")
+            self._restart_ask_again_interval = None
+        else:
+            self._restart_ask_again_interval = timedelta(seconds=int(restart_ask_again_interval))
+
+        self._restart_handler_active = False
+        self._last_restart_request = None
+        signal.signal(signal.SIGUSR1, self._restart_handler)
 
     def _init_metadata_background_collection(self, search_paths):
         # if search paths are provided on the command line,
@@ -1057,11 +1014,52 @@ class Main(QtWidgets.QMainWindow):
         else:
             LOG.debug("no resources to collect, skipping followup task")
 
+    def _restart_handler(self, signal: int, frame: FrameType):
+        if self._restart_handler_active:
+            return
+        self._restart_handler_active = True
+
+        if self._restart_ask_again_interval is not None:
+            if self._last_restart_request is None:
+                self._last_restart_request = datetime.now()
+            else:
+                since_last_restart = datetime.now() - self._last_restart_request
+                if since_last_restart < self._restart_ask_again_interval:
+                    LOG.debug("Ignoring restart request because last restart " "request was denied recently")
+                    return
+
+        msg_box = QtWidgets.QMessageBox()
+        msg_box.setIcon(QtWidgets.QMessageBox.Information)
+        msg_box.setText("Do you want to perform the requested restart?")
+        msg_box.setWindowTitle("Restart Request")
+        msg_box.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+
+        def force_restart():
+            msg_box.close()
+            LOG.info("forced shutdown after restart request")
+            sys.exit(EXIT_FORCED_SHUTDOWN)
+
+        if self._restart_popup_deadline is not None:
+            timer = QtCore.QTimer()
+            timer.setSingleShot(True)
+            timer.timeout.connect(force_restart)
+            timer.start(self._restart_popup_deadline * 1000)
+
+        if msg_box.exec() == QtWidgets.QMessageBox.Yes:
+            LOG.info("shutdown in order to comply with restart request")
+            sys.exit(EXIT_CONFIRMED_SHUTDOWN)
+        else:
+            LOG.info("ignored restart request")
+            self._last_restart_request = datetime.now()
+            self._restart_handler_active = False
+
     def closeEvent(self, event, *args, **kwargs):
         LOG.debug("main window closing")
         self.workspace.close()
 
     def open_from_cache(self, *args, **kwargs):
+        assert isinstance(self.workspace, CachingWorkspace)  # nosec B101
+
         def _activate_products_for_names(uuids):
             LOG.info("activating cached products with uuids: {}".format(repr(uuids)))
             self.activate_products_by_uuid(uuids)
@@ -1297,7 +1295,7 @@ def set_default_geometry(window, desktop=-1):
     window.show()  # assures that the window has a windowHandle
 
     desktop_window: QtGui.QWindow = window.windowHandle()
-    assert desktop_window  # Only call this for windows, i.e. toplevel widgets
+    assert desktop_window  # Only call this for windows, i.e. toplevel widgets # nosec B101
     screen: QtGui.QScreen = desktop_window.screen()
     if desktop >= 0:
         screens = QtWidgets.QApplication.screens()
@@ -1336,7 +1334,7 @@ def _search_paths(arglist):
             yield subpath
 
 
-def create_app() -> (app.Application, QtWidgets.QApplication):
+def create_app() -> typ.Tuple[app.Application, QtWidgets.QApplication]:
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
     vispy_app = app.use_app("pyqt5")
     qt_app = vispy_app.create()

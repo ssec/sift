@@ -68,12 +68,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     in order to reduce abstraction leakage and permit the document storage to evolve.
     """
 
-    config_dir: str = None
-    queue: TaskQueue = None
-    _workspace: BaseWorkspace = None
-
-    _info_by_uuid = None  # dict(uuid:Doc____Layer)
-
     # signals
     didAddDataset = pyqtSignal(dict, Presentation)
     didUpdateBasicDataset = pyqtSignal(UUID, Kind)
@@ -84,7 +78,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def __init__(
         self,
         workspace: BaseWorkspace,
-        queue,
+        queue: TaskQueue,
         config_dir=DOCUMENT_SETTINGS_DIR,
         **kwargs,
     ):
@@ -96,7 +90,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             os.makedirs(self.config_dir)
 
         self._workspace = workspace
-        self._info_by_uuid = {}
+        self._info_by_uuid: typ.Dict[UUID, dict] = {}  # dict(uuid:frozendict)
 
         self.colormaps = COLORMAP_MANAGER
         self.default_area_def_name = AreaDefinitionsManager.default_area_def_name()
@@ -126,7 +120,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def change_projection(self, area_def_name=None):
         if area_def_name is None:
             area_def_name = self.default_area_def_name
-        assert area_def_name in AreaDefinitionsManager.available_area_def_names()
+        assert area_def_name in AreaDefinitionsManager.available_area_def_names()  # nosec B101
         if area_def_name != self.current_area_def_name:
             LOG.debug(
                 f"Changing projection (area definition) from" f" '{self.current_area_def_name}' to '{area_def_name}'"
@@ -201,8 +195,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self._workspace.import_product_content(uuid, **importer_kwargs)
         # updated metadata with content information (most importantly navigation
         # information)
-        info = dict(self._workspace.get_info(uuid))
-        assert info is not None
+        frozen_info = self._workspace.get_info(uuid)
+        assert frozen_info is not None  # nosec B101
+        info = dict(frozen_info)  # make a copy to which stuff can be added
         LOG.debug("cell_width: {}".format(repr(info[Info.CELL_WIDTH])))
 
         LOG.debug("new dataset info: {}".format(repr(info)))
@@ -244,7 +239,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             subcat = uuid_or_info[Info.DATASET_NAME]
         return "{}:{}:{}:{}".format(kind.name, refpoint, measurement, subcat)
 
-    def import_files(self, paths, insert_before=0, **importer_kwargs) -> dict:
+    def import_files(self, paths, insert_before=0, **importer_kwargs) -> typ.Generator[dict, None, None]:
         """Load product metadata and content from provided file paths.
 
         :param paths: paths to open
@@ -271,8 +266,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         merge_target_uuids = {}  # map new files uuids to merge target uuids
         total_products = 0
         for dex, (num_prods, info) in enumerate(infos):
-            assert info is not None
-
             uuid = info[Info.UUID]
             merge_target_uuid = uuid
             if do_merge_with_existing:
@@ -323,6 +316,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             }
 
     def sort_product_uuids(self, uuids: typ.Iterable[UUID]) -> typ.List[UUID]:
+        assert isinstance(self._workspace, CachingWorkspace)  # nosec B101
         uuidset = set(str(x) for x in uuids)
         if not uuidset:
             return []

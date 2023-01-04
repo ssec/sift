@@ -18,7 +18,7 @@ LOG = logging.getLogger(__name__)
 
 
 class HeapAnalyzer:
-    _allocations = defaultdict(list)
+    _allocations: defaultdict = defaultdict(list)
     _combined_snapshot_count = 0
 
     @staticmethod
@@ -29,6 +29,8 @@ class HeapAnalyzer:
         for file in os.listdir(snapshot_directory):
             if file.endswith(".snapshot"):
                 captures = file_name_regex.search(file)
+                if captures is None:
+                    continue
                 idx = int(captures.group(1))
                 filtered_files[idx] = file
 
@@ -96,7 +98,7 @@ class HeapAnalyzer:
                 self._combined_snapshot_count = len(allocs)
             else:
                 # the lists must have the same length for the stacked plot
-                assert self._combined_snapshot_count == len(allocs)
+                assert self._combined_snapshot_count == len(allocs)  # nosec B101
 
     def _get_sorted_allocations(self, sort_key: str = "size") -> OrderedDict:
         if sort_key not in ["size", "count"]:

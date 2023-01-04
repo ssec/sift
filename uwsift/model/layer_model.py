@@ -1,7 +1,7 @@
 import logging
 import struct
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 from uuid import UUID
 
 from PyQt5.QtCore import QAbstractItemModel, QMimeData, QModelIndex, Qt, pyqtSignal
@@ -95,7 +95,7 @@ class LayerModel(QAbstractItemModel):
 
         self._document = document
         self._workspace = self._document._workspace
-        assert self._workspace  # Verify proper initialisation order
+        assert self._workspace  # Verify proper initialisation order  # nosec B101
 
         self._headers = LAYER_TREE_VIEW_HEADER
 
@@ -138,7 +138,7 @@ class LayerModel(QAbstractItemModel):
     def get_dynamic_layers(self):
         return [layer for layer in self.layers if layer.dynamic]
 
-    def data(self, index: QModelIndex, role: int = None):
+    def data(self, index: QModelIndex, role: Optional[int] = None):
         if not index.isValid():
             return None
         if role not in self._supportedRoles:
@@ -246,7 +246,7 @@ class LayerModel(QAbstractItemModel):
             parent = QModelIndex()
         if not self.hasIndex(row, col, parent):
             return QModelIndex()
-        assert not parent.isValid()
+        assert not parent.isValid()  # nosec B101
         layer = self.layers[row]
         return self.createIndex(row, col, layer)
 
@@ -268,8 +268,8 @@ class LayerModel(QAbstractItemModel):
         if not index.isValid():
             return False
 
-        assert role == Qt.EditRole, f"Unexpected role {role} for changing data."
-        assert index.column() == LMC.VISIBILITY, f"Attempt to edit immutable column {index.column()}."
+        assert role == Qt.EditRole, f"Unexpected role {role} for changing data."  # nosec B101
+        assert index.column() == LMC.VISIBILITY, f"Attempt to edit immutable column {index.column()}."  # nosec B101
 
         LOG.debug(f"Changing row {index.row()}, column {index.column()}" f" to {data}.")
 
@@ -365,7 +365,7 @@ class LayerModel(QAbstractItemModel):
         if row != -1:  # we may also interpret this as put to the end
             target_row = row
         elif parentIndex.isValid():
-            assert not parentIndex.isValid(), (
+            assert not parentIndex.isValid(), (  # nosec B101
                 "BUG: hierarchical layers not implemented," " dropping on a parent must not yet occur!"
             )
             # This case needs modification when hierarchical layers are
@@ -380,7 +380,7 @@ class LayerModel(QAbstractItemModel):
 
         # According to https://doc.qt.io/qt-5/qabstractitemmodel.html#beginMoveRows
         # now we can assert ...
-        assert not source_row <= target_row <= source_row + 1
+        assert not source_row <= target_row <= source_row + 1  # nosec B101
 
         if source_row < target_row:
             target_row -= 1
@@ -400,6 +400,8 @@ class LayerModel(QAbstractItemModel):
     def on_didMatchTimes(self, t_matched_dict: dict):  # noqa
         for layer_uuid, active_dataset_uuids in t_matched_dict.items():
             layer = self.get_layer_by_uuid(layer_uuid)
+            if layer is None:
+                continue
             for product_dataset in layer.timeline.values():
                 if product_dataset.uuid in active_dataset_uuids:
                     product_dataset.is_active = True
@@ -439,6 +441,7 @@ class LayerModel(QAbstractItemModel):
 
     def change_colormap_for_layer(self, uuid: UUID, colormap: object):
         layer = self.get_layer_by_uuid(uuid)
+        assert layer is not None  # nosec B101
         layer.presentation.colormap = colormap
         change_dict = self._build_presentation_change_dict(layer, colormap)
         self.didChangeColormap.emit(change_dict)
@@ -457,12 +460,14 @@ class LayerModel(QAbstractItemModel):
 
     def change_color_limits_for_layer(self, uuid: UUID, color_limits: object):
         layer = self.get_layer_by_uuid(uuid)
+        assert layer is not None  # nosec B101
         layer.presentation.climits = color_limits
         change_dict = self._build_presentation_change_dict(layer, color_limits)
         self.didChangeColorLimits.emit(change_dict)
 
-    def change_gamma_for_layer(self, uuid: UUID, gamma: float):
+    def change_gamma_for_layer(self, uuid: UUID, gamma: Union[float, List[float]]):
         layer = self.get_layer_by_uuid(uuid)
+        assert layer is not None  # nosec B101
         layer.presentation.gamma = gamma
         change_dict = self._build_presentation_change_dict(layer, gamma)
         self.didChangeGamma.emit(change_dict)
@@ -501,7 +506,7 @@ class LayerModel(QAbstractItemModel):
 
         prez = Presentation(uuid=None, kind=Kind.RGB, climits=recipe.color_limits, gamma=recipe.gammas)
 
-        rgb_layer = LayerItem(self, info, prez, recipe=recipe)
+        rgb_layer = LayerItem(self, frozendict(info), prez, recipe=recipe)
         self.didCreateLayer.emit(rgb_layer)
         self._add_layer(rgb_layer)
         return rgb_layer
@@ -524,7 +529,9 @@ class LayerModel(QAbstractItemModel):
         return input_datasets_uuids
 
     @staticmethod
-    def _get_datasets_infos_of_multichannel_dataset(sched_time: datetime, input_layers: List[LayerItem]) -> List[dict]:
+    def _get_datasets_infos_of_multichannel_dataset(
+        sched_time: datetime, input_layers: List[LayerItem]
+    ) -> List[Optional[frozendict]]:
         input_datasets_infos = []
         for layer in input_layers:
             dataset_info = layer.timeline.get(sched_time).info if layer else None
@@ -545,7 +552,7 @@ class LayerModel(QAbstractItemModel):
 
         for sched_time in datasets_to_remove:
             dataset: ProductDataset = layer.timeline.get(sched_time)
-            assert dataset
+            assert dataset  # nosec B101
             self._remove_dataset(layer, sched_time, dataset.uuid)
 
     def _remove_dataset(self, layer: LayerItem, sched_time: datetime, dataset_uuid: UUID):
@@ -609,16 +616,18 @@ class LayerModel(QAbstractItemModel):
         return datasets_to_added, datasets_to_update, datasets_to_remove
 
     @staticmethod
-    def _get_common_timeline_of_input_layers(timelines_to_compare: List[dict]):
+    def _get_common_timeline_of_input_layers(timelines_to_compare: List[dict]) -> list:
         if len(timelines_to_compare) == 0:
             return []
 
-        intersection = timelines_to_compare[-1].keys()
+        intersection = set(timelines_to_compare[-1].keys())
         for idx in range(len(timelines_to_compare) - 1):
             curr_timeline = timelines_to_compare[idx]
             intersection = intersection & curr_timeline.keys()
 
-        return intersection
+        common_times = list(intersection)
+        common_times.sort()
+        return common_times
 
     @staticmethod
     def _get_timeline_of_layers(input_layers: List[LayerItem]):
@@ -657,6 +666,7 @@ class LayerModel(QAbstractItemModel):
         :param recipe: Recipe of the layer whose timeline is to be updated
         """
         recipe_layer: LayerItem = self._get_layer_of_recipe(recipe.id)
+        assert recipe_layer and recipe_layer.recipe  # nosec B101
 
         if isinstance(recipe, CompositeRecipe):
             self.update_rgb_layer_gamma(recipe)
@@ -684,6 +694,7 @@ class LayerModel(QAbstractItemModel):
         elif isinstance(recipe, AlgebraicRecipe):
             self._update_algebraic_datasets(sched_times_to_update, input_layers, recipe_layer)
             self._add_algebraic_datasets(sched_times_to_add, input_layers, recipe_layer)
+            assert isinstance(recipe_layer.recipe, AlgebraicRecipe)  # nosec B101 # suppress mypy [attr-defined]
             recipe_layer.recipe.modified = False
 
             self._update_dependent_recipe_layers(recipe_layer)
@@ -691,10 +702,11 @@ class LayerModel(QAbstractItemModel):
         dataset_uuids = recipe_layer.get_datasets_uuids()
         if dataset_uuids:
             dataset = recipe_layer.get_dataset_by_uuid(dataset_uuids[0])
+            assert dataset  # nosec B101 # suppress mypy [union-attr]
             recipe_layer.replace_recipe_layer_info(dataset.info)
         elif not all(input_layers):
             info = {Info.KIND: recipe_layer.kind}
-            recipe_layer.replace_recipe_layer_info(info)
+            recipe_layer.replace_recipe_layer_info(frozendict(info))
 
         # TODO (AR): is this the right place to check whether color limits
         #  should be reset to an invalid state? What, if the formula together
@@ -827,7 +839,7 @@ class LayerModel(QAbstractItemModel):
 
         prez = Presentation(uuid=None, kind=Kind.COMPOSITE, colormap="grays", climits=INVALID_COLOR_LIMITS)
 
-        algebraic_layer = LayerItem(self, info, prez, recipe=recipe)
+        algebraic_layer = LayerItem(self, frozendict(info), prez, recipe=recipe)
 
         self.didCreateLayer.emit(algebraic_layer)
         self._add_layer(algebraic_layer)
@@ -836,7 +848,7 @@ class LayerModel(QAbstractItemModel):
     def _add_algebraic_datasets(
         self, sched_times: List[datetime], input_layers: List[LayerItem], algebraic_layer: LayerItem
     ):
-        assert isinstance(algebraic_layer.recipe, AlgebraicRecipe)
+        assert isinstance(algebraic_layer.recipe, AlgebraicRecipe)  # nosec B101
 
         for sched_time in sched_times:
             input_datasets_uuids = self._get_datasets_uuids_of_multichannel_dataset(sched_time, input_layers)
@@ -859,7 +871,7 @@ class LayerModel(QAbstractItemModel):
                 LOG.warning(f"Invalid formula of layer '{algebraic_layer.descriptor}': {e}")
                 return
 
-            dataset = algebraic_layer.add_algebraic_dataset(None, info, sched_time, input_datasets_uuids)
+            dataset = algebraic_layer.add_algebraic_dataset(None, frozendict(info), sched_time, input_datasets_uuids)
 
             self.didAddImageDataset.emit(algebraic_layer, dataset)
 
@@ -1006,19 +1018,16 @@ class LayerModel(QAbstractItemModel):
         else:
             return None
 
-    def get_input_layers_info(self, recipe_layer: LayerItem) -> Optional[List[frozendict]]:
-        if recipe_layer.recipe:
-            input_layer_infos = []
-            for layer_uuid in recipe_layer.recipe.input_layer_ids:
-                input_layer: LayerItem = self.get_layer_by_uuid(layer_uuid)
-                if input_layer:
-                    input_layer_infos.append(input_layer.info)
-                else:
-                    input_layer_infos.append(None)
-            return input_layer_infos
-
-        LOG.debug(f"Layer with {recipe_layer.uuid} is no recipe layer. So this layer does not own input layers.")
-        return None
+    def get_input_layers_info(self, recipe_layer: LayerItem) -> List[Optional[frozendict]]:
+        assert recipe_layer.recipe, "This method must only be called with 'recipe layers'"  # nosec B101
+        input_layer_infos: List[Optional[frozendict]] = []
+        for layer_uuid in recipe_layer.recipe.input_layer_ids:
+            input_layer = self.get_layer_by_uuid(layer_uuid)
+            if input_layer:
+                input_layer_infos.append(input_layer.info)
+            else:
+                input_layer_infos.append(None)
+        return input_layer_infos
 
 
 class ProductFamilyKeyMappingPolicy:
