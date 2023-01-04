@@ -548,11 +548,11 @@ class BaseWorkspace(QObject):
                 content[k] = v
 
         # Run the code: code_object, no globals, copy of locals
-        exec(ops, None, valids_namespace)
+        exec(ops, None, valids_namespace)  # nosec B102
         if result_name not in valids_namespace:
             raise RuntimeError("Unable to retrieve result '{}' from code execution".format(result_name))
 
-        exec(ops, None, content)
+        exec(ops, None, content)  # nosec B102
         if result_name not in content:
             raise RuntimeError("Unable to retrieve result '{}' from code execution".format(result_name))
         info = self._get_composite_metadata(info, list(dep_metadata.values()), valids_namespace[result_name])
