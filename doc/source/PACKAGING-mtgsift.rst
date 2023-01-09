@@ -27,8 +27,16 @@ Prerequisites
 
 Only a few preparatory steps need to be done outside the build system.
 
-It is assumed that Miniconda3 (recommended) or Anaconda3 is installed and
-properly initialized for your shell [#f2]_.
+It is assumed that a `Conda <https://docs.conda.io/projects/conda/en/stable/>`_
+system is installed and properly initialized for your shell [#f2]_. Because it
+uses the quicker
+`Mamba <https://mamba.readthedocs.io/en/latest/index.html>`_
+and sets up environments with the `conda-forge <https://conda-forge.org/>`_
+repository as default channel the recommended system is
+`Mambaforge <https://github.com/conda-forge/miniforge#mambaforge>`_,
+but also `Miniforge3 <https://github.com/conda-forge/miniforge#miniforge3>`_,
+`Miniconda3 <https://docs.conda.io/en/latest/miniconda.html#latest-miniconda-installer-links>`_
+or `Anaconda3 <https://www.anaconda.com/products/distribution>`_ should work.
 
 Install *CMake* and *Make* [#f3]_ into your *base* environment.
 
