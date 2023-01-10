@@ -41,7 +41,7 @@ DEFAULT_TILE_HEIGHT = 512
 DEFAULT_TILE_WIDTH = 512
 DEFAULT_TEXTURE_HEIGHT = 2
 DEFAULT_TEXTURE_WIDTH = 16
-DEFAULT_ANIMATION_DELAY = 100.0  # milliseconds
+DEFAULT_ANIMATION_DELAY = 500.0  # milliseconds
 # The values below are taken from the test geotiffs that are projected to the `DEFAULT_PROJECTION` below.
 # These units are in meters in mercator projection space
 DEFAULT_X_PIXEL_SIZE = 4891.969810251281160
