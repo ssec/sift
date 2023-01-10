@@ -259,8 +259,8 @@ class OpenFileWizard(QtWidgets.QWizard):
         configured_readers = config.get("data_reading.readers", None)
         readers = available_satpy_readers(as_dict=True)
         readers = (r for r in readers if not configured_readers or r["name"] in configured_readers)
-        readers = sorted(readers, key=lambda x: x.get("long_name", x["name"]))
-        OpenFileWizard.configured_readers = OrderedDict((ri.get("long_name", ri["name"]), ri["name"]) for ri in readers)
+        readers = sorted(readers, key=lambda x: x.get("short_name", x["name"]))
+        OpenFileWizard.configured_readers = OrderedDict((ri.get("short_name", ri["name"]), ri["name"]) for ri in readers)
 
     def _initialize_page_product_selection(self):
         # name and level
