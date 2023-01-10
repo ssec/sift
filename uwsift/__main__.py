@@ -85,7 +85,6 @@ STATUS_BAR_DURATION = 2000  # ms
 WATCHDOG_DATETIME_FORMAT_DISPLAY = "%Y-%m-%d %H:%M:%S %Z"
 WATCHDOG_DATETIME_FORMAT_STORE = "%Y-%m-%d %H:%M:%S %z"
 
-
 EXIT_FORCED_SHUTDOWN = 101
 EXIT_CONFIRMED_SHUTDOWN = 102
 
@@ -427,8 +426,8 @@ class Main(QtWidgets.QMainWindow):
         current_row = self.ui.treeView.currentIndex().row()
         product_dataset = None
         if current_row >= 0:
-            selected_probeable_layer = self.layer_model.layers[current_row]
-            product_dataset = selected_probeable_layer.get_first_active_product_dataset()
+            selected_layer = self.layer_model.layers[current_row]
+            product_dataset = selected_layer.get_first_active_product_dataset()
         uuid = None if product_dataset is None else product_dataset.uuid
 
         state, xy_pos = self.graphManager.current_point_probe_status(probe_name)
@@ -455,7 +454,7 @@ class Main(QtWidgets.QMainWindow):
                 data_point = None
 
             if data_point is not None:
-                info = selected_probeable_layer.info
+                info = selected_layer.info
                 unit_info = info[Info.UNIT_CONVERSION]
                 data_point = unit_info[1](data_point)
                 data_str = unit_info[2](data_point, numeric=False)
