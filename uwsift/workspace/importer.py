@@ -875,8 +875,9 @@ class SatpyImporter(aImporter):
             if ds.attrs[Info.KIND] != Kind.POINTS:
                 continue
 
-            do_color_by_values = ds_id.name in style_attributes_by_product and bool(
-                style_attributes_by_product[ds_id.name] & supported_color_by_style_attrs
+            ds_name = ds_id["name"]
+            do_color_by_values = ds_name in style_attributes_by_product and bool(
+                style_attributes_by_product[ds_name] & supported_color_by_style_attrs
             )
             try:
                 # Only if we want to use the values of the data to color
