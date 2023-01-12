@@ -25,7 +25,7 @@ command.
 
 .. note::
 
-    PyQt4 is required for GUI operations, but must be install manually
+    PyQt5 is required for GUI operations, but must be install manually
     since it is not 'pip' installable.
 
 For Developers
@@ -207,8 +207,9 @@ setup(
         "numpy",
         "pillow",
         "pyproj",
-        "pyqt5>=5.9",
+        "pyqt5>=5.15",
         "pyqtgraph",
+        "pyqtwebengine",
         "pyshp",
         "pyyaml",
         "rasterio",
@@ -217,11 +218,11 @@ setup(
         "shapely",
         "sqlalchemy",
         "trollsift",
-        "vispy>=0.7.1",
+        "vispy>=0.10.0",
         'pygrib;sys_platform=="linux" or sys_platform=="darwin"',
     ],
     tests_requires=["pytest", "pytest-qt", "pytest-mock"],
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     extras_require=extras_require,
     packages=find_packages(),
     entry_points={
