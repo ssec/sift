@@ -212,7 +212,7 @@ Rectangle{
 
         Connections {
             target: timebaseModel
-            onTimebaseChanged:{
+            function onTimebaseChanged() {
                 timelineRulerCanvas.calculate_resolution();
                 timelineRulerCanvas.buildTickBlueprints();
                 timelineRulerCanvas.requestPaint();
@@ -341,14 +341,14 @@ Rectangle{
         // Connections
         Connections{
             target: timelineRulerCanvas
-            onWidthChanged: {
+            function onWidthChanged() {
                 timelineMarkerCanvas.updateMarkerBlueprints();
                 timelineMarkerCanvas.requestPaint();
             }
         }
         Connections{
             target: timebaseModel
-            onTimebaseChanged: {
+            function onTimebaseChanged() {
                 timelineMarkerCanvas.dataLoaded = true
                 timelineMarkerCanvas.currIndex = 0;
                 timelineMarkerCanvas.updateMarkerBlueprints();
@@ -358,7 +358,7 @@ Rectangle{
 
         Connections{
             target: timebaseModel
-            onReturnToInitialState: {
+            function onReturnToInitialState() {
                timelineMarkerCanvas.dataLoaded = false;
             }
         }
