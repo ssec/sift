@@ -46,7 +46,7 @@ class LayerModel(QAbstractItemModel):
     didChangeGamma = pyqtSignal(dict)
     didChangeLayerVisible = pyqtSignal(UUID, bool)
     didChangeLayerOpacity = pyqtSignal(UUID, float)
-    didChangeRecipeLayerNames = pyqtSignal()
+    didChangeRecipeLayerNames = pyqtSignal(str)
 
     didUpdateLayers = pyqtSignal()
     didReorderLayers = pyqtSignal(list)
@@ -114,7 +114,13 @@ class LayerModel(QAbstractItemModel):
         # The minimal 'dataset' information required by LayerItem
         # initialization:
         pseudo_info = frozendict(
-            {Info.KIND: Kind.LINES, Info.PLATFORM: Platform.SYSTEM, Info.INSTRUMENT: Instrument.GENERATED, "name": name}
+            {
+                Info.KIND: Kind.LINES,
+                Info.PLATFORM: Platform.SYSTEM,
+                Info.INSTRUMENT: Instrument.GENERATED,
+                Info.SHORT_NAME: name,
+                "name": name,
+            }
         )
 
         presentation = Presentation(uuid=None, kind=Kind.LINES)
@@ -775,9 +781,11 @@ class LayerModel(QAbstractItemModel):
         self.didRequestRGBCompositeRecipeCreation.emit(layers)
 
     def update_recipe_layer_name(self, recipe: Recipe):
+        from uwsift.view.probes import DEFAULT_POINT_PROBE
+
         recipe_layer: LayerItem = self._get_layer_of_recipe(recipe.id)
         recipe_layer.update_invariable_display_data()
-        self.didChangeRecipeLayerNames.emit()
+        self.didChangeRecipeLayerNames.emit(DEFAULT_POINT_PROBE)
 
         index = self.index(recipe_layer.order, LMC.NAME)
         self.dataChanged.emit(index, index)
