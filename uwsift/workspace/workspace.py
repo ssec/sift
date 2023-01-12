@@ -116,8 +116,6 @@ class ActiveContent(QObject):
         # Needed for the calculation of the correct statistics
         # we need a dict not a frozendict so convert it everytime to a dict
         attrs = dict(info)
-        if info.get(Info.ALGEBRAIC):
-            attrs.update({"algebraic": info[Info.ALGEBRAIC]})
 
         # exclude multichannel images from statistics calculation:
         if info.get(Info.KIND) != Kind.MC_IMAGE:
