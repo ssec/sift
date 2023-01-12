@@ -1,7 +1,7 @@
 import logging
 import struct
 from datetime import datetime
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Union
 from uuid import UUID
 
 from PyQt5.QtCore import QAbstractItemModel, QMimeData, QModelIndex, Qt, pyqtSignal
@@ -419,20 +419,6 @@ class LayerModel(QAbstractItemModel):
         COMPOSITE.
         """
         return [layer for layer in self.layers if layer.kind in [Kind.IMAGE, Kind.COMPOSITE]]
-
-    def get_top_probeable_layer(self) -> Optional[LayerItem]:
-        probeable_layers = self.get_probeable_layers()
-        return None if len(probeable_layers) == 0 else probeable_layers[0]
-
-    def get_top_probeable_layer_with_active_product_dataset(
-        self,
-    ) -> Tuple[Optional[LayerItem], Optional[ProductDataset]]:
-        top_probeable_layer = self.get_top_probeable_layer()
-        return (
-            (None, None)
-            if top_probeable_layer is None
-            else (top_probeable_layer, top_probeable_layer.get_first_active_product_dataset())
-        )
 
     @staticmethod
     def _build_presentation_change_dict(layer: LayerItem, presentation_element: object):
