@@ -120,6 +120,16 @@ class LayerItem:
             f"{self._invariable_display_data[LMC.WAVELENGTH]}"
         )
 
+    @property
+    def short_descriptor(self):
+        """Return the short display descriptor of a layer"""
+        name = self.info[Info.SHORT_NAME] if Info.SHORT_NAME in self.info else self._invariable_display_data[LMC.NAME]
+        return (
+            f"{name}, {self._invariable_display_data[LMC.WAVELENGTH]}"
+            if self._invariable_display_data[LMC.WAVELENGTH] != N_A
+            else f"{name}"
+        )
+
     def update_invariable_display_data(self) -> None:
         if self.recipe:
             self._invariable_display_data = {
