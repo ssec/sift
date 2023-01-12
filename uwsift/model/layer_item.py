@@ -135,7 +135,7 @@ class LayerItem:
             self._invariable_display_data = {
                 LMC.SOURCE: self.recipe.kind(),
                 LMC.NAME: self.recipe.name,
-                LMC.WAVELENGTH: N_A,
+                LMC.WAVELENGTH: "",
                 LMC.PROBE_UNIT: N_A,
             }
             return
@@ -236,14 +236,14 @@ class LayerItem:
         try:
             ds_wl = f"{info['wavelength'].central} {info['wavelength'].unit}"
         except (KeyError, AttributeError):
-            ds_wl = N_A
+            ds_wl = None
 
         try:
             ds_unit = info[Info.UNIT_CONVERSION][0]
         except KeyError:
             ds_unit = N_A
 
-        return ds_name or N_A, ds_wl or N_A, ds_unit or N_A
+        return ds_name or N_A, ds_wl or "", ds_unit or N_A
 
     @property
     def timeline(self):
