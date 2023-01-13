@@ -64,7 +64,7 @@ from uwsift.util import (
     check_imageio_deps,
     get_package_data_dir,
 )
-from uwsift.util.common import format_wavelength, normalize_longitude
+from uwsift.util.common import normalize_longitude
 from uwsift.util.logger import configure_loggers
 from uwsift.view.algebraic_config import AlgebraicLayerConfigPane
 from uwsift.view.colormap_editor import ColormapEditor
@@ -84,7 +84,6 @@ STATUS_BAR_DURATION = 2000  # ms
 
 WATCHDOG_DATETIME_FORMAT_DISPLAY = "%Y-%m-%d %H:%M:%S %Z"
 WATCHDOG_DATETIME_FORMAT_STORE = "%Y-%m-%d %H:%M:%S %z"
-
 
 EXIT_FORCED_SHUTDOWN = 101
 EXIT_CONFIRMED_SHUTDOWN = 102
@@ -427,8 +426,10 @@ class Main(QtWidgets.QMainWindow):
         current_row = self.ui.treeView.currentIndex().row()
         product_dataset = None
         if current_row >= 0:
-            selected_probeable_layer = self.layer_model.layers[current_row]
-            product_dataset = selected_probeable_layer.get_first_active_product_dataset()
+            selected_layer = self.layer_model.layers[current_row]
+            product_dataset = selected_layer.get_first_active_product_dataset()
+        else:
+            selected_layer = None
         uuid = None if product_dataset is None else product_dataset.uuid
 
         state, xy_pos = self.graphManager.current_point_probe_status(probe_name)
@@ -446,27 +447,22 @@ class Main(QtWidgets.QMainWindow):
         data_str = "N/A"
         layer_str = "N/A"
 
-        if state and uuid is not None:
-            try:
-                data_point = self.workspace.get_content_point(uuid, xy_pos)
-                col, row = self.workspace.position_to_grid_index(uuid, xy_pos)
-            except ValueError:
-                LOG.debug("Could not get data value", exc_info=True)
-                data_point = None
+        if state:
+            if selected_layer:
+                layer_str = selected_layer.short_descriptor
 
-            if data_point is not None:
-                info = selected_probeable_layer.info
-                unit_info = info[Info.UNIT_CONVERSION]
-                data_point = unit_info[1](data_point)
-                data_str = unit_info[2](data_point, numeric=False)
-                if info.get(Info.CENTRAL_WAVELENGTH):
-                    wl_str = format_wavelength(info[Info.CENTRAL_WAVELENGTH])
-                    layer_str = "{}, {}".format(info[Info.SHORT_NAME], wl_str)
-                else:
-                    layer_str = info[Info.SHORT_NAME]
+            if uuid is not None:
+                data_point = selected_layer.probe_value
+
+                if data_point is not None:
+                    unit_info = selected_layer.info[Info.UNIT_CONVERSION]
+                    convert_unit_func = unit_info[1]
+                    format_quantity_func = unit_info[2]
+                    data_str = format_quantity_func(convert_unit_func(data_point), numeric=False)
+                    col, row = self.workspace.position_to_grid_index(uuid, xy_pos)
 
         self.ui.cursorProbeLayer.setText(layer_str)
-        self.ui.cursorProbeText.setText("{} ({}) [{}, {}]".format(data_str, probe_loc, col, row))
+        self.ui.cursorProbeText.setText(f"{data_str} ({probe_loc}) [{col}, {row}]")
 
     @staticmethod
     def run_gc_after_layer_deletion():
@@ -708,6 +704,7 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.didChangeRecipeLayerNames.connect(self.graphManager.handleActiveProductDatasetsChanged)
 
         self.ui.treeView.selectedLayerForProbeChanged.connect(self.update_point_probe_text)
+        self.layer_model.didChangeRecipeLayerNames.connect(self.update_point_probe_text)
 
         # Connect to an unnamed slot (lambda: ...) to strip off the argument
         # (of type dict) from the signal 'didMatchTimes'
