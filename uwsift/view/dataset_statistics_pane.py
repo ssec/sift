@@ -193,3 +193,8 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
             self._determine_table_content_by_stats_dict(stats, header)
         elif isinstance(stats, list):
             self._determine_table_content_by_stats_list(stats, header)
+        self._resize_all_but_the_last_column_to_contents()
+
+    def _resize_all_but_the_last_column_to_contents(self):
+        for column in range(0, self._pane_ui.statisticsTableWidget.columnCount() - 1):
+            self._pane_ui.statisticsTableWidget.resizeColumnToContents(column)
