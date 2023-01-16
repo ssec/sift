@@ -1,6 +1,6 @@
 import numbers
 from decimal import Decimal
-from typing import Optional, Tuple
+from typing import Tuple
 
 import numpy as np
 from PyQt5 import QtWidgets
@@ -9,7 +9,6 @@ from PyQt5.QtGui import QFont
 
 from uwsift.common import Info
 from uwsift.model.layer_item import LayerItem
-from uwsift.model.product_dataset import ProductDataset
 from uwsift.ui.dataset_statistics_widget_ui import Ui_datasetStatisticsPane
 
 
@@ -45,15 +44,27 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
     # Slot functions
 
     def initiate_update(self):
-        """Query the current active dataset of the selected layer and start the update the corresponding parts which
-        needs an update.
-
-        This process will only be done if a selection in the LayerManager exist.
+        """Refresh the display of name and the statistics from the current active dataset or clear the pane if there is
+        none.
         """
-        if self._current_selected_layer:
-            first_active_dataset = self._current_selected_layer.get_first_active_product_dataset()
+        self._clear_statistics_pane()  # TODO: start revision here if you want to keep parts of the table layout
 
-            self._carry_out_update(first_active_dataset)
+        if not self._current_selected_layer:
+            return
+
+        first_active_dataset = self._current_selected_layer.get_first_active_product_dataset()
+        if not first_active_dataset:
+            return
+
+        dataset_display_name = (
+            f"{self._current_selected_layer.descriptor} {first_active_dataset.info[Info.DISPLAY_TIME]}"
+        )
+        self._pane_ui.datasetNameLabel.setText(dataset_display_name)
+
+        stats = self._current_selected_layer.model._workspace.get_statistics_for_dataset_by_uuid(
+            first_active_dataset.uuid
+        )
+        self._update_table_content(stats)
 
     def _decimal_places_changed(self):
         if self._current_selected_layer:
@@ -71,25 +82,12 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
         """
         if layers is not None and len(layers) == 1:
             self._current_selected_layer = layers[0]
-            self.initiate_update()
         else:
-            self._clear_statistics_pane()
+            self._current_selected_layer = None
+
+        self.initiate_update()
 
     # Utility functions
-
-    def _carry_out_update(self, first_active_dataset: Optional[ProductDataset]):
-        self._clear_statistics_pane()
-
-        if first_active_dataset:
-            dataset_display_name = (
-                f"{self._current_selected_layer.descriptor} {first_active_dataset.info[Info.DISPLAY_TIME]}"
-            )
-            self._pane_ui.datasetNameLabel.setText(dataset_display_name)
-
-            stats = self._current_selected_layer.model._workspace.get_statistics_for_dataset_by_uuid(
-                first_active_dataset.uuid
-            )
-            self._update_table_content(stats)
 
     def _clear_statistics_pane(self):
         self._pane_ui.datasetNameLabel.setText("")
@@ -156,7 +154,7 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
                 item = self._get_tailored_item(value)
                 self._pane_ui.statisticsTableWidget.setItem(row, col, item)
 
-    def _determine_value_for_table_item(self, value: float):
+    def _determine_value_for_table_item(self, value: float) -> str:
         decimal_places = self._pane_ui.decimalPlacesSpinBox.value()
 
         if isinstance(value, np.number):
@@ -165,13 +163,13 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
             # convert a numpy numeric value to a Decimal class object
             value = value.item()
 
+        value_str = str(value)
         if isinstance(value, numbers.Number):
-            if isinstance(value, int) and decimal_places > 0:
-                expand = " " * (decimal_places + 1)
-                value = str(value) + expand
+            if isinstance(value, int):
+                value_str = str(value)
             elif decimal_places > -1:
-                value = self._determine_rounded_value(decimal_places, Decimal(value))
-        return str(value)
+                value_str = str(self._determine_rounded_value(decimal_places, Decimal(value)))
+        return value_str
 
     @staticmethod
     def _get_tailored_item(value: str) -> QtWidgets.QTableWidgetItem:
@@ -193,3 +191,8 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
             self._determine_table_content_by_stats_dict(stats, header)
         elif isinstance(stats, list):
             self._determine_table_content_by_stats_list(stats, header)
+        self._resize_all_but_the_last_column_to_contents()
+
+    def _resize_all_but_the_last_column_to_contents(self):
+        for column in range(0, self._pane_ui.statisticsTableWidget.columnCount() - 1):
+            self._pane_ui.statisticsTableWidget.resizeColumnToContents(column)

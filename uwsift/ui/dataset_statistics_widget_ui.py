@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'dataset_statistics_widget.ui'
+# Form implementation generated from reading ui file 'uwsift/ui/dataset_statistics_widget.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.7
 #
@@ -34,6 +34,7 @@ class Ui_datasetStatisticsPane(object):
         self.statisticsTableWidget.setObjectName("statisticsTableWidget")
         self.statisticsTableWidget.setColumnCount(0)
         self.statisticsTableWidget.setRowCount(0)
+        self.statisticsTableWidget.horizontalHeader().setStretchLastSection(True)
         self.verticalLayout.addWidget(self.statisticsTableWidget)
         self.horizontalLayout = QtWidgets.QHBoxLayout()
         self.horizontalLayout.setObjectName("horizontalLayout")
