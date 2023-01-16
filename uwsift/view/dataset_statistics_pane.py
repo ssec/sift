@@ -154,7 +154,7 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
                 item = self._get_tailored_item(value)
                 self._pane_ui.statisticsTableWidget.setItem(row, col, item)
 
-    def _determine_value_for_table_item(self, value: float):
+    def _determine_value_for_table_item(self, value: float) -> str:
         decimal_places = self._pane_ui.decimalPlacesSpinBox.value()
 
         if isinstance(value, np.number):
@@ -163,13 +163,13 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
             # convert a numpy numeric value to a Decimal class object
             value = value.item()
 
+        value_str = str(value)
         if isinstance(value, numbers.Number):
-            if isinstance(value, int) and decimal_places > 0:
-                expand = " " * (decimal_places + 1)
-                value = str(value) + expand
+            if isinstance(value, int):
+                value_str = str(value)
             elif decimal_places > -1:
-                value = self._determine_rounded_value(decimal_places, Decimal(value))
-        return str(value)
+                value_str = str(self._determine_rounded_value(decimal_places, Decimal(value)))
+        return value_str
 
     @staticmethod
     def _get_tailored_item(value: str) -> QtWidgets.QTableWidgetItem:
