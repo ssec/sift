@@ -1,6 +1,6 @@
 import numbers
 from decimal import Decimal
-from typing import Optional, Tuple
+from typing import Tuple
 
 import numpy as np
 from PyQt5 import QtWidgets
@@ -9,7 +9,6 @@ from PyQt5.QtGui import QFont
 
 from uwsift.common import Info
 from uwsift.model.layer_item import LayerItem
-from uwsift.model.product_dataset import ProductDataset
 from uwsift.ui.dataset_statistics_widget_ui import Ui_datasetStatisticsPane
 
 
@@ -53,7 +52,18 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
         if self._current_selected_layer:
             first_active_dataset = self._current_selected_layer.get_first_active_product_dataset()
 
-            self._carry_out_update(first_active_dataset)
+            self._clear_statistics_pane()
+
+            if first_active_dataset:
+                dataset_display_name = (
+                    f"{self._current_selected_layer.descriptor} {first_active_dataset.info[Info.DISPLAY_TIME]}"
+                )
+                self._pane_ui.datasetNameLabel.setText(dataset_display_name)
+
+                stats = self._current_selected_layer.model._workspace.get_statistics_for_dataset_by_uuid(
+                    first_active_dataset.uuid
+                )
+                self._update_table_content(stats)
 
     def _decimal_places_changed(self):
         if self._current_selected_layer:
@@ -76,20 +86,6 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
             self._clear_statistics_pane()
 
     # Utility functions
-
-    def _carry_out_update(self, first_active_dataset: Optional[ProductDataset]):
-        self._clear_statistics_pane()
-
-        if first_active_dataset:
-            dataset_display_name = (
-                f"{self._current_selected_layer.descriptor} {first_active_dataset.info[Info.DISPLAY_TIME]}"
-            )
-            self._pane_ui.datasetNameLabel.setText(dataset_display_name)
-
-            stats = self._current_selected_layer.model._workspace.get_statistics_for_dataset_by_uuid(
-                first_active_dataset.uuid
-            )
-            self._update_table_content(stats)
 
     def _clear_statistics_pane(self):
         self._pane_ui.datasetNameLabel.setText("")
