@@ -44,26 +44,27 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
     # Slot functions
 
     def initiate_update(self):
-        """Query the current active dataset of the selected layer and start the update the corresponding parts which
-        needs an update.
-
-        This process will only be done if a selection in the LayerManager exist.
+        """Refresh the display of name and the statistics from the current active dataset or clear the pane if there is
+        none.
         """
-        if self._current_selected_layer:
-            first_active_dataset = self._current_selected_layer.get_first_active_product_dataset()
+        self._clear_statistics_pane()  # TODO: start revision here if you want to keep parts of the table layout
 
-            self._clear_statistics_pane()
+        if not self._current_selected_layer:
+            return
 
-            if first_active_dataset:
-                dataset_display_name = (
-                    f"{self._current_selected_layer.descriptor} {first_active_dataset.info[Info.DISPLAY_TIME]}"
-                )
-                self._pane_ui.datasetNameLabel.setText(dataset_display_name)
+        first_active_dataset = self._current_selected_layer.get_first_active_product_dataset()
+        if not first_active_dataset:
+            return
 
-                stats = self._current_selected_layer.model._workspace.get_statistics_for_dataset_by_uuid(
-                    first_active_dataset.uuid
-                )
-                self._update_table_content(stats)
+        dataset_display_name = (
+            f"{self._current_selected_layer.descriptor} {first_active_dataset.info[Info.DISPLAY_TIME]}"
+        )
+        self._pane_ui.datasetNameLabel.setText(dataset_display_name)
+
+        stats = self._current_selected_layer.model._workspace.get_statistics_for_dataset_by_uuid(
+            first_active_dataset.uuid
+        )
+        self._update_table_content(stats)
 
     def _decimal_places_changed(self):
         if self._current_selected_layer:
@@ -81,9 +82,10 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
         """
         if layers is not None and len(layers) == 1:
             self._current_selected_layer = layers[0]
-            self.initiate_update()
         else:
-            self._clear_statistics_pane()
+            self._current_selected_layer = None
+
+        self.initiate_update()
 
     # Utility functions
 
