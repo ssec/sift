@@ -31,7 +31,8 @@ def dataset_statistical_analysis(xarr):
 
     elif "algebraic" in xarr.attrs:
         # Algebraic data. At least for differences, we want to have some additional statistical metrics.
-        if xarr.attrs["algebraic"] == "x-y":
+        normalized_formula = xarr.attrs["algebraic"].replace(" ", "")
+        if normalized_formula == "x-y" or normalized_formula == "y-x":
             stats = ContinuousDifferenceStats()
         else:
             LOG.debug(f"'ContinuousBasicStats' will be computed for algebraic operation {xarr.attrs['algebraic']}.")
