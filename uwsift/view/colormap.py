@@ -1463,7 +1463,6 @@ OTHER_COLORMAPS = OrderedDict(
         ("Red Transparency", red_trans),
         ("Green Transparency", green_trans),
         ("Blue Transparency", blue_trans),
-        ("grays", _colormaps["grays"]),
         ("Prob Severe", LazyColormap(AWIPSColormap, os.path.join(CMAP_BASE_DIR, "OAX", "prob_severe.cmap"))),
     ]
 )
