@@ -1249,10 +1249,14 @@ class SatpyImporter(aImporter):
             )
 
     def get_fci_segment_height(self, segment_number: int, segment_width: int) -> int:
-        seg_heights = self.scn._readers[self.reader].segment_heights
-        # we can assume that we're reading only from one filetype (either FDHSI or HRFI)
-        file_type = list(self.scn._readers[self.reader].file_handlers.keys())[0]
-        return seg_heights(file_type, segment_width)[segment_number - 1]
+        try:
+            seg_heights = self.scn._readers[self.reader].segment_heights
+            # we can assume that we're reading only from one filetype (either FDHSI or HRFI)
+            file_type = list(self.scn._readers[self.reader].file_handlers.keys())[0]
+            return seg_heights(file_type, segment_width)[segment_number - 1]
+        except AttributeError:
+            LOG.exception("You're probably using an old version of Satpy. Please update Satpy to be >=0.39.0 "
+                          "to use merge_with_existing=True with the FCI reader.")
 
     def _calc_segment_heights(self, segments_data, segments_indices):
         def get_segment_height_calculator() -> Callable:
