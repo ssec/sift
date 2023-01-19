@@ -11,6 +11,12 @@ REQUIRES
 :copyright: 2017 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
+try:
+    import hdf5plugin
+    HDF5PLUGIN_IMPORT = True
+except ImportError:
+    HDF5PLUGIN_IMPORT = False
+
 import logging
 import os
 from abc import ABC, abstractmethod
@@ -87,6 +93,11 @@ import_progress = namedtuple(
 # completion:float, 0..1 how far we are along on this stage
 # stage_desc:tuple(str), brief description of each of the stages we'll be doing
 """
+
+if not HDF5PLUGIN_IMPORT:
+    LOG.warning("Your installation/environment doesn't include the package hdf5plugin. If you want to visualise "
+                "compressed FCI L1c data, please add this package using \"pip install hdf5plugin\" or "
+                "\"conda install -c conda-forge hdf5plugin \"..")
 
 
 def _load_satpy_readers_cache(force_refresh=None):
