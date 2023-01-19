@@ -11,7 +11,6 @@ REQUIRES
 :copyright: 2017 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-
 import logging
 import os
 from abc import ABC, abstractmethod
