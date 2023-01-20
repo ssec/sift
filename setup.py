@@ -25,7 +25,7 @@ command.
 
 .. note::
 
-    PyQt4 is required for GUI operations, but must be install manually
+    PyQt5 is required for GUI operations, but must be install manually
     since it is not 'pip' installable.
 
 For Developers
@@ -197,31 +197,32 @@ setup(
     zip_safe=False,
     include_package_data=True,
     install_requires=[
+        "appdirs",
+        "donfig",
+        "h5py",
+        "imageio",
+        "matplotlib",
+        "netCDF4",
+        "numba",
         "numpy",
         "pillow",
-        "numba",
-        "vispy>=0.7.1",
-        "netCDF4",
-        "h5py",
         "pyproj",
-        "pyshp",
-        "shapely",
-        "rasterio",
-        "sqlalchemy",
-        "appdirs",
-        "pyyaml",
+        "pyqt5>=5.15",
         "pyqtgraph",
+        "pyqtwebengine",
+        "pyshp",
+        "pyyaml",
+        "rasterio",
         "satpy",
-        "matplotlib",
         "scikit-image",
-        "donfig",
-        'pygrib;sys_platform=="linux" or sys_platform=="darwin"',
-        "imageio",
-        "pyqt5>=5.9",
+        "shapely",
+        "sqlalchemy",
         "trollsift",
+        "vispy>=0.10.0",
+        'pygrib;sys_platform=="linux" or sys_platform=="darwin"',
     ],
     tests_requires=["pytest", "pytest-qt", "pytest-mock"],
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     extras_require=extras_require,
     packages=find_packages(),
     entry_points={

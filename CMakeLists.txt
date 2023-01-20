@@ -3,7 +3,7 @@
 #
 #
 # Author: Alexander Rettig
-cmake_minimum_required( VERSION 3.10 ) # May be relaxed to allow older CMake versions
+cmake_minimum_required( VERSION 3.10 ) # May be relaxed to allow older CMake versions but not below 3.8 because we use COMMAND_EXPAND_LISTS
 
 # 'LANGUAGES' might be changed to Python when a Python toolchain becomes available
 project( mtgsift LANGUAGES NONE )
@@ -14,7 +14,7 @@ project( mtgsift LANGUAGES NONE )
 
 list( APPEND CMAKE_MODULE_PATH "cmake/" )
 
-set( PYTHON_VERSION 3.7 )
+set( PYTHON_VERSION 3.10 CACHE STRING "Version of Python to setup/build MTG-SIFT for." )
 
 #-------------------------------------------------------------------------------------------------
 # Dependencies
@@ -28,10 +28,12 @@ find_package( Conda REQUIRED )
 #-------------------------------------------------------------------------------------------------
 
 if( NOT ${PROJECT_NAME}_CONDA_ENVIRONMENT )
-  set( ${PROJECT_NAME}_CONDA_ENVIRONMENT "$ENV{CONDA_DEFAULT_ENV}" CACHE STRING "Name (or absolute path) of conda environment in which ${PROJECT_NAME} is build/packaged" )
-  if( "${${PROJECT_NAME}_CONDA_ENVIRONMENT}" STREQUAL "base" )
-    set( ${PROJECT_NAME}_CONDA_ENVIRONMENT "devel-default"         CACHE STRING "Name (or absolute path) of conda environment in which ${PROJECT_NAME} is build/packaged" FORCE )
-  endif()
+  set( ${PROJECT_NAME}_CONDA_ENVIRONMENT "devel-${PYTHON_VERSION}" CACHE STRING "Name (or absolute path) of conda environment in which ${PROJECT_NAME} is build/packaged" )
+endif()
+
+if( "${${PROJECT_NAME}_CONDA_ENVIRONMENT}" STREQUAL "base" )
+  set( ${PROJECT_NAME}_CONDA_ENVIRONMENT "devel-${PYTHON_VERSION}" CACHE STRING "Name (or absolute path) of conda environment in which ${PROJECT_NAME} is build/packaged" FORCE )
+  message( FATAL_ERROR "${PROJECT_NAME} project must not be set up in a Conda 'base' environment. Resetting to sensible default." )
 endif()
 
 set( ${PROJECT_NAME}_DEPENDENCIES_CHANNEL "conda-forge" CACHE STRING "Conda channel which provides dependencies of ${PROJECT_NAME}." )
@@ -43,9 +45,17 @@ set( ${PROJECT_NAME}_DEPENDENCIES_CHANNEL "conda-forge" CACHE STRING "Conda chan
 # Support bootstrap a development environment
 # Prerequisite: Anaconda3 is installed, environment (base) activated
 
+if( ${Conda_EXECUTABLE} MATCHES .*/?mamba )
+  set( XRIT_DEFAULT ON )
+else()
+  set( XRIT_DEFAULT OFF )
+endif()
+option( WITH_xRITDecompress "If set, integrate xRITDecompress in the development environment" ${XRIT_DEFAULT} )
+
 add_custom_target( devel-bootstrap
   COMMAND ${Conda_EXECUTABLE} create  --name ${${PROJECT_NAME}_CONDA_ENVIRONMENT} --channel conda-forge --strict-channel-priority python=${PYTHON_VERSION}
   COMMAND ${Conda_EXECUTABLE} install --name ${${PROJECT_NAME}_CONDA_ENVIRONMENT} --channel conda-forge --strict-channel-priority --file conda-envs/mtgsift-devel-minimal.pkgs
+  COMMAND $<IF:$<BOOL:${WITH_xRITDecompress}>,${Conda_EXECUTABLE},true> install --name ${${PROJECT_NAME}_CONDA_ENVIRONMENT} --channel eumetsat --strict-channel-priority public-decomp-wt
   COMMAND echo "You may want to run the following commands manually:"
   COMMAND echo "  conda activate ${${PROJECT_NAME}_CONDA_ENVIRONMENT}"
   COMMAND echo "  conda config --env --add channels conda-forge"
@@ -53,6 +63,7 @@ add_custom_target( devel-bootstrap
   COMMAND echo "  ${CMAKE_COMMAND} ."
   COMMAND echo "  ${CMAKE_MAKE_PROGRAM} patch-shapely # This may fail, if the patch is already applied"
   VERBATIM
+  COMMAND_EXPAND_LISTS
   COMMENT "Setting up conda environment for development ..."
   )
 

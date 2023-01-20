@@ -38,7 +38,7 @@ and ``MTGSIFT_CHANNEL`` a Conda channel, where the MTG-SIFT packages can be
 found [#f1]_, the following common steps should be performed to prepare a clean
 environment for the desired task::
 
-  %> conda create --name MY_ENV --channel conda-forge --strict-channel-priority python=3.7
+  %> conda create --name MY_ENV --channel conda-forge --strict-channel-priority python=3.10
   %> conda activate MY_ENV
   (MY_ENV)%> conda config --env --add channels conda-forge
   (MY_ENV)%> conda config --env --add channels MTGSIFT_CHANNEL

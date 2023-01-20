@@ -1331,6 +1331,24 @@ def _search_paths(arglist):
             yield subpath
 
 
+def autoconfigure_xritdecompress():
+    xrit_env_var = "XRIT_DECOMPRESS_PATH"
+    xrit_binary_names = ("xRITDecompress", "xRITDecompress.exe")
+    if os.environ.get(xrit_env_var, None):
+        LOG.debug("XRIT_DECOMPRESS_PATH already set to %s", os.environ[xrit_env_var])
+        return
+    if "PATH" in os.environ:
+        for p in os.environ["PATH"].split(os.pathsep):
+            if not p:
+                continue
+            for xrit_binary_name in xrit_binary_names:
+                xrit_cmd = os.path.join(p, xrit_binary_name)
+                if os.path.exists(xrit_cmd) and not os.path.isdir(xrit_cmd):
+                    os.environ[xrit_env_var] = xrit_cmd
+                    LOG.info("Auto configured xRITDecompress to %s", xrit_cmd)
+                    return
+
+
 def create_app() -> typ.Tuple[app.Application, QtWidgets.QApplication]:
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
     vispy_app = app.use_app("pyqt5")
@@ -1401,6 +1419,8 @@ def main() -> int:
 
     data_search_paths = [] if not args.paths else list(_search_paths(args.paths))
     LOG.info("will search {} for new data periodically".format(repr(data_search_paths)))
+
+    autoconfigure_xritdecompress()
 
     window = Main(
         workspace_dir=args.workspace_dir,
