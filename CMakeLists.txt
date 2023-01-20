@@ -130,7 +130,7 @@ set( _pyi_dir_ ${${PROJECT_NAME}_PYINSTALLER_BASE_DIR}  )
 add_custom_target( pyinstaller-package
   COMMAND ${CMAKE_COMMAND} -E remove_directory "${_pyi_dir_}"
   COMMAND pip install -e .
-  COMMAND ${PyInstaller_EXECUTABLE} --distpath "${_pyi_dir_}/dist" --workpath "${_pyi_dir_}/work" --clean -y ${PROJECT_NAME}-onedir.spec
+  COMMAND ${PyInstaller_EXECUTABLE} --distpath "${_pyi_dir_}/dist" --workpath "${_pyi_dir_}/work" --clean -y ${PROJECT_NAME}-pyinstaller-package.spec
   BYPRODUCTS "${_pyi_dir_}/dist/${PROJECT_NAME}/${PROJECT_NAME}"
   VERBATIM
   COMMENT "Building PyInstaller package in '${_pyi_dir_}/dist/${PROJECT_NAME}/${PROJECT_NAME}'"

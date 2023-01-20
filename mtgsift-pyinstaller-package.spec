@@ -2,9 +2,9 @@
 
 # During spec file development run like so:
 #   export PYTHONHASHSEED=1
-#   pyinstaller --clean --noconfirm --debug all mtgsift-onedir.spec
+#   pyinstaller --clean --noconfirm --debug all mtgsift-pyinstaller-package.spec
 # To generate a self-contained executable:
-#   pyinstaller --clean --noconfirm             mtgsift-onedir.spec
+#   pyinstaller --clean --noconfirm             mtgsift-pyinstaller-package.spec
 
 import sys
 sys.setrecursionlimit(5000)
