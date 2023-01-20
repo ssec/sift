@@ -37,6 +37,15 @@ shapely=2.0.0
 sqlalchemy=1.4.39
 vispy=0.12.1
 
+# Explicit Satpy dependencies to make more readers work
+bottleneck=1.3.5
+h5netcdf=1.1.0
+hdf5plugin=4.0.1
+# pygac: not available in conda-forge, you may have a look here: https://anaconda.org/bucricket/pygac
+pyhdf=0.10.5
+python-eccodes=1.4.2  # This and its dependency 'eecodes' seem to be broken on Windows
+rioxarray=0.13.3
+
 # This is only for development
 cmake=3.24.0
 conda-build=3.21.9
