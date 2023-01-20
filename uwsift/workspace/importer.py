@@ -88,6 +88,13 @@ import_progress = namedtuple(
 # stage_desc:tuple(str), brief description of each of the stages we'll be doing
 """
 
+try:
+    import hdf5plugin
+except ImportError:
+    LOG.warning("Your installation/environment doesn't include the package hdf5plugin. If you want to visualise "
+                "compressed FCI L1c data, please add this package using \"pip install hdf5plugin\" or "
+                "\"conda install -c conda-forge hdf5plugin \"..")
+
 
 def _load_satpy_readers_cache(force_refresh=None):
     """Get Satpy reader information from a cache file or Satpy itself."""
