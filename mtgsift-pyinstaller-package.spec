@@ -53,9 +53,12 @@ data_files.append((os.path.join(icon_dir, "menu.svg"), icon_dir))
 
 # For Cython support (see
 # https://pyinstaller.readthedocs.io/en/stable/feature-notes.html#cython-support):
-hidden_imports = [
+hidden_imports = [  # PLEASE ADD NEW ITEMS IN ALPHABETICAL ORDER
+    "gribapi"
     "ncepgrib2",  # For PyGrib
     "pkg_resources",
+    "pyhdf",
+    "pyhdf.six",
     "pyproj",
     "satpy",
     "shapely",
@@ -66,22 +69,20 @@ hidden_imports = [
     "vispy.app.backends._pyqt5",
     "vispy.ext._bundled.six",
     "xarray",
-    "pyhdf",
-    "pyhdf.six",
-    "gribapi"
 ]
-hidden_imports += collect_submodules("pkg_resources")
-hidden_imports += collect_submodules("pyproj")
-hidden_imports += collect_submodules("rasterio")
-hidden_imports += collect_submodules("satpy")
-hidden_imports += collect_submodules("sqlalchemy")
-hidden_imports += collect_submodules("numcodecs")
-hidden_imports += collect_submodules("shapely")
-hidden_imports += collect_submodules("pyqtgraph")
-hidden_imports += collect_submodules("pyhdf")
-hidden_imports += collect_submodules("python-eccodes")
+# PLEASE ADD NEW ITEMS IN ALPHABETICAL ORDER
 hidden_imports += collect_submodules("eccodes")
 hidden_imports += collect_submodules("gribapi")
+hidden_imports += collect_submodules("numcodecs")
+hidden_imports += collect_submodules("pkg_resources")
+hidden_imports += collect_submodules("pyhdf")
+hidden_imports += collect_submodules("pyproj")
+hidden_imports += collect_submodules("pyqtgraph")
+hidden_imports += collect_submodules("python-eccodes")
+hidden_imports += collect_submodules("rasterio")
+hidden_imports += collect_submodules("satpy")
+hidden_imports += collect_submodules("shapely")
+hidden_imports += collect_submodules("sqlalchemy")
 if is_win:
     hidden_imports += collect_submodules("encodings")
     hidden_imports += collect_submodules("PyQt5")
