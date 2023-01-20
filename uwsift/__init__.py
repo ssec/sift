@@ -7,7 +7,15 @@ from importlib.util import spec_from_file_location
 
 from donfig import Config
 
-from .util.default_paths import DOCUMENT_SETTINGS_DIR
+from distutils.dir_util import copy_tree
+from distutils.errors import DistutilsFileError
+
+from uwsift.util import get_base_dir
+
+from .util.default_paths import (
+    APPLICATION_DIR,
+    DOCUMENT_SETTINGS_DIR,
+)
 from .version import __version__  # noqa
 
 BASE_CONFIG_DIR = os.path.join(DOCUMENT_SETTINGS_DIR, "config")
@@ -20,73 +28,29 @@ CONFIG_PATHS = [
     os.path.join(os.path.expanduser("~"), ".config", "uwsift"),
 ]
 
-# EXPERIMENTAL: This functionality is experimental and may change in future
-#     releases until it is an advertised feature.
-DEFAULT_CONFIGURATION = {
-    # settings for storing temporary or persistent data on the file system
-    # this preset is for using a simple workspace without any caching
-    "storage": {"use_inventory_db": False, "cleanup_file_cache": True},
-    # related to any reading of data
-    "data_reading": {
-        # What readers to use when opening files
-        # None => all readers
-        # from environment variable: export UWSIFT_DATA_READING__READERS = "['abi_l1b', 'ami_l1b']"
-        # 'readers': None,
-        "readers": [
-            "abi_l1b",
-            "ahi_hrit",
-            "ahi_hsd",
-            "ami_l1b",
-            "fci_l1c_fdhsi",
-            "fci_l1_geoobs",
-            "glm_l2",
-            "grib",
-            "li_l2",
-            "seviri_l1b_hrit",
-            "seviri_l1b_native",
-            "seviri_l1b_nc",
-            "seviri_l2_bufr",
-        ],
-        # Filters for what datasets not to include
-        "exclude_datasets": {
-            # 'calibration': ['radiance', 'counts'],
-        },
-        # Reader-specific reading configuration
-        "seviri_l1b_hrit": {
-            # If group_keys is not specified it defaults to Satpy's configuration
-            "group_keys": ["start_time", "platform_shortname", "service"],
-            # Offered patterns to filter files (trollsift syntax), by default first entry is used.
-            "filter_patterns": [
-                "{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-"
-                "{channel:_<6s}___-{segment:_<6s}___-{start_time:%Y%m%d%H%M}-{c:1s}_",
-                "{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-"
-                "{channel:_<6s}___-{segment:_<6s}___-{start_time:%Y%m%d%H%M}-__",
-            ],
-        },
-    },
-    # Reader-specific mapping configuration
-    "data_mapping": {
-        "seviri_l1b_hrit": {
-            "iScansNegatively": True,
-            "jScansPositively": True,
-        },
-    },
-    # specific to the open file wizard dialog
-    "open_file_wizard": {
-        "default_reader": "seviri_l1b_hrit",  # use 'None' for first in list
-        "id_components": [
-            "name",
-            "wavelength",
-            "resolution",
-            "calibration",
-            "level",
-        ],
-    },
-    # display options
-    "display": {"use_tiled_geolocated_images": True},
-}
 
-config = Config("uwsift", defaults=[DEFAULT_CONFIGURATION], paths=CONFIG_PATHS)
+def init_default_config(config_dir: str):
+    print("Initialize {} with default config.".format(config_dir))
+    default_config_dir = os.path.join(get_base_dir(), 'resources', 'config', APPLICATION_DIR, 'settings', 'config')
+    if os.path.isdir(default_config_dir):
+        try:
+            copy_tree(default_config_dir, config_dir)
+        except DistutilsFileError as e:
+            print(f"Failed to initialize default configuration: {e}")
+    else:
+        print(f"Cannot locate default configuration. Expected at '{default_config_dir}'")
+
+
+uninitialized=True
+for path in CONFIG_PATHS:
+    if os.path.exists(path) and os.path.isdir(path):
+        uninitialized=False
+        break
+
+if uninitialized:
+    init_default_config(CONFIG_PATHS[0])
+
+config = Config("uwsift", paths=CONFIG_PATHS)
 
 
 def overwrite_import(package_name: str, custom_import_path: str, *, verbose=True):

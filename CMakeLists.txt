@@ -61,7 +61,6 @@ add_custom_target( devel-bootstrap
   COMMAND echo "  conda config --env --add channels conda-forge"
   COMMAND echo "  conda config --env --set channel_priority strict"
   COMMAND echo "  ${CMAKE_COMMAND} ."
-  COMMAND echo "  ${CMAKE_MAKE_PROGRAM} patch-shapely # This may fail, if the patch is already applied"
   VERBATIM
   COMMAND_EXPAND_LISTS
   COMMENT "Setting up conda environment for development ..."
@@ -116,38 +115,6 @@ if( DIST_PyInstaller )
     message( "PyInstaller packaging: Consider to install UPX (https://upx.github.io/) to get a smaller package." )
   endif()
 
-#---------- Patching Shapely.geos for PyInstaller ------------------------
-# This block may be removed as soon as Shapely cleanly can by PyInstaller'ed
-# from within a Conda environment
-
-find_package( Patch )
-
-execute_process(
-  COMMAND python -c "import shapely.geos; print(shapely.geos.__file__)"
-  OUTPUT_VARIABLE shapely.geos.__file__
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-  )
-set( shapely.geos.patch "${CMAKE_SOURCE_DIR}/shapely.geos.patch" )
-
-if( Patch_FOUND )
-  add_custom_target( patch-shapely
-    COMMAND ${Patch_EXECUTABLE} --posix --input=${shapely.geos.patch} --force --reject-file=- ${shapely.geos.__file__}
-    VERBATIM
-    COMMENT "Patching ${shapely.geos.__file__} for PyInstaller.
-         This may fail, e.g. if the patch was already applied.
-         In that case, verify '${shapely.geos.__file__}' against '${shapely.geos.patch}' please."
-    )
-  message( "The following file from shapely may need to be patched to work for PyInstaller:\n"
-    "  '${shapely.geos.__file__}'.\n"
-    "  The patch to be applied is '${shapely.geos.patch}'.\n"
-    "  Please build the target 'patch-shapely' once before 'pyinstaller-package'." )
-else()
-  message( WARNING "The following file from shapely may need to be patched to work for PyInstaller:"
-    " '${shapely.geos.__file__}'. The patch to be applied is '${shapely.geos.patch}',"
-    " but there is no 'Patch' tool found/configured. You may patch the file manually." )
-endif()
-
-
 #-------------------------------------------------------------------------
 
 set( ${PROJECT_NAME}_PYINSTALLER_BASE_DIR "${CMAKE_BINARY_DIR}/../pyinstaller" CACHE STRING
@@ -158,18 +125,28 @@ set( ${PROJECT_NAME}_PYINSTALLER_BASE_DIR "${CMAKE_BINARY_DIR}/../pyinstaller" C
     " The directory configured as ${PROJECT_NAME}_PYINSTALLER_BASE_DIR='${${PROJECT_NAME}_PYINSTALLER_BASE_DIR}'"
     " is *owned* by the build system, it will be removed and recreated by the target 'pyinstaller-package'!" )
 
-foreach( PYINSTALLER_MODE onedir onefile )
-  message( "Creating target 'pyinstaller-${PYINSTALLER_MODE}-package'" )
-  set( _pyi_dir_ ${${PROJECT_NAME}_PYINSTALLER_BASE_DIR}/${PYINSTALLER_MODE}  )
-  add_custom_target( pyinstaller-${PYINSTALLER_MODE}-package
-    COMMAND ${CMAKE_COMMAND} -E remove_directory ${${PROJECT_NAME}_PYINSTALLER_BASE_DIR}/${PYINSTALLER_MODE}
-    COMMAND pip install -e .
-    COMMAND ${PyInstaller_EXECUTABLE} --distpath "${_pyi_dir_}/dist" --workpath "${_pyi_dir_}/work" --clean -y ${PROJECT_NAME}-${PYINSTALLER_MODE}.spec
-    BYPRODUCTS "${_pyi_dir_}/dist/${PROJECT_NAME}/${PROJECT_NAME}"
-    VERBATIM
-    COMMENT "Building PyInstaller package in '${_pyi_dir_}/dist/${PROJECT_NAME}/${PROJECT_NAME}'"
-    )
-
-endforeach()
+message( "Creating target 'pyinstaller-package'" )
+set( _pyi_dir_ ${${PROJECT_NAME}_PYINSTALLER_BASE_DIR} )
+add_custom_command(OUTPUT pyinstaller-build
+  COMMAND ${CMAKE_COMMAND} -E remove_directory "${_pyi_dir_}"
+  COMMAND pip install -e .
+  COMMAND ${PyInstaller_EXECUTABLE} --distpath "${_pyi_dir_}/package" --workpath "${_pyi_dir_}/work" --clean -y ${PROJECT_NAME}-pyinstaller-package.spec
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${_pyi_dir_}/dist/${PROJECT_NAME}"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${_pyi_dir_}/dist/${PROJECT_NAME}/bin"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${_pyi_dir_}/dist/${PROJECT_NAME}/logs"
+  COMMAND ${CMAKE_COMMAND} -E copy_directory "${_pyi_dir_}/package/${PROJECT_NAME}/resources/bin" "${_pyi_dir_}/dist/${PROJECT_NAME}/bin"
+  COMMAND ${CMAKE_COMMAND} -E rename "${_pyi_dir_}/package/${PROJECT_NAME}" "${_pyi_dir_}/dist/${PROJECT_NAME}/lib"
+  BYPRODUCTS "${_pyi_dir_}/dist/${PROJECT_NAME}/lib/${PROJECT_NAME}"
+  VERBATIM
+  COMMENT "Building PyInstaller package in '${_pyi_dir_}/dist/${PROJECT_NAME}/lib'"
+  )
+add_custom_target( pyinstaller-package
+  COMMAND ${CMAKE_COMMAND} -E tar "cf" "${PROJECT_NAME}.zip" --format=zip "${PROJECT_NAME}"
+  DEPENDS pyinstaller-build
+  BYPRODUCTS "${_pyi_dir_}/dist/${PROJECT_NAME}.zip"
+  WORKING_DIRECTORY "${_pyi_dir_}/dist"
+  VERBATIM
+  COMMENT "Package PyInstaller output for mtgsift"
+)
 
 endif( DIST_PyInstaller )

@@ -1,0 +1,3 @@
+Dummy file to ensure the directory is not skipped by PyInstaller.
+
+This directory is required for llvmlite whose Conda package tries to add Library/bin with os.add_ddl_directory(...).

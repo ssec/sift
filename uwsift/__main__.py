@@ -1365,7 +1365,9 @@ def main() -> int:
     parser.add_argument("-w", "--workspace-dir", default=WORKSPACE_DB_DIR, help="Specify workspace base directory")
     parser.add_argument("--cache-dir", help="(DEPRECATED: use --workspace-dir) Specify workspace directory")
     parser.add_argument("--clear-workspace", action="store_true", help="Remove workspace contents during start up")
-    parser.add_argument("--config-dir", default=DOCUMENT_SETTINGS_DIR, help="Specify config directory")
+    # FIXME Config dir from command line does not work currently because config is already loaded and used
+    # in various places before main is executed.
+    #    parser.add_argument("--config-dir", default=DOCUMENT_SETTINGS_DIR, help="Specify config directory")
     parser.add_argument(
         "-s",
         "--space",
@@ -1408,7 +1410,8 @@ def main() -> int:
         LOG.warning("'--cache-dir' is deprecated, use '--workspace-dir'")
         args.workspace_dir = args.cache_dir
 
-    LOG.info("Using configuration directory: %s", args.config_dir)
+    #    LOG.info("Using configuration directory: %s", args.config_dir)
+    LOG.info("Using configuration directory: %s", DOCUMENT_SETTINGS_DIR)
     LOG.info("Using cache directory: %s", args.cache_dir)
     vispy_app, qt_app = create_app()
 
@@ -1424,7 +1427,7 @@ def main() -> int:
 
     window = Main(
         workspace_dir=args.workspace_dir,
-        config_dir=args.config_dir,
+        config_dir=DOCUMENT_SETTINGS_DIR,
         cache_size=args.space,
         search_paths=data_search_paths,
         border_shapefile=args.border_shapefile,
@@ -1460,5 +1463,24 @@ def main() -> int:
     return 0
 
 
+def close_splash_screen():
+    """
+    Helper function to close startup splash screen provided by pyinstaller.
+    If pyinstaller package has no splash screen or this is not started as
+    pyinstaller package at all the function does nothing.
+    """
+    if "_PYIBoot_SPLASH" in os.environ:
+        try:
+            import pyi_splash
+
+            pyi_splash.close()
+        except:
+            # not good not terrible. Splash screen might be still open but
+            # more likely there was no splash screen to begin with and the
+            # environment variable set defined by something else.
+            pass
+
+
 if __name__ == "__main__":
+    close_splash_screen()
     sys.exit(main())

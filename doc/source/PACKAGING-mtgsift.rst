@@ -85,7 +85,6 @@ If not already done, execute the steps::
   (devel-3.10)%> conda config --env --add channels conda-forge
   (devel-3.10)%> conda config --env --set channel_priority strict
   (devel-3.10)%> cmake -G "Unix Makefiles" .
-  (devel-3.10)%> make patch-shapely
 
 The system is now ready to create Conda and PyInstaller packages for
 MTG-SIFT. The according targets can be found in the target lists printed by
@@ -95,8 +94,7 @@ running::
    The following are some of the valid targets for this Makefile:
    [...]
    ... conda-packages
-   ... pyinstaller-onedir-package
-   ... pyinstaller-onefile-package
+   ... pyinstaller-package
    [...]
 
 Each of these *package-target*\ s can be build by running::
@@ -128,30 +126,13 @@ environment from which the path is accessible::
 
 .. _pyinstaller-packaging:
 
-The targets *pyinstaller-onedir-package* and *pyinstaller-onefile-package*
+The target *pyinstaller-package*
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-Using the two targets you can create executables which allow to run MTG-SIFT
+Using this target you can create an executable which allow to run MTG-SIFT
 without any additional installation of dependencies. All dependencies are
 provided.
 
-Please don't forget to at least once build the target *patch-shapely* in the
-Conda environment you use for packaging. The MTG-SIFT dependency *Shapely* has
-an issue with respect to PyInstaller based packaging, which is fixed with the
-provided patch for now::
-
-  (devel-3.10)%> make patch-shapely
-
-The difference between the two targets is:
-
-- The *onedir* target creates an executable *mtgsift/mtgsift*
-  (*mtgsift\\mtgsift.exe* on Windows) within a directory *mtgsift/* which
-  furthermore contains all dependencies.
-- The *onefile* package creates only one executable *mtgsift* (*mtgsift.exe*
-  on Windows) which encapsulates all dependencies. Since each time when
-  started it has to unpack these its startup times are significantly longer
-  than of the *onedir* variant, but in contrast to the latter it is truly
-  self-contained.
 
 
 .. rubric:: Footnotes

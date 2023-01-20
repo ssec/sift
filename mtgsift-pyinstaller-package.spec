@@ -2,9 +2,9 @@
 
 # During spec file development run like so:
 #   export PYTHONHASHSEED=1
-#   pyinstaller --clean --noconfirm --debug all mtgsift-onedir.spec
+#   pyinstaller --clean --noconfirm --debug all mtgsift-pyinstaller-package.spec
 # To generate a self-contained executable:
-#   pyinstaller --clean --noconfirm             mtgsift-onedir.spec
+#   pyinstaller --clean --noconfirm             mtgsift-pyinstaller-package.spec
 
 import sys
 sys.setrecursionlimit(5000)
@@ -53,9 +53,12 @@ data_files.append((os.path.join(icon_dir, "menu.svg"), icon_dir))
 
 # For Cython support (see
 # https://pyinstaller.readthedocs.io/en/stable/feature-notes.html#cython-support):
-hidden_imports = [
+hidden_imports = [  # PLEASE ADD NEW ITEMS IN ALPHABETICAL ORDER
+    "cftime"   # for satpy
+    "gribapi",
     "ncepgrib2",  # For PyGrib
     "pkg_resources",
+    "pyhdf",
     "pyproj",
     "satpy",
     "shapely",
@@ -64,36 +67,34 @@ hidden_imports = [
     "sqlalchemy",
     "sqlalchemy.ext.baked",
     "vispy.app.backends._pyqt5",
-    "vispy.ext._bundled.six",
     "xarray",
-    "pyhdf",
-    "pyhdf.six",
-    "gribapi"
 ]
-hidden_imports += collect_submodules("pkg_resources")
-hidden_imports += collect_submodules("pyproj")
-hidden_imports += collect_submodules("rasterio")
-hidden_imports += collect_submodules("satpy")
-hidden_imports += collect_submodules("sqlalchemy")
-hidden_imports += collect_submodules("numcodecs")
-hidden_imports += collect_submodules("shapely")
-hidden_imports += collect_submodules("pyqtgraph")
-hidden_imports += collect_submodules("pyhdf")
-hidden_imports += collect_submodules("python-eccodes")
+# PLEASE ADD NEW ITEMS IN ALPHABETICAL ORDER
+hidden_imports += collect_submodules("cftime")
 hidden_imports += collect_submodules("eccodes")
 hidden_imports += collect_submodules("gribapi")
+hidden_imports += collect_submodules("numcodecs")
+hidden_imports += collect_submodules("pkg_resources")
+hidden_imports += collect_submodules("pyhdf")
+hidden_imports += collect_submodules("pyproj")
+hidden_imports += collect_submodules("pyqtgraph")
+hidden_imports += collect_submodules("python-eccodes")
+hidden_imports += collect_submodules("rasterio")
+hidden_imports += collect_submodules("satpy")
+hidden_imports += collect_submodules("shapely")
+hidden_imports += collect_submodules("sqlalchemy")
 if is_win:
     hidden_imports += collect_submodules("encodings")
     hidden_imports += collect_submodules("PyQt5")
 
 
-def _include_if_exists(binaries, lib_dir, lib_pattern):
+def _include_if_exists(binaries, lib_dir, lib_pattern, target_dir = '.'):
     from glob import glob
     results = glob(os.path.join(lib_dir, lib_pattern))
     print(lib_dir, lib_pattern, results)
     if results:
         for result in results:
-            binaries.append((result, '.'))
+            binaries.append((result, target_dir))
 
 
 # Add missing shared libraries
@@ -102,21 +103,40 @@ if not is_win:
     bin_dir   = os.path.join(sys.exec_prefix, "bin")
     lib_dir   = os.path.join(sys.exec_prefix, "lib")
     share_dir = os.path.join(sys.exec_prefix, "share")
-    # Add ffmpeg
     binaries += [(os.path.join(bin_dir, 'ffmpeg'), '.')]
     if is_linux:
         binaries += [(os.path.join(lib_dir, 'libfontconfig*.so'), '.')]
+    _include_if_exists(binaries, bin_dir, 'xRITDecompress', os.path.join('resources', 'bin'))
 else:
     bin_dir   = os.path.join(sys.exec_prefix, "Library", "bin")
     lib_dir   = os.path.join(sys.exec_prefix, "Library", "lib")
     share_dir = os.path.join(sys.exec_prefix, "Library", "share")
-    # Add ffmpeg
     binaries += [(os.path.join(bin_dir, 'ffmpeg.exe'), '.')]
+    _include_if_exists(binaries, bin_dir, 'xRITDecompress.exe', os.path.join('resources', 'bin'))
 
 #-------------------------------------------------------------------------------
 # Add extra pygrib .def files
-data_files.append((os.path.join(share_dir, 'eccodes'), os.path.join('share', 'eccodes')))
+if not is_win:
+    data_files.append((os.path.join(share_dir, 'eccodes'), os.path.join('share', 'eccodes')))
 
+
+#-------------------------------------------------------------------------------
+# For Windows add empty dummy directories which some dependencies insist to add
+# via os.add_dll_directory. As consequence mtgsift fails to start on Windows
+# if those directories are missing.
+if is_win:
+    data_files.append((os.path.join('resources', 'pyinstaller'), '.'))
+
+
+#-------------------------------------------------------------------------------
+# Add default config and startup scripts
+data_files.append((os.path.join('resources', 'config'), os.path.join('resources', 'config')))
+script_ext = ''
+if is_linux:
+    script_ext = '.sh'
+if is_win:
+    script_ext = '.bat'
+data_files.append((os.path.join('resources', 'bin', exe_name + script_ext), os.path.join('resources', 'bin')))
 
 #-------------------------------------------------------------------------------
 # Add ffmpeg dependencies that pyinstaller doesn't automatically find
@@ -168,7 +188,12 @@ pyz = PYZ(a.pure,
 # options = [ ('v', None, 'OPTION') ]
 options=[]
 
+splash = Splash('splash.png',
+                binaries=a.binaries,
+                datas=a.datas)
+
 exe = EXE(pyz,
+          splash,
           a.scripts,
           options,
           exclude_binaries=True,
@@ -179,6 +204,7 @@ exe = EXE(pyz,
           console=True )
 
 coll = COLLECT(exe,
+               splash.binaries,
                a.binaries,
                a.zipfiles,
                a.datas,
