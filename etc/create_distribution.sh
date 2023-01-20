@@ -3,7 +3,7 @@ set -x
 
 cwd=$(pwd)
 
-HOME_PYINSTALLER_BUILD="../../pyinstaller/onedir/"
+HOME_PYINSTALLER_BUILD="../../pyinstaller/"
 DIST_OUTPUT="../../distribution-build"
 
 SCR_TEMPLATE="./mtgsift-dist-template"
