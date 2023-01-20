@@ -54,11 +54,11 @@ data_files.append((os.path.join(icon_dir, "menu.svg"), icon_dir))
 # For Cython support (see
 # https://pyinstaller.readthedocs.io/en/stable/feature-notes.html#cython-support):
 hidden_imports = [  # PLEASE ADD NEW ITEMS IN ALPHABETICAL ORDER
-    "gribapi"
+    "cftime"   # for satpy
+    "gribapi",
     "ncepgrib2",  # For PyGrib
     "pkg_resources",
     "pyhdf",
-    "pyhdf.six",
     "pyproj",
     "satpy",
     "shapely",
@@ -67,10 +67,10 @@ hidden_imports = [  # PLEASE ADD NEW ITEMS IN ALPHABETICAL ORDER
     "sqlalchemy",
     "sqlalchemy.ext.baked",
     "vispy.app.backends._pyqt5",
-    "vispy.ext._bundled.six",
     "xarray",
 ]
 # PLEASE ADD NEW ITEMS IN ALPHABETICAL ORDER
+hidden_imports += collect_submodules("cftime")
 hidden_imports += collect_submodules("eccodes")
 hidden_imports += collect_submodules("gribapi")
 hidden_imports += collect_submodules("numcodecs")
@@ -103,7 +103,6 @@ if not is_win:
     bin_dir   = os.path.join(sys.exec_prefix, "bin")
     lib_dir   = os.path.join(sys.exec_prefix, "lib")
     share_dir = os.path.join(sys.exec_prefix, "share")
-    # Add ffmpeg
     binaries += [(os.path.join(bin_dir, 'ffmpeg'), '.')]
     if is_linux:
         binaries += [(os.path.join(lib_dir, 'libfontconfig*.so'), '.')]
@@ -111,13 +110,20 @@ else:
     bin_dir   = os.path.join(sys.exec_prefix, "Library", "bin")
     lib_dir   = os.path.join(sys.exec_prefix, "Library", "lib")
     share_dir = os.path.join(sys.exec_prefix, "Library", "share")
-    # Add ffmpeg
     binaries += [(os.path.join(bin_dir, 'ffmpeg.exe'), '.')]
 
 #-------------------------------------------------------------------------------
 # Add extra pygrib .def files
-data_files.append((os.path.join(share_dir, 'eccodes'), os.path.join('share', 'eccodes')))
+if not is_win:
+    data_files.append((os.path.join(share_dir, 'eccodes'), os.path.join('share', 'eccodes')))
 
+
+#-------------------------------------------------------------------------------
+# For Windows add empty dummy directories which some dependencies insist to add
+# via os.add_dll_directory. As consequence mtgsift fails to start on Windows
+# if those directories are missing.
+if is_win:
+    data_files.append((os.path.join('resources', 'pyinstaller'), '.'))
 
 #-------------------------------------------------------------------------------
 # Add ffmpeg dependencies that pyinstaller doesn't automatically find
