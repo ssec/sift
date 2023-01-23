@@ -1570,7 +1570,7 @@ class ColormapManager(OrderedDict):
             ro = read_only or file_ext not in self.writeable_extensions
             try:
                 cmap_class = self.colormap_classes[file_ext]
-                self.add_colormap(file_stem, LazyColormap(cmap_class, pathname), category=category, read_only=ro)
+                self._add_colormap(file_stem, LazyColormap(cmap_class, pathname), category=category, read_only=ro)
                 added_colormaps.append(file_stem)
             except (ValueError, IOError, KeyError):
                 LOG.error("Error importing colormap: {}".format(pathname))
@@ -1580,7 +1580,7 @@ class ColormapManager(OrderedDict):
     def is_writeable_colormap(self, name):
         return name in self._writeable_cmaps
 
-    def add_colormap(self, name, colormap, category=USER_CATEGORY, read_only=True):
+    def _add_colormap(self, name, colormap, category=USER_CATEGORY, read_only=True):
         assert isinstance(colormap, (LazyColormap, BaseColormap))  # nosec B101
         cat_dict = self._category_dict.setdefault(category, [])
         if name not in cat_dict:
@@ -1610,7 +1610,7 @@ class ColormapManager(OrderedDict):
             return default
 
     def __setitem__(self, key, value):
-        self.add_colormap(key, value)
+        self._add_colormap(key, value)
 
     def __delitem__(self, key):
         super(ColormapManager, self).__delitem__(key)
