@@ -40,7 +40,7 @@ class WrappingDrivingPolicy(QObject):
         except ValueError:
             return None
 
-    def get_next_possible_driving_layer(self) -> Optional[LayerItem]:
+    def _get_next_possible_driving_layer(self) -> Optional[LayerItem]:
         for layer in self._get_dynamic_layers():
             return layer
         LOG.info("No suitable driving layer found!")
@@ -55,7 +55,7 @@ class WrappingDrivingPolicy(QObject):
         if driving_layer_index:
             return
         else:
-            self.driving_layer = self.get_next_possible_driving_layer()
+            self.driving_layer = self._get_next_possible_driving_layer()
             self.didUpdatePolicy.emit(self.driving_layer)
 
     def change_timebase(self, layer):
