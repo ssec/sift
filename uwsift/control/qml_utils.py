@@ -35,7 +35,7 @@ class QmlLayerManager(QObject):
         self._layer_model = None
 
         self._convenience_functions: Dict[str, Callable] = None
-        self.set_convenience_functions({"Most Frequent": self.get_most_frequent_data_layer_index})
+        self._set_convenience_functions({"Most Frequent": self.get_most_frequent_data_layer_index})
 
         # TODO(mk): make this configurable if the user wants to display dates differently?
         self._format_str = DEFAULT_TIME_FORMAT
@@ -76,7 +76,7 @@ class QmlLayerManager(QObject):
         conv_fun = self._convenience_functions.get(function_name, None)
         return conv_fun
 
-    def set_convenience_functions(self, conv_funcs):
+    def _set_convenience_functions(self, conv_funcs):
         self._convenience_functions = conv_funcs
         self.convFuncModel = LayerModel(layer_strings=list(conv_funcs.keys()))
 
@@ -97,24 +97,6 @@ class QmlLayerManager(QObject):
     def convFuncModel(self, new_model):
         self._conv_func_model = new_model
         self.convFuncModelChanged.emit()
-
-    # TODO(mk): deprecated methods, remove?
-    def change_layer_model(self, idx, elem):
-        insert_idx = idx + self.num_convenience_functions
-        if insert_idx < len(self._qml_layer_model._layer_strings):
-            self._qml_layer_model._layer_strings[insert_idx] = elem
-        else:
-            self._qml_layer_model._layer_strings.append(elem)
-        for el in self._qml_layer_model._layer_strings:
-            print(f"{el}")
-        self.layerModelChanged.emit()
-
-    def clear_layer_model(self):
-        topIdx = len(self._qml_layer_model._layer_strings) - 1
-        while topIdx > self.num_convenience_functions:
-            del self._qml_layer_model._layer_strings[topIdx]
-            topIdx -= 1
-        self.layerModelChanged.emit()
 
     # TODO(mk): this only works for SEVIRI data like this, make this more general!
     @staticmethod
