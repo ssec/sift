@@ -205,13 +205,13 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if Info.UNIT_CONVERSION not in info:
             info[Info.UNIT_CONVERSION] = units_conversion(info)
         if Info.FAMILY not in info:
-            info[Info.FAMILY] = self.family_for_product_or_info(info)
+            info[Info.FAMILY] = self._family_for_product_or_info(info)
         presentation = self._insert_dataset_with_info(info, insert_before=insert_before)
 
         # signal updates from the document
         self.didAddDataset.emit(info, presentation)
 
-    def family_for_product_or_info(self, uuid_or_info):
+    def _family_for_product_or_info(self, uuid_or_info):
         if isinstance(uuid_or_info, UUID):
             if isinstance(self._workspace, CachingWorkspace):
                 with self._workspace.metadatabase as s:
