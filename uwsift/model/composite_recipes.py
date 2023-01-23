@@ -244,7 +244,7 @@ class RecipeManager(QObject):
             recipe = self.open_recipe(pathname)
             self._stored_recipes[recipe.name] = (pathname, recipe)
 
-    def add_recipe(self, recipe):
+    def _add_recipe(self, recipe):
         self.recipes[recipe.id] = recipe
 
     def create_rgb_recipe(self, layers):
@@ -261,7 +261,7 @@ class RecipeManager(QObject):
             g=None if layers[1] is None else layers[1].uuid,
             b=None if layers[2] is None else layers[2].uuid,
         )
-        self.add_recipe(recipe)
+        self._add_recipe(recipe)
 
         self.didCreateRGBCompositeRecipe.emit(recipe)
 
@@ -325,7 +325,7 @@ class RecipeManager(QObject):
             z=None if layers[2] is None else layers[2].uuid,
             operation_kind=DIFF_OP_NAME,
         )
-        self.add_recipe(recipe)
+        self._add_recipe(recipe)
 
         self.didCreateAlgebraicRecipe.emit(recipe)
 
@@ -375,7 +375,7 @@ class RecipeManager(QObject):
     def __delitem__(self, recipe_id):
         del self.recipes[recipe_id]
 
-    def save_recipe(self, recipe, filename=None, overwrite=False):
+    def save_recipe(self, recipe, filename=None, overwrite=False):  # noqa D102. Unused, consider removing
         if not filename:
             filename = recipe.name + ".yaml"
         pathname = os.path.join(self.recipe_dir, filename)
