@@ -111,17 +111,17 @@ class TextureTileState(object):
         self.tile_free = [True] * self.num_tiles
         self.itile_age = []
 
-    def next_available_tile(self):
+    def _next_available_tile(self):
         for idx, tile_free in enumerate(self.tile_free):
             if tile_free:
                 return idx
 
         # We don't have any free tiles, remove the oldest one
         LOG.debug("Expiring image tile from texture atlas: %r", self.itile_age[0])
-        ttile_idx = self.remove_tile(self.itile_age[0])
+        ttile_idx = self._remove_tile(self.itile_age[0])
         return ttile_idx
 
-    def refresh_age(self, itile_idx):
+    def _refresh_age(self, itile_idx):
         """Update the age of an image tile so it is less likely to expire."""
         try:
             # Remove it from wherever it is
@@ -141,19 +141,19 @@ class TextureTileState(object):
         # Have we already added this tile, get the tile index
         if itile_idx in self:
             if expires:
-                self.refresh_age(itile_idx)
+                self._refresh_age(itile_idx)
             return self[itile_idx]
 
-        ttile_idx = self.next_available_tile()
+        ttile_idx = self._next_available_tile()
 
         self.itile_cache[itile_idx] = ttile_idx
         self._rev_cache[ttile_idx] = itile_idx
         self.tile_free[ttile_idx] = False
         if expires:
-            self.refresh_age(itile_idx)
+            self._refresh_age(itile_idx)
         return ttile_idx
 
-    def remove_tile(self, itile_idx):
+    def _remove_tile(self, itile_idx):
         ttile_idx = self.itile_cache.pop(itile_idx)
         self._rev_cache.pop(ttile_idx)
         self.tile_free[ttile_idx] = True
