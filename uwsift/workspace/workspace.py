@@ -43,7 +43,7 @@ from abc import abstractmethod
 from collections import defaultdict
 from collections.abc import Mapping as ReadOnlyMapping
 from datetime import timedelta
-from typing import Generator, Mapping, Optional, Tuple
+from typing import Dict, Generator, Mapping, Optional, Tuple
 from uuid import UUID
 from uuid import uuid1 as uuidgen
 
@@ -281,7 +281,7 @@ class BaseWorkspace(QObject):
             self.cwd = os.path.abspath(directory_path)
             self.cache_dir = os.path.join(self.cwd, "data_cache")
 
-        self._available: dict[int, ActiveContent] = {}  # dictionary of {Content.id : ActiveContent object}
+        self._available: Dict[int, ActiveContent] = {}  # dictionary of {Content.id : ActiveContent object}
         self._importers = IMPORT_CLASSES.copy()
         self._state: defaultdict = defaultdict(Flags)
         global TheWorkspace  # singleton

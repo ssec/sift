@@ -91,9 +91,11 @@ import_progress = namedtuple(
 try:
     import hdf5plugin
 except ImportError:
-    LOG.warning("Your installation/environment doesn't include the package hdf5plugin. If you want to visualise "
-                "compressed FCI L1c data, please add this package using \"pip install hdf5plugin\" or "
-                "\"conda install -c conda-forge hdf5plugin \"..")
+    LOG.warning(
+        "Your installation/environment doesn't include the package hdf5plugin. If you want to visualise "
+        'compressed FCI L1c data, please add this package using "pip install hdf5plugin" or '
+        '"conda install -c conda-forge hdf5plugin "..'
+    )
 
 
 def _load_satpy_readers_cache(force_refresh=None):
@@ -1263,8 +1265,13 @@ class SatpyImporter(aImporter):
             file_type = list(self.scn._readers[self.reader].file_handlers.keys())[0]
             return seg_heights(file_type, segment_width)[segment_number - 1]
         except AttributeError:
-            LOG.exception("You're probably using an old version of Satpy. Please update Satpy to be >=0.39.0 "
-                          "to use merge_with_existing=True with the FCI reader.")
+            LOG.exception(
+                "You're probably using an old version of Satpy. Please update Satpy to be >=0.39.0 "
+                "to use merge_with_existing=True with the FCI reader."
+            )
+            raise
+
+        return -1
 
     def _calc_segment_heights(self, segments_data, segments_indices):
         def get_segment_height_calculator() -> Callable:
