@@ -66,10 +66,10 @@ class ExportImageDialog(QtWidgets.QDialog):
         self.ui.includeFooterCheckbox.clicked.connect(self._footer_changed)
         self._footer_changed()
 
-        self.ui.frameAllRadio.clicked.connect(self.change_frame_range)
-        self.ui.frameCurrentRadio.clicked.connect(self.change_frame_range)
-        self.ui.frameRangeRadio.clicked.connect(self.change_frame_range)
-        self.change_frame_range()  # set default
+        self.ui.frameAllRadio.clicked.connect(self._change_frame_range)
+        self.ui.frameCurrentRadio.clicked.connect(self._change_frame_range)
+        self.ui.frameRangeRadio.clicked.connect(self._change_frame_range)
+        self._change_frame_range()  # set default
 
     def set_total_frames(self, n):
         self.ui.frameRangeFrom.validator().setBottom(1)
@@ -143,7 +143,7 @@ class ExportImageDialog(QtWidgets.QDialog):
         self.ui.animationGroupBox.setDisabled(disable or not is_gif)
         self.ui.frameDelayGroup.setDisabled(disable or not (is_gif or is_video))
 
-    def change_frame_range(self):
+    def _change_frame_range(self):
         if self.ui.frameRangeRadio.isChecked():
             self.ui.frameRangeFrom.setDisabled(False)
             self.ui.frameRangeTo.setDisabled(False)
@@ -153,7 +153,7 @@ class ExportImageDialog(QtWidgets.QDialog):
 
         self._check_animation_controls()
 
-    def get_frame_range(self):
+    def _get_frame_range(self):
         if self.ui.frameCurrentRadio.isChecked():
             frame = None
         elif self.ui.frameAllRadio.isChecked():
@@ -176,7 +176,7 @@ class ExportImageDialog(QtWidgets.QDialog):
 
         # loop is actually an integer of number of times to loop (0 infinite)
         info = {
-            "frame_range": self.get_frame_range(),
+            "frame_range": self._get_frame_range(),
             "include_footer": self.ui.includeFooterCheckbox.isChecked(),
             # 'transparency': self.ui.transparentCheckbox.isChecked(),
             "loop": self.ui.loopRadio.isChecked(),
