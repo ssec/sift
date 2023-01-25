@@ -747,7 +747,7 @@ class PROJ4Transform(BaseTransform):
         self.proj4_str = proj4_str
         self.proj = Proj(proj4_str)
         self._proj4_inverse = inverse
-        proj_dict = self.create_proj_dict(proj4_str)
+        proj_dict = self._create_proj_dict(proj4_str)
 
         # Get the specific functions for this projection
         proj_funcs = PROJECTIONS[proj_dict["proj"]]
@@ -815,7 +815,7 @@ class PROJ4Transform(BaseTransform):
             return self.proj.crs.is_geographic
         return self.proj.is_latlong()
 
-    def create_proj_dict(self, proj_str):  # noqa: C901
+    def _create_proj_dict(self, proj_str):  # noqa: C901
         d = tuple(x.replace("+", "").split("=") for x in proj_str.split(" "))
         d = dict((x[0], x[1] if len(x) > 1 else "true") for x in d)
 
