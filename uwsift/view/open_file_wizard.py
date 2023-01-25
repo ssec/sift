@@ -152,27 +152,27 @@ class OpenFileWizard(QtWidgets.QWizard):
         # Page 2 - Product selection
 
         self._all_selected = False
-        self.ui.selectAllButton.clicked.connect(self.select_all_products_state)
+        self.ui.selectAllButton.clicked.connect(self._select_all_products_state)
         self.ui.selectIDTable.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.ui.selectIDTable.customContextMenuRequested.connect(self._product_context_menu)
 
-        self.ui.resamplingMethodComboBox.currentIndexChanged.connect(self.update_resampling_info)
-        self.ui.resamplingMethodComboBox.currentIndexChanged.connect(self.update_activation_of_projection_combobox)
+        self.ui.resamplingMethodComboBox.currentIndexChanged.connect(self._update_resampling_info)
+        self.ui.resamplingMethodComboBox.currentIndexChanged.connect(self._update_activation_of_projection_combobox)
 
-        self.ui.radiusOfInfluenceSpinBox.valueChanged.connect(self.update_resampling_info)
+        self.ui.radiusOfInfluenceSpinBox.valueChanged.connect(self._update_resampling_info)
 
         self.ui.projectionComboBox.setModel(parent.ui.projectionComboBox.model())
-        self.ui.projectionComboBox.currentIndexChanged.connect(self.update_resampling_info)
+        self.ui.projectionComboBox.currentIndexChanged.connect(self._update_resampling_info)
 
         self._update_resampling_shape_spin_boxes()
         self.ui.projectionComboBox.currentIndexChanged.connect(self._update_resampling_shape_spin_boxes)
-        self.ui.resamplingShapeRowSpinBox.valueChanged.connect(self.update_resampling_info)
-        self.ui.resamplingShapeColumnSpinBox.valueChanged.connect(self.update_resampling_info)
+        self.ui.resamplingShapeRowSpinBox.valueChanged.connect(self._update_resampling_info)
+        self.ui.resamplingShapeColumnSpinBox.valueChanged.connect(self._update_resampling_info)
 
         # GUI has been initialized, make sure we have a consistent
         # resampling_info
         self.resampling_info = None
-        self.update_resampling_info()
+        self._update_resampling_info()
 
         # on cell change: check if page is complete
         self.ui.selectIDTable.cellChanged.connect(self._check_product_page_completeness)
@@ -260,7 +260,9 @@ class OpenFileWizard(QtWidgets.QWizard):
         readers = available_satpy_readers(as_dict=True)
         readers = (r for r in readers if not configured_readers or r["name"] in configured_readers)
         readers = sorted(readers, key=lambda x: x.get("short_name", x["name"]))
-        OpenFileWizard.configured_readers = OrderedDict((ri.get("short_name", ri["name"]), ri["name"]) for ri in readers)
+        OpenFileWizard.configured_readers = OrderedDict(
+            (ri.get("short_name", ri["name"]), ri["name"]) for ri in readers
+        )
 
     def _initialize_page_product_selection(self):
         # name and level
@@ -287,8 +289,8 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.selectIDTable.resizeColumnsToContents()
 
         self.ui.projectionComboBox.setCurrentIndex(self.parent().document.current_projection_index())
-        self.update_resampling_method_combobox()
-        self.update_resampling_info()
+        self._update_resampling_method_combobox()
+        self._update_resampling_info()
 
     def _pretty_identifiers(self, data_id: DataID) -> Generator[Tuple[str, object, str], None, None]:
         """Determine pretty version of each identifier."""
@@ -611,13 +613,13 @@ class OpenFileWizard(QtWidgets.QWizard):
     # PAGE 2 RELATED FUNCTIONALITY
     # ==============================================================================================
 
-    def select_all_products_state(self, checked: bool):
+    def _select_all_products_state(self, checked: bool):
         """Select all or deselect all products listed on the product table."""
         # the new state (all selected or all unselected)
         self._all_selected = not self._all_selected
-        self.select_all_products(select=self._all_selected)
+        self._select_all_products(select=self._all_selected)
 
-    def select_all_products(self, select=True, prop_key: Union[str, None] = None, prop_val: Union[str, None] = None):
+    def _select_all_products(self, select=True, prop_key: Union[str, None] = None, prop_val: Union[str, None] = None):
         """Select products based on a specific property."""
         for row_idx in range(self.ui.selectIDTable.rowCount()):
             # our check state goes on the name item (always)
@@ -640,7 +642,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         action = menu.exec_(self.ui.selectIDTable.mapToGlobal(position))
         if action == select_action or action == deselect_action:
             select = action == select_action
-            self.select_all_products(select=select, prop_key=id_comp, prop_val=id_data)
+            self._select_all_products(select=select, prop_key=id_comp, prop_val=id_data)
 
     def _check_product_page_completeness(self):
         """update status message, check if this page is complete."""
@@ -656,7 +658,7 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         self.ui.productSelectionPage.completeChanged.emit()
 
-    def update_resampling_method_combobox(self):
+    def _update_resampling_method_combobox(self):
         reader = self.get_reader()
         geometry_definition: str = config.get(f"data_reading.{reader}.geometry_definition", "AreaDefinition")
 
@@ -699,14 +701,14 @@ class OpenFileWizard(QtWidgets.QWizard):
         self._set_opts_disabled(self.ui.resamplingMethodComboBox.currentData() == "none")
         self.ui.resamplingMethodComboBox.blockSignals(False)
 
-    def update_activation_of_projection_combobox(self):
+    def _update_activation_of_projection_combobox(self):
         if self.ui.resamplingMethodComboBox.currentData() != "none":
             self._set_opts_disabled(False)
         else:
             self._set_opts_disabled(True)
             self._reset_fields()
 
-    def update_resampling_info(self):
+    def _update_resampling_info(self):
         area_def_name = self.ui.projectionComboBox.currentText()
         area_def = AreaDefinitionsManager.area_def_by_name(area_def_name)
 
