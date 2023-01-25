@@ -132,21 +132,21 @@ class ProbeGraphManager(QObject):
 
         # hook things up so we know when the selected tab changes
         self.tab_widget_object.currentChanged[int].connect(self.handle_tab_change)
-        self.drawChildGraph.connect(self.draw_child)
+        self.drawChildGraph.connect(self._draw_child)
 
         # hook up the various layer_model signals that would mean we need to
         # reload things
 
         # hook up auto update vs manual update changes
         self.update_button.clicked.connect(self.handleActiveProductDatasetsChanged)
-        self.update_button.clicked.connect(self._update_point_probe_graph)
-        self.auto_update_checkbox.stateChanged.connect(self.autoUpdateStateChanged)
+        self.update_button.clicked.connect(self._update_default_point_probe_graph)
+        self.auto_update_checkbox.stateChanged.connect(self._on_auto_update_checkbox_state_changed)
         self.auto_update_checkbox.setCheckState(Qt.Unchecked)
 
-    def draw_child(self, child_name):
+    def _draw_child(self, child_name):
         for child in self.graphs:
             if child.myName == child_name:
-                child.draw()
+                child._draw()
                 break
 
     def set_up_tab(self, tab_index, do_increment_tab_letter=True):
@@ -249,12 +249,12 @@ class ProbeGraphManager(QObject):
         self.point_probes[probe_name] = [state, xy_pos]
         self.pointProbeChanged.emit(probe_name, state, xy_pos)
 
-    def _update_point_probe_graph(self):
+    def _update_default_point_probe_graph(self):
         probe_name = DEFAULT_POINT_PROBE
         point_probe = self.point_probes.get(probe_name, [None, None])
-        self.update_point_probe_graph(probe_name, *point_probe)
+        self._update_point_probe_graph(probe_name, *point_probe)
 
-    def update_point_probe_graph(self, probe_name, state, xy_pos):
+    def _update_point_probe_graph(self, probe_name, state, xy_pos):
         # need to set the point for all graphs because the point probe
         # is used across all plots
         for idx, graph in enumerate(self.graphs):
@@ -308,14 +308,14 @@ class ProbeGraphManager(QObject):
         currentName = self.graphs[self.selected_graph_index].getName()
         self.didChangeTab.emit((currentName,))
 
-    def autoUpdateStateChanged(self, state):
+    def _on_auto_update_checkbox_state_changed(self, state):
         if self.auto_update_checkbox.isChecked():
             self.update_button.setEnabled(False)
             self.layer_model.didFinishActivateProductDatasets.connect(self.handleActiveProductDatasetsChanged)
-            self.pointProbeChanged.connect(self.update_point_probe_graph)
+            self.pointProbeChanged.connect(self._update_point_probe_graph)
         else:
             self.layer_model.didFinishActivateProductDatasets.disconnect(self.handleActiveProductDatasetsChanged)
-            self.pointProbeChanged.disconnect(self.update_point_probe_graph)
+            self.pointProbeChanged.disconnect(self._update_point_probe_graph)
             self.update_button.setEnabled(True)
 
 
@@ -742,7 +742,7 @@ class ProbeGraphDisplay(object):
         self.manager.drawChildGraph.emit(self.myName)
         yield {TASK_DOING: "Probe Plot: Done", TASK_PROGRESS: 1.0}
 
-    def draw(self):
+    def _draw(self):
         self.canvas.draw()
 
     def plotHistogram(self, data, title, x_point, x_label, y_label, numBins=100):
