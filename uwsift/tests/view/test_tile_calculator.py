@@ -242,7 +242,7 @@ def test_calc_stride(tc_params, v, t, exp):
 def test_calc_overview_stride(tc_params, ims, exp):
     """Test calculated stride is correct given a valid image."""
     tile_calc = TileCalculator(*tc_params)
-    res = tile_calc.calc_overview_stride(ims)
+    res = tile_calc._calc_overview_stride(ims)
     assert res == exp
 
 
