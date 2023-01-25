@@ -237,7 +237,7 @@ class PieDialDelegate(QtWidgets.QStyledItemDelegate):
         :return:
         """
         editor = PieDialEditor(parent, PieDial())
-        editor.editingFinished.connect(self.commit_and_close_editor)
+        editor.editingFinished.connect(self._commit_and_close_editor)
 
         return editor
 
@@ -247,7 +247,7 @@ class PieDialDelegate(QtWidgets.QStyledItemDelegate):
         pie_dial = PieDial(visible=layer_visibility.visible, opacity=layer_visibility.opacity)
         pie_dial.paint(painter, option.rect)
 
-    def commit_and_close_editor(self):
+    def _commit_and_close_editor(self):
         """ """
         editor = self.sender()
         self.commitData.emit(editor)

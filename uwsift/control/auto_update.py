@@ -82,9 +82,9 @@ class AutoUpdateManager:
         self.timer = app.Timer(minimum_interval, connect=update_in_background)
         self.timer.start()
 
-        self._auto_update_policy = StartTimeGranuleUpdatePolicy(self.query_for_satpy_importer_kwargs_and_readers)
+        self._auto_update_policy = StartTimeGranuleUpdatePolicy(self._query_for_satpy_importer_kwargs_and_readers)
 
-    def query_for_satpy_importer_kwargs_and_readers(self, current_constraints):
+    def _query_for_satpy_importer_kwargs_and_readers(self, current_constraints):
         return Catalogue.query_for_satpy_importer_kwargs_and_readers(
             self.reader, self.search_path, self.filter_patterns, self.group_keys, current_constraints, self.products
         )

@@ -526,7 +526,7 @@ class SatpyImporter(aImporter):
 
         from uuid import uuid1
 
-        self.load_all_datasets()
+        self._load_all_datasets()
         revised_datasets = self._revise_all_datasets()
         for ds_id, ds in revised_datasets.items():
             # don't recreate a Product for one we already have
@@ -638,7 +638,7 @@ class SatpyImporter(aImporter):
         if not attrs[Info.INSTRUMENT] or isinstance(attrs[Info.INSTRUMENT], str):
             attrs[Info.INSTRUMENT] = Instrument.UNKNOWN
 
-    def load_all_datasets(self) -> None:
+    def _load_all_datasets(self) -> None:
         self.scn.load(self.dataset_ids, pad_data=False, upper_right_corner="NE", **self.product_filters)
         # copy satpy metadata keys to SIFT keys
 
@@ -1111,7 +1111,7 @@ class SatpyImporter(aImporter):
                 c.source_files = set()  # TODO(AR): adds member to the ContentImage object 'c'
                 # c.info.update(prod.info) would just make everything leak together so let's not do it
                 prod.content.append(c)
-                self.add_content_to_cache(c)
+                self._add_content_to_cache(c)
 
             required_files = _get_paths_of_required_aux_files(self.scn, self.required_aux_file_types)
             # Note loaded source files but not required files. This is necessary
@@ -1213,7 +1213,7 @@ class SatpyImporter(aImporter):
         )
         content.info[Info.KIND] = prod.info[Info.KIND]
         prod.content.append(content)
-        self.add_content_to_cache(content)
+        self._add_content_to_cache(content)
         completion = 2.0
         return completion, content, data_memmap
 
@@ -1258,7 +1258,7 @@ class SatpyImporter(aImporter):
                 radius_of_influence=self.resampling_info["radius_of_influence"],
             )
 
-    def get_fci_segment_height(self, segment_number: int, segment_width: int) -> int:
+    def _get_fci_segment_height(self, segment_number: int, segment_width: int) -> int:
         try:
             seg_heights = self.scn._readers[self.reader].segment_heights
             # we can assume that we're reading only from one filetype (either FDHSI or HRFI)
@@ -1276,7 +1276,7 @@ class SatpyImporter(aImporter):
     def _calc_segment_heights(self, segments_data, segments_indices):
         def get_segment_height_calculator() -> Callable:
             if self.reader in ["fci_l1c_nc", "fci_l1c_fdhsi"]:
-                return self.get_fci_segment_height
+                return self._get_fci_segment_height
             else:
                 return lambda x, y: segments_data.shape[0] // len(segments_indices)
 
@@ -1339,7 +1339,7 @@ class SatpyImporter(aImporter):
             image_stop = image_starts_stops[i][1]
             image_data[image_start:image_stop, :] = segments_data[segment_start:segment_stop, :]
 
-    def add_content_to_cache(self, c: Content) -> None:
+    def _add_content_to_cache(self, c: Content) -> None:
         if self.use_inventory_db:
             self._S.add(c)
             self._S.commit()

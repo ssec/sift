@@ -603,7 +603,7 @@ class CachingWorkspace(BaseWorkspace):
                     LOG.info("{} {}: {:.01f}%".format(name, update.stage_desc, update.completion * 100.0))
             LOG.debug("received {} updates during import".format(nupd))
             uuid = prod.uuid
-            self.clear_product_state_flag(prod.uuid, State.ARRIVING)
+            self._clear_product_state_flag(prod.uuid, State.ARRIVING)
 
         # make an ActiveContent object from the Content, now that we've imported it
         ac = self._overview_content_for_uuid(uuid, kind=default_prod_kind)

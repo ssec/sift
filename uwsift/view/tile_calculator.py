@@ -540,7 +540,7 @@ class TileCalculator(object):
         # size of tile in image projection
         self.tile_size = Resolution(self.pixel_rez.dy * self.tile_shape[0], self.pixel_rez.dx * self.tile_shape[1])
         # maximum stride that we shouldn't lower resolution beyond
-        self.overview_stride = self.calc_overview_stride()
+        self.overview_stride = self._calc_overview_stride()
 
     def visible_tiles(self, visible_geom, stride=None, extra_tiles_box=None) -> Box:
         """
@@ -627,7 +627,7 @@ class TileCalculator(object):
             visible.dx, visible.dy, texture.dx, texture.dy, self.overview_stride[0].step, self.overview_stride[1].step
         )
 
-    def calc_overview_stride(self, image_shape=None):
+    def _calc_overview_stride(self, image_shape=None):
         image_shape = image_shape or self.image_shape
         # FUTURE: Come up with a fancier way of doing overviews like averaging each strided section, if needed
         tsy, tsx = calc_overview_stride(image_shape[0], image_shape[1], self.tile_shape)

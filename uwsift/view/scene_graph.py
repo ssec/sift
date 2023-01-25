@@ -115,7 +115,7 @@ class PendingPolygon(object):
         self.points = []
         self.radius = 10.0
 
-    def is_complete(self, canvas_pos):
+    def _is_complete(self, canvas_pos):
         # XXX: Can't get "visuals_at" method of the SceneCanvas to work to find if the point is ready
         if len(self.points) < 3:
             return False
@@ -125,7 +125,7 @@ class PendingPolygon(object):
             return True
 
     def add_point(self, canvas_pos, xy_pos, z=100):
-        if self.is_complete(canvas_pos):
+        if self._is_complete(canvas_pos):
             # Are you finishing the polygon by adding this point (same point as the first point...or near it)
             return True
         self.canvas_points.append(canvas_pos)
@@ -308,7 +308,7 @@ class SceneGraphManager(QObject):
         self._latlon_grid_color_idx = 1
         self._borders_color_idx = 0
 
-        self.setup_initial_canvas(center)
+        self._setup_initial_canvas(center)
         self.pending_polygon = PendingPolygon(self.main_map)
 
     def get_screenshot_array(self, frame_range=None):
@@ -325,17 +325,17 @@ class SceneGraphManager(QObject):
         images = []
         for i in range(s, e + 1):
             self.animation_controller.jump(i)
-            self.update()
+            self._update()
             self.main_canvas.on_draw(None)
             u = self.animation_controller.get_current_frame_uuid()
             images.append((u, _screenshot()))
 
         self.animation_controller.jump(current_frame)
-        self.update()
+        self._update()
         self.main_canvas.on_draw(None)
         return images
 
-    def setup_initial_canvas(self, center=None):
+    def _setup_initial_canvas(self, center=None):
         self.main_canvas = SIFTMainMapCanvas(parent=self.parent())
         self.main_view = self.main_canvas.central_widget.add_view(name="MainView")
 
@@ -361,12 +361,12 @@ class SceneGraphManager(QObject):
         # Head node of the map graph
         self.main_map = MainMap(name="MainMap", parent=self.main_map_parent)
 
-        self.create_test_image()
+        self._create_test_image()
 
         area_def = self.document.area_definition()
         self._set_projection(area_def)
 
-    def create_test_image(self):
+    def _create_test_image(self):
         proj4_str = os.getenv("SIFT_DEBUG_IMAGE_PROJ", None)
         if proj4_str is None:
             return
@@ -587,7 +587,7 @@ class SceneGraphManager(QObject):
         for polygon_name in self.polygon_probes.keys():
             self.polygon_probes[polygon_name].visible = polygon_name in temp_set
 
-    def update(self):
+    def _update(self):
         return self.main_canvas.update()
 
     def cycle_borders_color(self):
@@ -644,7 +644,7 @@ class SceneGraphManager(QObject):
         idx = (idx + 1) % len(tool_names)
         self.change_tool(tool_names[idx])
 
-    def set_colormap(self, colormap, uuid=None):
+    def _set_colormap(self, colormap, uuid=None):
         colormap = self.document.find_colormap(colormap)
 
         uuids = uuid
@@ -660,7 +660,7 @@ class SceneGraphManager(QObject):
             else:
                 self.dataset_nodes[uuid].color = colormap
 
-    def set_color_limits(self, clims, uuid=None):
+    def _set_color_limits(self, clims, uuid=None):
         """Update the color limits for the specified UUID"""
         uuids = uuid
         if uuid is None:
@@ -673,7 +673,7 @@ class SceneGraphManager(QObject):
             if dataset_node is not None:
                 self.dataset_nodes[uuid].clim = clims
 
-    def set_gamma(self, gamma, uuid):
+    def _set_gamma(self, gamma, uuid):
         uuids = uuid
         if uuid is None:
             uuids = self.dataset_nodes.keys()
@@ -688,17 +688,17 @@ class SceneGraphManager(QObject):
     def change_dataset_nodes_colormap(self, change_dict):
         for uuid, cmapid in change_dict.items():
             LOG.info("changing {} to colormap {}".format(uuid, cmapid))
-            self.set_colormap(cmapid, uuid)
+            self._set_colormap(cmapid, uuid)
 
     def change_dataset_nodes_color_limits(self, change_dict):
         for uuid, clims in change_dict.items():
             LOG.debug("changing {} to color limits {}".format(uuid, clims))
-            self.set_color_limits(clims, uuid)
+            self._set_color_limits(clims, uuid)
 
     def change_dataset_nodes_gamma(self, change_dict):
         for uuid, gamma in change_dict.items():
             LOG.debug("changing {} to gamma {}".format(uuid, gamma))
-            self.set_gamma(gamma, uuid)
+            self._set_gamma(gamma, uuid)
 
     def change_layer_visible(self, layer_uuid: UUID, visible: bool):
         self.layer_nodes[layer_uuid].visible = visible
@@ -714,7 +714,7 @@ class SceneGraphManager(QObject):
         # TODO in case a dataset has its own Presentation simply overwriting
         #  the opacity of the 'child' node representing it is wrong:
         #  opacities have to be mixed then. This cannot be done here though
-        self.update()
+        self._update()
 
     def change_dataset_visible(self, dataset_uuid: UUID, visible: bool):
         self.dataset_nodes[dataset_uuid].visible = visible
@@ -1120,7 +1120,7 @@ class SceneGraphManager(QObject):
                 self.on_view_change(None)
                 if isinstance(composite, RGBCompositeImage):
                     composite.determine_reference_points()
-                self.update()
+                self._update()
             else:
                 self.add_node_for_composite_dataset(layer, product_dataset)
         else:
@@ -1164,7 +1164,7 @@ class SceneGraphManager(QObject):
             raise
 
         self.on_view_change(None)
-        self.update()
+        self._update()
 
     def update_layers_z(self, uuids: list):
         if self.layer_nodes:
@@ -1177,7 +1177,7 @@ class SceneGraphManager(QObject):
                 layer_node.transform.translate = (0, 0, 0 - z_level)
                 layer_node.order = z_counter
                 z_counter -= 1
-            self.update()
+            self._update()
 
     def purge_dataset(self, uuid_removed: UUID):
         """
@@ -1213,7 +1213,7 @@ class SceneGraphManager(QObject):
     def _connect_doc_signals(self, document: Document):
         document.didUpdateBasicDataset.connect(self.update_basic_dataset)  # new data integrated in existing layer
 
-    def set_dataset_visible(self, uuid: UUID, visible: Optional[bool] = None):
+    def _set_dataset_visible(self, uuid: UUID, visible: Optional[bool] = None):
         dataset_node = self.dataset_nodes.get(uuid, None)
         if dataset_node is None:
             return
@@ -1228,7 +1228,7 @@ class SceneGraphManager(QObject):
         def _assess(uuid, child):
             need_retile, preferred_stride, tile_box = child.assess()
             if need_retile:
-                self.start_retiling_task(uuid, preferred_stride, tile_box)
+                self._start_retiling_task(uuid, preferred_stride, tile_box)
 
         current_datasets_uuids = self.dataset_nodes.keys()
 
@@ -1241,7 +1241,7 @@ class SceneGraphManager(QObject):
         for uuid in current_datasets_uuids:
             _assess_if_active(uuid)
 
-    def start_retiling_task(self, uuid, preferred_stride, tile_box):
+    def _start_retiling_task(self, uuid, preferred_stride, tile_box):
         LOG.debug("Scheduling retile for child with UUID: %s", uuid)
         self.queue.add(
             str(uuid) + "_retile",

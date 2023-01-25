@@ -28,21 +28,21 @@ class ColormapEditor(QtWidgets.QDialog):
         self.ColorBar.setEnabled(False)
 
         self.CloneButton = QtWidgets.QPushButton("Clone Colormap")
-        self.CloneButton.clicked.connect(self.clone_colormap)
+        self.CloneButton.clicked.connect(self._clone_colormap)
         self.CloneButton.setEnabled(False)
 
         # Create Import button
         self.ImportButton = QtWidgets.QPushButton("Import Colormap")
-        self.ImportButton.clicked.connect(self.importButtonClick)
+        self.ImportButton.clicked.connect(self._importButtonClick)
 
         # Create Colormap List and Related Functions
         self.cmap_list = QtWidgets.QListWidget()
         self.cmap_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-        self.cmap_list.itemSelectionChanged.connect(self.update_color_bar)
+        self.cmap_list.itemSelectionChanged.connect(self._update_color_bar)
 
         # Create SQRT Button and Related Functions
         self.sqrt = QtWidgets.QCheckBox("SQRT")
-        self.sqrt.clicked.connect(self.sqrt_action)
+        self.sqrt.clicked.connect(self._sqrt_action)
         self.sqrt.setEnabled(False)
 
         # Create Close button
@@ -51,17 +51,17 @@ class ColormapEditor(QtWidgets.QDialog):
 
         # Create Delete Button and Related Functions
         self.DeleteButton = QtWidgets.QPushButton("Delete Colormap")
-        self.DeleteButton.clicked.connect(self.handle_delete_click)
+        self.DeleteButton.clicked.connect(self._handle_delete_click)
         self.DeleteButton.setEnabled(False)
 
         # Create Export Button and Related Functions
         self.ExportButton = QtWidgets.QPushButton("Export Colormap")
-        self.ExportButton.clicked.connect(self.exportButtonClick)
+        self.ExportButton.clicked.connect(self._exportButtonClick)
         self.ExportButton.setEnabled(False)
 
         # Create Save button
         self.SaveButton = QtWidgets.QPushButton("Save Colormap")
-        self.SaveButton.clicked.connect(self.save_button_click)
+        self.SaveButton.clicked.connect(self._save_button_click)
         self.SaveButton.setEnabled(False)
 
         # Add widgets to their respective spots in the UI grid
@@ -84,14 +84,14 @@ class ColormapEditor(QtWidgets.QDialog):
                 is_sqrt = getattr(cmap_obj, "sqrt", False)
                 self.import_colormaps(cmap, cmap_obj._controls, cmap_obj.colors._rgba, sqrt=is_sqrt, editable=editable)
 
-    def save_button_click(self):
+    def _save_button_click(self):
         # save custom colormap
         name = self.cmap_list.item(self.cmap_list.currentRow()).text()
         self.user_colormap_states[name] = self.ColorBar.saveState()
         self.user_colormap_states[name]["sqrt"] = self.sqrt.isChecked()
-        self.save_new_map(self.user_colormap_states[name], name)
+        self._save_new_map(self.user_colormap_states[name], name)
 
-    def clone_colormap(self):
+    def _clone_colormap(self):
         # Clone existing colormap
         text, ok = QtWidgets.QInputDialog.getText(self, "Clone Colormap", "Enter colormap name:")
         protected_names = ["mode", "ticks", "step"]
@@ -127,10 +127,10 @@ class ColormapEditor(QtWidgets.QDialog):
                     return
 
                 self.user_colormap_states[save_name] = self.ColorBar.saveState()
-            self.updateListWidget(save_name)
-            self.save_new_map(self.user_colormap_states[save_name], save_name)
+            self._updateListWidget(save_name)
+            self._save_new_map(self.user_colormap_states[save_name], save_name)
 
-    def toRemoveDelete(self):
+    def _toRemoveDelete(self):
         # Determine if an internal colormap is selected, returns boolean
         toReturn = False
 
@@ -145,7 +145,7 @@ class ColormapEditor(QtWidgets.QDialog):
 
         return toReturn
 
-    def save_new_map(self, new_cmap, name):
+    def _save_new_map(self, new_cmap, name):
         # Call document function with new colormap
         self.doc.update_user_colormap(new_cmap, name)
 
@@ -173,11 +173,11 @@ class ColormapEditor(QtWidgets.QDialog):
                 self.user_colormap_states[name]["sqrt"] = sqrt
             else:
                 self.builtin_colormap_states[name] = newWidget.saveState()
-            self.updateListWidget()
+            self._updateListWidget()
         except AssertionError as e:
             LOG.error(e)
 
-    def updateListWidget(self, to_show=None):
+    def _updateListWidget(self, to_show=None):
         # Update list widget with new colormap list
         self.cmap_list.clear()
 
@@ -205,7 +205,7 @@ class ColormapEditor(QtWidgets.QDialog):
         if to_show is not None:
             self.cmap_list.setCurrentRow(corVal, QtCore.QItemSelectionModel.Select)
 
-    def update_color_bar(self):
+    def _update_color_bar(self):
         # Update the colorbar with the newly selected colormap
         # FIXME: isn't this redundant?
         self.sqrt.setCheckState(False)
@@ -246,7 +246,7 @@ class ColormapEditor(QtWidgets.QDialog):
 
         self.DeleteButton.setEnabled(showDel)
 
-    def sqrt_action(self):
+    def _sqrt_action(self):
         # If square root button is checked/unchecked, modify the ticks as such
         if self.sqrt.isChecked():
             tickList = self.ColorBar.listTicks()
@@ -257,9 +257,9 @@ class ColormapEditor(QtWidgets.QDialog):
             for tick in tickList:
                 self.ColorBar.setTickValue(tick[0], self.ColorBar.tickValue(tick[0]) * self.ColorBar.tickValue(tick[0]))
 
-    def handle_delete_click(self):
+    def _handle_delete_click(self):
         # Delete colormap(s)
-        block = self.toRemoveDelete()
+        block = self._toRemoveDelete()
         if block is True:
             # This shouldn't happen
             QtWidgets.QMessageBox.information(self, "Error: Can not delete internal colormaps.")
@@ -276,9 +276,9 @@ class ColormapEditor(QtWidgets.QDialog):
             for index in selected_colormaps:
                 del self.user_colormap_states[index.text()]
                 self.doc.remove_user_colormap(index.text())
-            self.updateListWidget()
+            self._updateListWidget()
 
-    def importButtonClick(self):
+    def _importButtonClick(self):
         # Import colormap
         fname = QtWidgets.QFileDialog.getOpenFileName(
             self, "Get Colormap File", os.path.expanduser("~"), "Colormaps (*.json)"
@@ -315,13 +315,13 @@ class ColormapEditor(QtWidgets.QDialog):
                     LOG.info("Overwriting colormap '{}'".format(cmap_name))
                 else:
                     LOG.info("Importing new colormap '{}'".format(cmap_name))
-                self.save_new_map(cmap_info, cmap_name)
+                self._save_new_map(cmap_info, cmap_name)
             self.user_colormap_states.update(cmap_content)
-            self.updateListWidget(cmap_name)
+            self._updateListWidget(cmap_name)
         except IOError:
             LOG.error("Error importing colormap from file " "{}".format(filename), exc_info=True)
 
-    def exportButtonClick(self):
+    def _exportButtonClick(self):
         # Export colormap(s)
         selected_colormaps = self.cmap_list.selectedItems()
         fname = QtWidgets.QFileDialog.getSaveFileName(None, "Save As", "Export.json")[0]

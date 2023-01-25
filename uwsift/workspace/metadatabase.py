@@ -798,7 +798,7 @@ class Metadatabase(object):
             raise AssertionError("Metadatabase is a singleton and already exists")
         self._MDB = self
         if uri:
-            self.connect(uri, **kwargs)
+            self._connect(uri, **kwargs)
 
     @staticmethod
     def instance(*args, **kwargs):
@@ -827,7 +827,7 @@ class Metadatabase(object):
             zult = False if not present else zult
         return zult
 
-    def connect(self, uri, create_tables=False, **kwargs):
+    def _connect(self, uri, create_tables=False, **kwargs):
         assert self.engine is None  # nosec B101
         assert self.connection is None  # nosec B101
         self.engine = create_engine(uri, **kwargs)

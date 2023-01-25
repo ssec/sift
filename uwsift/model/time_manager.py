@@ -66,7 +66,7 @@ class TimeManager(QObject):
         layer_model.didUpdateLayers.connect(self.update_qml_layer_model)
         layer_model.didUpdateLayers.connect(self.sync_to_time_transformer)
         layer_model.didChangeRecipeLayerNames.connect(self.update_qml_layer_model)
-        layer_model.didReorderLayers.connect(self.update_layer_order)
+        layer_model.didReorderLayers.connect(self._update_layer_order)
 
         self.didMatchTimes.connect(self._layer_model.on_didMatchTimes)
 
@@ -98,7 +98,7 @@ class TimeManager(QObject):
         self._time_transformer.jump(index)
         self.sync_to_time_transformer()
 
-    def sync_to_time_transformer(self):
+    def sync_to_time_transformer(self):  # noqa D102 MAKE_PRIVATE
         t_sim = self._time_transformer.t_sim
         t_idx = self._time_transformer.timeline_index
 
@@ -107,7 +107,7 @@ class TimeManager(QObject):
 
         self.tick_qml_state(t_sim, t_idx)
 
-    def get_current_timebase_timeline(self):
+    def get_current_timebase_timeline(self):  # noqa D102 MAKE_PRIVATE
         timebase_layer = self._layer_model.get_layer_by_uuid(self.current_timebase_uuid)
         return timebase_layer.timeline if timebase_layer else {}
 
@@ -121,12 +121,12 @@ class TimeManager(QObject):
         current_dataset = self.get_current_timebase_current_dataset()
         return None if not current_dataset else current_dataset.uuid
 
-    def get_current_timebase_datasets(self) -> List[ProductDataset]:
+    def get_current_timebase_datasets(self) -> List[ProductDataset]:  # noqa D102 MAKE_PRIVATE
         timeline = self.get_current_timebase_timeline()
         timeline_datasets = list(timeline.values())
         return timeline_datasets
 
-    def get_current_timebase_current_dataset(self):
+    def get_current_timebase_current_dataset(self):  # noqa D102 MAKE_PRIVATE
         i = self.get_current_timebase_timeline_index()
         try:
             return self.get_current_timebase_datasets()[i]
@@ -207,13 +207,13 @@ class TimeManager(QObject):
 
         self.qml_backend.didChangeTimebase.emit(new_index_of_current_timebase)
 
-    def update_layer_order(self):
+    def _update_layer_order(self):
         dynamic_layers = self._layer_model.get_dynamic_layers()
         dynamic_layers_descriptors = [layer.descriptor for layer in dynamic_layers]
 
         self.qml_layer_manager._qml_layer_model.layer_strings = dynamic_layers_descriptors
 
-    def tick_qml_state(self, t_sim, timeline_idx):
+    def tick_qml_state(self, t_sim, timeline_idx):  # noqa D102 MAKE_PRIVATE
         # TODO(mk): if TimeManager is subclassed the behavior below must be adapted:
         #           it may no longer be desirable to show t_sim as the current time step
         self.qml_timestamps_model.currentTimestamp = self._time_transformer.t_sim
