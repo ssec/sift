@@ -2,20 +2,16 @@
 
 import os
 import sys
+from distutils.dir_util import copy_tree
+from distutils.errors import DistutilsFileError
 from importlib.machinery import PathFinder
 from importlib.util import spec_from_file_location
 
 from donfig import Config
 
-from distutils.dir_util import copy_tree
-from distutils.errors import DistutilsFileError
-
 from uwsift.util import get_base_dir
 
-from .util.default_paths import (
-    APPLICATION_DIR,
-    DOCUMENT_SETTINGS_DIR,
-)
+from .util.default_paths import APPLICATION_DIR, DOCUMENT_SETTINGS_DIR
 from .version import __version__  # noqa
 
 BASE_CONFIG_DIR = os.path.join(DOCUMENT_SETTINGS_DIR, "config")
@@ -30,8 +26,8 @@ CONFIG_PATHS = [
 
 
 def init_default_config(config_dir: str):
-    print("Initialize {} with default config.".format(config_dir))
-    default_config_dir = os.path.join(get_base_dir(), 'resources', 'config', APPLICATION_DIR, 'settings', 'config')
+    print(f"Initialize {config_dir} with default config.")
+    default_config_dir = os.path.join(get_base_dir(), "resources", "config", APPLICATION_DIR, "settings", "config")
     if os.path.isdir(default_config_dir):
         try:
             copy_tree(default_config_dir, config_dir)
@@ -41,10 +37,10 @@ def init_default_config(config_dir: str):
         print(f"Cannot locate default configuration. Expected at '{default_config_dir}'")
 
 
-uninitialized=True
+uninitialized = True
 for path in CONFIG_PATHS:
     if os.path.exists(path) and os.path.isdir(path):
-        uninitialized=False
+        uninitialized = False
         break
 
 if uninitialized:
