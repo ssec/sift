@@ -11,23 +11,31 @@ from donfig import Config
 
 from uwsift.util import get_base_dir
 
-from .util.default_paths import APPLICATION_NAME, DOCUMENT_SETTINGS_DIR
+from .util.default_paths import APPLICATION_NAME, USER_CONFIG_DIR
 from .version import __version__  # noqa
 
-BASE_CONFIG_DIR = os.path.join(DOCUMENT_SETTINGS_DIR, "config")
-READERS_CONFIG_DIR = os.path.join(BASE_CONFIG_DIR, "readers")
-os.environ.setdefault("UWSIFT_CONFIG", BASE_CONFIG_DIR)
+SYSTEM_CONFIG_DIR = os.path.join(get_base_dir(), "etc", APPLICATION_NAME)
 
-CONFIG_PATHS = [
-    BASE_CONFIG_DIR,
-    READERS_CONFIG_DIR,
-    os.path.join(os.path.expanduser("~"), ".config", "uwsift"),
+__CONFIG = "config"
+__READERS = "readers"
+
+SYSTEM_CONFIG_PATHS = [
+    os.path.join(SYSTEM_CONFIG_DIR, __CONFIG),
+    os.path.join(SYSTEM_CONFIG_DIR, __CONFIG, __READERS),
 ]
+
+USER_CONFIG_PATHS = [
+    os.path.join(USER_CONFIG_DIR, __CONFIG),
+    os.path.join(USER_CONFIG_DIR, __CONFIG, __READERS),
+]
+
+# Configurations read later by Donfig Config() overwrite previous settings, thus user config comes last:
+CONFIG_PATHS = SYSTEM_CONFIG_PATHS + USER_CONFIG_PATHS
 
 
 def init_default_config(config_dir: str):
     print(f"Initialize {config_dir} with default config.")
-    default_config_dir = os.path.join(get_base_dir(), "etc", APPLICATION_NAME, "config")
+    default_config_dir = os.path.join(SYSTEM_CONFIG_DIR, CONFIG_STR)
     if os.path.isdir(default_config_dir):
         try:
             copy_tree(default_config_dir, config_dir)
@@ -38,14 +46,15 @@ def init_default_config(config_dir: str):
 
 
 uninitialized = True
-for path in CONFIG_PATHS:
+for path in USER_CONFIG_PATHS:
     if os.path.exists(path) and os.path.isdir(path):
         uninitialized = False
         break
 
 if uninitialized:
-    init_default_config(CONFIG_PATHS[0])
+    init_default_config(USER_CONFIG_PATHS[0])
 
+print(f"Reading configuration from:\n{CONFIG_PATHS}")
 config = Config("uwsift", paths=CONFIG_PATHS)
 
 
