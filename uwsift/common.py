@@ -88,6 +88,12 @@ INVALID_COLOR_LIMITS = (float("inf"), float("-inf"))
 FALLBACK_RANGE = (0.0, 255.0)
 
 
+class ImageDisplayMode(str, Enum):
+    SIMPLE_GEOLOCATED = "simple_geolocated"
+    TILED_GEOLOCATED = "tiled_geolocated"
+    PIXEL_MATRIX = "pixel_matrix"
+
+
 # Calculate and provide LayerModel column indices from LAYER_TREE_VIEW_HEADER
 class LayerModelColumns:
     VISIBILITY = LAYER_TREE_VIEW_HEADER.index(VISIBILITY)  # noqa

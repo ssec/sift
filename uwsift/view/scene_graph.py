@@ -41,13 +41,14 @@ from vispy.scene.visuals import Image, Line, Markers, Polygon
 from vispy.util.keys import SHIFT
 from vispy.visuals.transforms import MatrixTransform, STTransform
 
-from uwsift import USE_TILED_GEOLOCATED_IMAGES, config
+from uwsift import IMAGE_DISPLAY_MODE, config
 from uwsift.common import (
     BORDERS_DATASET_NAME,
     DEFAULT_ANIMATION_DELAY,
     DEFAULT_TILE_HEIGHT,
     DEFAULT_TILE_WIDTH,
     LATLON_GRID_DATASET_NAME,
+    ImageDisplayMode,
     Info,
     Kind,
     Presentation,
@@ -784,9 +785,16 @@ class SceneGraphManager(QObject):
         return data
 
     def add_node_for_layer(self, layer: LayerItem):
-        if not USE_TILED_GEOLOCATED_IMAGES and layer.kind in [Kind.IMAGE, Kind.COMPOSITE, Kind.RGB, Kind.MC_IMAGE]:
+        if IMAGE_DISPLAY_MODE == ImageDisplayMode.PIXEL_MATRIX and layer.kind in [
+            Kind.IMAGE,
+            Kind.COMPOSITE,
+            Kind.RGB,
+            Kind.MC_IMAGE,
+        ]:
+            # Circumvent all reprojecting transformations
             layer_node = scene.Node(parent=self.main_map_parent, name=str(layer.uuid))
         else:
+            # Make child of the node with the reprojecting transform
             layer_node = scene.Node(parent=self.main_map, name=str(layer.uuid))
 
         z_transform = STTransform(translate=(0, 0, 0))
@@ -877,7 +885,7 @@ class SceneGraphManager(QObject):
         if False:  # Set to True FOR TESTING ONLY DON'T REMOVE!
             self._overwrite_with_test_pattern(image_data)
 
-        if USE_TILED_GEOLOCATED_IMAGES:
+        if IMAGE_DISPLAY_MODE == ImageDisplayMode.TILED_GEOLOCATED:
             image = TiledGeolocatedImage(
                 image_data,
                 product_dataset.info[Info.ORIGIN_X],
@@ -895,6 +903,20 @@ class SceneGraphManager(QObject):
             )
             image.transform = PROJ4Transform(product_dataset.info[Info.PROJ], inverse=True)
             image.determine_reference_points()
+        elif IMAGE_DISPLAY_MODE == ImageDisplayMode.SIMPLE_GEOLOCATED:
+            grid = (3712 // 8, 3712 // 8)  # FIXME: should be adaptive
+            image = Image(
+                image_data,
+                name=str(product_dataset.uuid),
+                interpolation="nearest",
+                method="subdivide",
+                grid=grid,
+                parent=self.layer_nodes[layer.uuid],
+            )
+            image.transform = PROJ4Transform(product_dataset.info[Info.PROJ], inverse=True) * STTransform(
+                scale=(product_dataset.info[Info.CELL_WIDTH], product_dataset.info[Info.CELL_HEIGHT], 1),
+                translate=(product_dataset.info[Info.ORIGIN_X], product_dataset.info[Info.ORIGIN_Y], 0),
+            )
         else:
             image = Image(
                 image_data,
@@ -928,7 +950,7 @@ class SceneGraphManager(QObject):
 
         img_data = self.workspace.get_content(product_dataset.uuid, kind=product_dataset.kind)
 
-        if USE_TILED_GEOLOCATED_IMAGES:
+        if IMAGE_DISPLAY_MODE == ImageDisplayMode.TILED_GEOLOCATED:
             image = TiledGeolocatedImage(
                 img_data,
                 product_dataset.info[Info.ORIGIN_X],
@@ -952,7 +974,21 @@ class SceneGraphManager(QObject):
             )
             image.transform = PROJ4Transform(product_dataset.info[Info.PROJ], inverse=True)
             image.determine_reference_points()
-        else:
+        elif IMAGE_DISPLAY_MODE == ImageDisplayMode.SIMPLE_GEOLOCATED:
+            grid = (3712 // 8, 3712 // 8)  # FIXME: should be adaptive
+            image = Image(
+                img_data,
+                name=str(product_dataset.uuid),
+                interpolation="nearest",
+                method="subdivide",
+                grid=grid,
+                parent=self.layer_nodes[layer.uuid],
+            )
+            image.transform = PROJ4Transform(product_dataset.info[Info.PROJ], inverse=True) * STTransform(
+                scale=(product_dataset.info[Info.CELL_WIDTH], product_dataset.info[Info.CELL_HEIGHT], 1),
+                translate=(product_dataset.info[Info.ORIGIN_X], product_dataset.info[Info.ORIGIN_Y], 0),
+            )
+        else:  # IMAGE_DISPLAY_MODE == ImageDisplayMode.PIXEL_MATRIX
             image = Image(
                 img_data,
                 name=str(product_dataset.uuid),
@@ -978,7 +1014,7 @@ class SceneGraphManager(QObject):
             for curr_input_uuid in product_dataset.input_datasets_uuids
         )
 
-        if USE_TILED_GEOLOCATED_IMAGES:
+        if IMAGE_DISPLAY_MODE == ImageDisplayMode.TILED_GEOLOCATED:
             composite = RGBCompositeImage(
                 images_data,
                 product_dataset.info[Info.ORIGIN_X],
@@ -999,6 +1035,23 @@ class SceneGraphManager(QObject):
             )
             composite.transform = PROJ4Transform(product_dataset.info[Info.PROJ], inverse=True)
             composite.determine_reference_points()
+        elif IMAGE_DISPLAY_MODE == ImageDisplayMode.SIMPLE_GEOLOCATED:
+            grid = (3712 // 8, 3712 // 8)  # FIXME: should be adaptive
+            composite = MultiChannelImage(
+                images_data,
+                name=str(product_dataset.uuid),
+                clim=layer.presentation.climits,
+                gamma=layer.presentation.gamma,
+                interpolation="nearest",
+                method="subdivide",
+                grid=grid,
+                cmap=None,
+                parent=self.layer_nodes[layer.uuid],
+            )
+            composite.transform = PROJ4Transform(product_dataset.info[Info.PROJ], inverse=True) * STTransform(
+                scale=(product_dataset.info[Info.CELL_WIDTH], product_dataset.info[Info.CELL_HEIGHT], 1),
+                translate=(product_dataset.info[Info.ORIGIN_X], product_dataset.info[Info.ORIGIN_Y], 0),
+            )
         else:
             composite = MultiChannelImage(
                 images_data,
