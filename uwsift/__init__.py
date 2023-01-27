@@ -2,8 +2,6 @@
 
 import os
 import sys
-from distutils.dir_util import copy_tree
-from distutils.errors import DistutilsFileError
 from importlib.machinery import PathFinder
 from importlib.util import spec_from_file_location
 
@@ -33,26 +31,16 @@ USER_CONFIG_PATHS = [
 CONFIG_PATHS = SYSTEM_CONFIG_PATHS + USER_CONFIG_PATHS
 
 
-def init_default_config(config_dir: str):
-    print(f"Initialize {config_dir} with default config.")
-    default_config_dir = os.path.join(SYSTEM_CONFIG_DIR, CONFIG_STR)
-    if os.path.isdir(default_config_dir):
+def init_user_config_dirs(user_config_dirs: list):
+    print(f"Creating user configuration directories:{user_config_dirs}")
+    for user_config_dir in user_config_dirs:
         try:
-            copy_tree(default_config_dir, config_dir)
-        except DistutilsFileError as e:
-            print(f"Failed to initialize default configuration: {e}")
-    else:
-        print(f"Cannot locate default configuration. Expected at '{default_config_dir}'")
+            os.makedirs(user_config_dir, mode=0o777, exist_ok=True)
+        except (PermissionError, FileExistsError) as e:
+            print(f"Failed to create '{user_config_dir}': {e}")
 
 
-uninitialized = True
-for path in USER_CONFIG_PATHS:
-    if os.path.exists(path) and os.path.isdir(path):
-        uninitialized = False
-        break
-
-if uninitialized:
-    init_default_config(USER_CONFIG_PATHS[0])
+init_user_config_dirs(USER_CONFIG_PATHS)
 
 print(f"Reading configuration from:\n{CONFIG_PATHS}")
 config = Config("uwsift", paths=CONFIG_PATHS)
