@@ -27,7 +27,7 @@ CONFIG_PATHS = [
 
 def init_default_config(config_dir: str):
     print(f"Initialize {config_dir} with default config.")
-    default_config_dir = os.path.join(get_base_dir(), "resources", "config", APPLICATION_NAME, "settings", "config")
+    default_config_dir = os.path.join(get_base_dir(), "etc", APPLICATION_NAME, "config")
     if os.path.isdir(default_config_dir):
         try:
             copy_tree(default_config_dir, config_dir)
