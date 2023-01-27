@@ -63,6 +63,7 @@ def get_package_data_dir():
 def prefix_share_dir():
     return os.path.realpath(os.path.join(sys.prefix, "share"))
 
+
 def get_base_dir():
     """
     Return the uwsift package base directory
