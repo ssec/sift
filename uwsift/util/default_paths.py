@@ -19,12 +19,12 @@ from pathlib import Path
 import appdirs
 
 APPLICATION_AUTHOR = "CIMSS-SSEC"
-APPLICATION_DIR = "SIFT"
+APPLICATION_NAME = "SIFT"
 
-USER_CACHE_DIR = appdirs.user_cache_dir(APPLICATION_DIR, APPLICATION_AUTHOR)
+USER_CACHE_DIR = appdirs.user_cache_dir(APPLICATION_NAME, APPLICATION_AUTHOR)
 # Data and config are the same on everything except linux
-USER_DATA_DIR = appdirs.user_data_dir(APPLICATION_DIR, APPLICATION_AUTHOR, roaming=True)
-USER_CONFIG_DIR = appdirs.user_config_dir(APPLICATION_DIR, APPLICATION_AUTHOR, roaming=True)
+USER_DATA_DIR = appdirs.user_data_dir(APPLICATION_NAME, APPLICATION_AUTHOR, roaming=True)
+USER_CONFIG_DIR = appdirs.user_config_dir(APPLICATION_NAME, APPLICATION_AUTHOR, roaming=True)
 
 WORKSPACE_DB_DIR = os.path.join(USER_CACHE_DIR, "workspace")
 WORKSPACE_TEMP_DIR = os.path.join(WORKSPACE_DB_DIR, "temp")

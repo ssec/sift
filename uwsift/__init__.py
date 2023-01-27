@@ -11,7 +11,7 @@ from donfig import Config
 
 from uwsift.util import get_base_dir
 
-from .util.default_paths import APPLICATION_DIR, DOCUMENT_SETTINGS_DIR
+from .util.default_paths import APPLICATION_NAME, DOCUMENT_SETTINGS_DIR
 from .version import __version__  # noqa
 
 BASE_CONFIG_DIR = os.path.join(DOCUMENT_SETTINGS_DIR, "config")
@@ -27,7 +27,7 @@ CONFIG_PATHS = [
 
 def init_default_config(config_dir: str):
     print(f"Initialize {config_dir} with default config.")
-    default_config_dir = os.path.join(get_base_dir(), "resources", "config", APPLICATION_DIR, "settings", "config")
+    default_config_dir = os.path.join(get_base_dir(), "resources", "config", APPLICATION_NAME, "settings", "config")
     if os.path.isdir(default_config_dir):
         try:
             copy_tree(default_config_dir, config_dir)
