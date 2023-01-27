@@ -132,10 +132,10 @@ add_custom_command(OUTPUT pyinstaller-build
   COMMAND pip install -e .
   COMMAND ${PyInstaller_EXECUTABLE} --distpath "${_pyi_dir_}/package" --workpath "${_pyi_dir_}/work" --clean -y ${PROJECT_NAME}-pyinstaller-package.spec
   COMMAND ${CMAKE_COMMAND} -E make_directory "${_pyi_dir_}/dist/${PROJECT_NAME}"
-  COMMAND ${CMAKE_COMMAND} -E make_directory "${_pyi_dir_}/dist/${PROJECT_NAME}/bin"
   COMMAND ${CMAKE_COMMAND} -E make_directory "${_pyi_dir_}/dist/${PROJECT_NAME}/logs"
-  COMMAND ${CMAKE_COMMAND} -E copy_directory "${_pyi_dir_}/package/${PROJECT_NAME}/resources/bin" "${_pyi_dir_}/dist/${PROJECT_NAME}/bin"
-  COMMAND ${CMAKE_COMMAND} -E rename "${_pyi_dir_}/package/${PROJECT_NAME}" "${_pyi_dir_}/dist/${PROJECT_NAME}/lib"
+  COMMAND ${CMAKE_COMMAND} -E rename "${_pyi_dir_}/package/${PROJECT_NAME}/resources/bin" "${_pyi_dir_}/dist/${PROJECT_NAME}/bin"
+  COMMAND ${CMAKE_COMMAND} -E rename "${_pyi_dir_}/package/${PROJECT_NAME}/etc"           "${_pyi_dir_}/dist/${PROJECT_NAME}/etc"
+  COMMAND ${CMAKE_COMMAND} -E rename "${_pyi_dir_}/package/${PROJECT_NAME}"               "${_pyi_dir_}/dist/${PROJECT_NAME}/lib"
   BYPRODUCTS "${_pyi_dir_}/dist/${PROJECT_NAME}/lib/${PROJECT_NAME}"
   VERBATIM
   COMMENT "Building PyInstaller package in '${_pyi_dir_}/dist/${PROJECT_NAME}/lib'"
