@@ -130,7 +130,7 @@ if is_win:
 
 #-------------------------------------------------------------------------------
 # Add default config and startup scripts
-data_files.append((os.path.join('resources', 'config'), os.path.join('resources', 'config')))
+data_files.append((os.path.join('etc', 'SIFT'), os.path.join('etc', 'SIFT')))
 script_ext = ''
 if is_linux:
     script_ext = '.sh'

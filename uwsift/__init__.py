@@ -7,49 +7,42 @@ from importlib.util import spec_from_file_location
 
 from donfig import Config
 
-from distutils.dir_util import copy_tree
-from distutils.errors import DistutilsFileError
-
 from uwsift.util import get_base_dir
 
-from .util.default_paths import (
-    APPLICATION_DIR,
-    DOCUMENT_SETTINGS_DIR,
-)
+from .util.default_paths import APPLICATION_NAME, USER_CONFIG_DIR
 from .version import __version__  # noqa
 
-BASE_CONFIG_DIR = os.path.join(DOCUMENT_SETTINGS_DIR, "config")
-READERS_CONFIG_DIR = os.path.join(BASE_CONFIG_DIR, "readers")
-os.environ.setdefault("UWSIFT_CONFIG", BASE_CONFIG_DIR)
+SYSTEM_CONFIG_DIR = os.path.join(get_base_dir(), "etc", APPLICATION_NAME)
 
-CONFIG_PATHS = [
-    BASE_CONFIG_DIR,
-    READERS_CONFIG_DIR,
-    os.path.join(os.path.expanduser("~"), ".config", "uwsift"),
+__CONFIG = "config"
+__READERS = "readers"
+
+SYSTEM_CONFIG_PATHS = [
+    os.path.join(SYSTEM_CONFIG_DIR, __CONFIG),
+    os.path.join(SYSTEM_CONFIG_DIR, __CONFIG, __READERS),
 ]
 
+USER_CONFIG_PATHS = [
+    os.path.join(USER_CONFIG_DIR, __CONFIG),
+    os.path.join(USER_CONFIG_DIR, __CONFIG, __READERS),
+]
 
-def init_default_config(config_dir: str):
-    print("Initialize {} with default config.".format(config_dir))
-    default_config_dir = os.path.join(get_base_dir(), 'resources', 'config', APPLICATION_DIR, 'settings', 'config')
-    if os.path.isdir(default_config_dir):
+# Configurations read later by Donfig Config() overwrite previous settings, thus user config comes last:
+CONFIG_PATHS = SYSTEM_CONFIG_PATHS + USER_CONFIG_PATHS
+
+
+def init_user_config_dirs(user_config_dirs: list):
+    print(f"Creating user configuration directories:{user_config_dirs}")
+    for user_config_dir in user_config_dirs:
         try:
-            copy_tree(default_config_dir, config_dir)
-        except DistutilsFileError as e:
-            print(f"Failed to initialize default configuration: {e}")
-    else:
-        print(f"Cannot locate default configuration. Expected at '{default_config_dir}'")
+            os.makedirs(user_config_dir, mode=0o777, exist_ok=True)
+        except (PermissionError, FileExistsError) as e:
+            print(f"Failed to create '{user_config_dir}': {e}")
 
 
-uninitialized=True
-for path in CONFIG_PATHS:
-    if os.path.exists(path) and os.path.isdir(path):
-        uninitialized=False
-        break
+init_user_config_dirs(USER_CONFIG_PATHS)
 
-if uninitialized:
-    init_default_config(CONFIG_PATHS[0])
-
+print(f"Reading configuration from:\n{CONFIG_PATHS}")
 config = Config("uwsift", paths=CONFIG_PATHS)
 
 

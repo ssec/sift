@@ -63,8 +63,11 @@ def get_package_data_dir():
 def prefix_share_dir():
     return os.path.realpath(os.path.join(sys.prefix, "share"))
 
+
 def get_base_dir():
     """
-    Return the uwsift package base directory
+    Return the uwsift installation/package base directory
     """
+    if IS_FROZEN:
+        return os.path.realpath(os.path.join(SCRIPT_DIR, "..", "..", ".."))
     return os.path.realpath(os.path.join(SCRIPT_DIR, "..", ".."))

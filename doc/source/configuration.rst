@@ -3,17 +3,44 @@ Configuration
 
 Many aspects of MTG-SIFT can or must be configured.
 
-The software comes with a set of sample configuration in separate files in a
-directory structure below the directory ``resources`` This structure mirrors the
-structure where the according configurations have to be located for actual use:
-The contents of the tree ``/config/SIFT/settings/config/``,
-``/config/SIFT/settings/config/readers`` can be copied (and adjusted of course)
-to the user's directories ``~/.config/SIFT/settings/config/``, and
-``~/.config/SIFT/settings/config/readers`` respectively. Instead of having
-several single files the YAML files on the same directory level can be merged
-together into one.
+The software comes with a default - *system* - configuration split in several
+separate files in a directory structure below the directory
+``etc/``::
 
-MTG-SIFT uses the Donfig config library, for addtional details on how to write
+    etc/
+    └── SIFT/
+        └── config/
+            ├── *.yaml
+            └── readers/
+                └── *.yaml
+
+Configurations specific to single Satpy readers are in separate files in a
+sub-directory 'readers'.
+
+The configuration in this directory tree is not intended to be edited by the
+user, as any changes would be lost when the software is updated.
+Instead, to configure the software differently from the default, the user can
+place additional configuration files below the into an analogous directory
+tree::
+
+    <USER_SIFT_CONFIG_DIR>/
+    └── config/
+        ├── *.yaml
+        └── readers/
+            └── *.yaml
+
+
+where USER_SIFT_CONFIG_DIR is the the standard operation system configuration
+path for the application SIFT
+(Windows: ``C:\Users\<user>\AppData\Roaming\CIMSS-SSEC\SIFT\``,
+Linux: ``~/.config/SIFT/``).
+
+The *user* configuration can be empty or only be partial: it is merged with the
+*system* configuration, adding or overwriting settings of the latter.
+It is not necessary to keep the configuration in individual files, it can be
+put into larger files as you wish.
+
+MTG-SIFT uses the Donfig config library, for additional details on how to write
 configurations have a look here: https://donfig.readthedocs.io/en/latest/.
 
 .. toctree::
