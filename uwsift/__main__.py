@@ -464,14 +464,15 @@ class Main(QtWidgets.QMainWindow):
         self.ui.cursorProbeLayer.setText(layer_str)
         self.ui.cursorProbeText.setText(f"{data_str} ({probe_loc}) [{col}, {row}]")
 
-    @staticmethod
-    def run_gc_after_layer_deletion():
+    def run_gc_after_layer_deletion(self):
         """
         Trigger a full garbage collection run after the deletion of a layer and its datasets from the scene graph.
         The code uses cyclic and weak references, which can only be freed by the GC.
         """
         unreachable_object_count = gc.collect()
         LOG.debug(f"GC found {unreachable_object_count} unreachable objects")
+        if hasattr(self.workspace, "remove_content_data_from_cache_dir_checked"):
+            self.workspace.remove_content_data_from_cache_dir_checked()
 
     def _update_heartbeat_file(self, dataset: ProductDataset):
         """

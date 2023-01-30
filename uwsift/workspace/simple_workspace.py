@@ -38,7 +38,7 @@ class SimpleWorkspace(BaseWorkspace):
         self.contents: dict = {}
         self._available: dict = {}
 
-        self._remove_content_data_from_cache_dir_checked()
+        self.remove_content_data_from_cache_dir_checked()
 
     @property
     def _S(self):
@@ -58,7 +58,7 @@ class SimpleWorkspace(BaseWorkspace):
         self._available[c.uuid] = zult = ActiveContent(self.cache_dir, c, self.get_info(c.uuid))
         c.touch()
         c.product.touch()
-        self._remove_content_data_from_cache_dir_checked(c)
+        self.remove_content_data_from_cache_dir_checked(c.uuid)
         return zult
 
     def _cached_arrays_for_content(self, c: Content):
@@ -72,14 +72,22 @@ class SimpleWorkspace(BaseWorkspace):
         return cache_entry or self._activate_content(c)
 
     # FIXME: Use code from CachingWorkspace._remove_content_files_from_workspace?
-    def _remove_content_data_from_cache_dir_checked(self, c: Optional[Content] = None):
+    def remove_content_data_from_cache_dir_checked(self, uuid: Optional[UUID] = None):
+        """Check whether the numpy.memmap cache files are to be deleted. If yes, then either all existing cache files
+        will be deleted or only the cache files with the specified uuid will be deleted.
+
+        If a PermissionError occurs, the file that triggered this error is skipped.
+        """
         if CLEANUP_FILE_CACHE:
             for file in os.listdir(self.cache_dir):
-                if c is not None:
-                    if file.startswith(str(c.uuid)):
+                try:
+                    if uuid is not None:
+                        if file.startswith(str(uuid)):
+                            os.remove(os.path.join(self.cache_dir, file))
+                    else:
                         os.remove(os.path.join(self.cache_dir, file))
-                else:
-                    os.remove(os.path.join(self.cache_dir, file))
+                except PermissionError as e:
+                    LOG.debug(f"Can't delete numpy memmap cache file {file}: {e}")
 
     #
     # often-used queries
