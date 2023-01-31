@@ -1475,7 +1475,7 @@ def close_splash_screen():
             import pyi_splash
 
             pyi_splash.close()
-        except:
+        except ModuleNotFoundError:
             # not good not terrible. Splash screen might be still open but
             # more likely there was no splash screen to begin with and the
             # environment variable set defined by something else.
