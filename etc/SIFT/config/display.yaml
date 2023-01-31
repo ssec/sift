@@ -1,7 +1,9 @@
 # Configuration of display features
 display:
-
-  # Activate reprojected image display using tiled geolocated image nodes,
-  # otherwise pixel matrix display with ordinary (albeit gamma correction
-  # capable) image nodes becomes active. Default: True
-  use_tiled_geolocated_images: True
+  # Choose from three options how to represent and display images (i.e. raster
+  # data, data with an AreaDefinition):
+  # - simple_geolocated: reprojected image (without dynamic tiling and
+  #   resampling), best for powerful graphics hardware (default)
+  # - tiled_geolocated: reprojected image with dynamic tiling and resampling
+  # - pixel_matrix: original image, i.e. neither reprojected nor resampled
+  image_mode: simple_geolocated
