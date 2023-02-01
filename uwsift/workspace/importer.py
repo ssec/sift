@@ -89,7 +89,7 @@ import_progress = namedtuple(
 """
 
 try:
-    import hdf5plugin
+    import hdf5plugin  # noqa F401 # suppress "'hdf5plugin' imported but unused"
 except ImportError:
     LOG.warning(
         "Your installation/environment doesn't include the package hdf5plugin. If you want to visualise "
