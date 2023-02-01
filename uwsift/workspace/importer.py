@@ -89,7 +89,7 @@ import_progress = namedtuple(
 """
 
 try:
-    import hdf5plugin
+    import hdf5plugin  # noqa F401 # suppress "'hdf5plugin' imported but unused"
 except ImportError:
     LOG.warning(
         "Your installation/environment doesn't include the package hdf5plugin. If you want to visualise "
@@ -682,9 +682,11 @@ class SatpyImporter(aImporter):
 
     @staticmethod
     def _set_time_metadata(attrs: dict) -> None:
+        # TODO Review Satpy start/end times ("[{nominal,observation]_}{start,end}_times") and adjust SIFT
+        #  terminology regarding start/end times and durations accordingly.
         start_time = attrs["start_time"]
         attrs[Info.OBS_TIME] = start_time
-        attrs[Info.SCHED_TIME] = start_time
+        attrs[Info.SCHED_TIME] = attrs["nominal_start_time"] if "nominal_start_time" in attrs else start_time
         duration = attrs.get("end_time", start_time) - start_time
         if duration.total_seconds() <= 0:
             duration = timedelta(minutes=60)
