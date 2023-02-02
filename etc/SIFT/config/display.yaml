@@ -7,3 +7,19 @@ display:
   # - tiled_geolocated: reprojected image with dynamic tiling and resampling
   # - pixel_matrix: original image, i.e. neither reprojected nor resampled
   image_mode: simple_geolocated
+  # image_mode: pixel_matrix
+  # image_mode: tiled_geolocated
+
+  # Settings relevant only for mode 'simple_geolocated'
+
+  #  The approximate extent of the subdivision grid cells in meters. This has
+  #  to be interpreted analogously to the pixel_width/pixel_height parameters
+  #  of and AreaDefinition, i.e. it is usually only valid for the sub-satellite
+  #  point
+  grid_cell_width: 24000
+  grid_cell_height: 24000
+
+  # Settings relevant only for mode 'tiled_geolocated'
+
+  # tess_level: 20        # not yet configurable
+  # image_mesh_size: 100  # not yet configurable
