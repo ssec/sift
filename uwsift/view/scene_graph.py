@@ -876,6 +876,26 @@ class SceneGraphManager(QObject):
         if presentation.opacity:
             image.opacity = presentation.opacity
 
+    @staticmethod
+    def _calc_subdivision_grid(dataset_info) -> tuple:
+        grid_cell_width = float(config.get("display.grid_cell_width", 96000))
+        grid_cell_height = float(config.get("display.grid_cell_height", 96000))
+        pixels_per_cell_x = round(grid_cell_width / abs(dataset_info[Info.CELL_WIDTH]))
+        pixels_per_cell_y = round(grid_cell_height / abs(dataset_info[Info.CELL_HEIGHT]))
+
+        num_cells_x = dataset_info[Info.SHAPE][0] // pixels_per_cell_x
+        num_cells_y = dataset_info[Info.SHAPE][1] // pixels_per_cell_y
+
+        actual_grid_cell_width = dataset_info[Info.SHAPE][0] * abs(dataset_info[Info.CELL_WIDTH]) / num_cells_x
+        actual_grid_cell_height = dataset_info[Info.SHAPE][1] * abs(dataset_info[Info.CELL_HEIGHT]) / num_cells_y
+
+        LOG.debug(
+            f"Gridding to ({num_cells_x} x {num_cells_y}) cells"
+            f" with cell size ({actual_grid_cell_width} m, {actual_grid_cell_height} m) "
+        )
+
+        return num_cells_x, num_cells_y
+
     def add_node_for_image_dataset(self, layer: LayerItem, product_dataset: ProductDataset):
         assert self.layer_nodes[layer.uuid] is not None  # nosec B101
         assert product_dataset.kind in [Kind.IMAGE, Kind.COMPOSITE]  # nosec B101
@@ -904,7 +924,7 @@ class SceneGraphManager(QObject):
             image.transform = PROJ4Transform(product_dataset.info[Info.PROJ], inverse=True)
             image.determine_reference_points()
         elif IMAGE_DISPLAY_MODE == ImageDisplayMode.SIMPLE_GEOLOCATED:
-            grid = (3712 // 8, 3712 // 8)  # FIXME: should be adaptive
+            grid = self._calc_subdivision_grid(product_dataset.info)
             image = Image(
                 image_data,
                 name=str(product_dataset.uuid),
@@ -975,7 +995,7 @@ class SceneGraphManager(QObject):
             image.transform = PROJ4Transform(product_dataset.info[Info.PROJ], inverse=True)
             image.determine_reference_points()
         elif IMAGE_DISPLAY_MODE == ImageDisplayMode.SIMPLE_GEOLOCATED:
-            grid = (3712 // 8, 3712 // 8)  # FIXME: should be adaptive
+            grid = self._calc_subdivision_grid(product_dataset.info)
             image = Image(
                 img_data,
                 name=str(product_dataset.uuid),
@@ -1036,7 +1056,7 @@ class SceneGraphManager(QObject):
             composite.transform = PROJ4Transform(product_dataset.info[Info.PROJ], inverse=True)
             composite.determine_reference_points()
         elif IMAGE_DISPLAY_MODE == ImageDisplayMode.SIMPLE_GEOLOCATED:
-            grid = (3712 // 8, 3712 // 8)  # FIXME: should be adaptive
+            grid = self._calc_subdivision_grid(product_dataset.info)
             composite = MultiChannelImage(
                 images_data,
                 name=str(product_dataset.uuid),
