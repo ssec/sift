@@ -62,6 +62,11 @@ IMAGE_MESH_SIZE = 100
 # before the image is considered "out of view"
 CANVAS_EXTENTS_EPSILON = 1e-4
 
+# For simple geolocated image
+# Size of a image quad subdivision grid cell in meters
+DEFAULT_GRID_CELL_WIDTH = 96000
+DEFAULT_GRID_CELL_HEIGHT = 96000
+
 DEFAULT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 # R_EQ = 6378.1370  # km

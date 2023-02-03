@@ -45,6 +45,8 @@ from uwsift import IMAGE_DISPLAY_MODE, config
 from uwsift.common import (
     BORDERS_DATASET_NAME,
     DEFAULT_ANIMATION_DELAY,
+    DEFAULT_GRID_CELL_HEIGHT,
+    DEFAULT_GRID_CELL_WIDTH,
     DEFAULT_TILE_HEIGHT,
     DEFAULT_TILE_WIDTH,
     LATLON_GRID_DATASET_NAME,
@@ -878,8 +880,8 @@ class SceneGraphManager(QObject):
 
     @staticmethod
     def _calc_subdivision_grid(dataset_info) -> tuple:
-        grid_cell_width = float(config.get("display.grid_cell_width", 96000))
-        grid_cell_height = float(config.get("display.grid_cell_height", 96000))
+        grid_cell_width = float(config.get("display.grid_cell_width", DEFAULT_GRID_CELL_WIDTH))
+        grid_cell_height = float(config.get("display.grid_cell_height", DEFAULT_GRID_CELL_HEIGHT))
         pixels_per_cell_x = round(grid_cell_width / abs(dataset_info[Info.CELL_WIDTH]))
         pixels_per_cell_y = round(grid_cell_height / abs(dataset_info[Info.CELL_HEIGHT]))
 
