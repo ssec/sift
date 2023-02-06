@@ -37,12 +37,12 @@ from vispy import app
 import uwsift.ui.open_cache_dialog_ui as open_cache_dialog_ui
 from uwsift import (
     AUTO_UPDATE_MODE__ACTIVE,
+    IMAGE_DISPLAY_MODE,
     USE_INVENTORY_DB,
-    USE_TILED_GEOLOCATED_IMAGES,
     __version__,
     config,
 )
-from uwsift.common import Info, Tool
+from uwsift.common import ImageDisplayMode, Info, Tool
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 
 # To have consistent logging for all modules (also for their static
@@ -1105,7 +1105,7 @@ class Main(QtWidgets.QMainWindow):
                 )
                 merge_with_existing = False
 
-            if USE_TILED_GEOLOCATED_IMAGES and merge_with_existing:
+            if IMAGE_DISPLAY_MODE == ImageDisplayMode.TILED_GEOLOCATED and merge_with_existing:
                 LOG.warning(
                     "Merging of new data segments into existing data"
                     " does not work well with adaptive tiled image"

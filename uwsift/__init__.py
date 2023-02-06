@@ -7,6 +7,7 @@ from importlib.util import spec_from_file_location
 
 from donfig import Config
 
+from uwsift.common import ImageDisplayMode
 from uwsift.util import get_base_dir
 
 from .util.default_paths import APPLICATION_NAME, USER_CONFIG_DIR
@@ -91,7 +92,17 @@ if satpy_extra_readers_import_path is not None:
     os.environ["SATPY_CONFIG_PATH"] = satpy_extra_readers_import_path
 
 
-USE_TILED_GEOLOCATED_IMAGES = config.get("display.use_tiled_geolocated_images")
+def _map_str_to_image_display_mode(image_display_mode_str: str) -> ImageDisplayMode:
+    for idm in ImageDisplayMode:
+        if image_display_mode_str.lower() == idm:
+            return idm
+    if image_display_mode_str:  # empty is OK, but typos should not go unnoticed.
+        print(f"Unknown image display mode '{image_display_mode_str}', falling back to the default.")
+    return ImageDisplayMode.SIMPLE_GEOLOCATED  # this is the default
+
+
+IMAGE_DISPLAY_MODE = _map_str_to_image_display_mode(config.get("display.image_mode", ""))
+print(f"Image Display Mode: {IMAGE_DISPLAY_MODE}")
 
 USE_INVENTORY_DB = config.get("storage.use_inventory_db")
 CLEANUP_FILE_CACHE = config.get("storage.cleanup_file_cache")

@@ -62,6 +62,11 @@ IMAGE_MESH_SIZE = 100
 # before the image is considered "out of view"
 CANVAS_EXTENTS_EPSILON = 1e-4
 
+# For simple geolocated image
+# Size of a image quad subdivision grid cell in meters
+DEFAULT_GRID_CELL_WIDTH = 96000
+DEFAULT_GRID_CELL_HEIGHT = 96000
+
 DEFAULT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 # R_EQ = 6378.1370  # km
@@ -86,6 +91,12 @@ LAYER_TREE_VIEW_HEADER = [VISIBILITY, SOURCE, NAME, WAVELENGTH, PROBE_VALUE, PRO
 
 INVALID_COLOR_LIMITS = (float("inf"), float("-inf"))
 FALLBACK_RANGE = (0.0, 255.0)
+
+
+class ImageDisplayMode(str, Enum):
+    SIMPLE_GEOLOCATED = "simple_geolocated"
+    TILED_GEOLOCATED = "tiled_geolocated"
+    PIXEL_MATRIX = "pixel_matrix"
 
 
 # Calculate and provide LayerModel column indices from LAYER_TREE_VIEW_HEADER

@@ -41,13 +41,16 @@ from vispy.scene.visuals import Image, Line, Markers, Polygon
 from vispy.util.keys import SHIFT
 from vispy.visuals.transforms import MatrixTransform, STTransform
 
-from uwsift import USE_TILED_GEOLOCATED_IMAGES, config
+from uwsift import IMAGE_DISPLAY_MODE, config
 from uwsift.common import (
     BORDERS_DATASET_NAME,
     DEFAULT_ANIMATION_DELAY,
+    DEFAULT_GRID_CELL_HEIGHT,
+    DEFAULT_GRID_CELL_WIDTH,
     DEFAULT_TILE_HEIGHT,
     DEFAULT_TILE_WIDTH,
     LATLON_GRID_DATASET_NAME,
+    ImageDisplayMode,
     Info,
     Kind,
     Presentation,
@@ -784,9 +787,16 @@ class SceneGraphManager(QObject):
         return data
 
     def add_node_for_layer(self, layer: LayerItem):
-        if not USE_TILED_GEOLOCATED_IMAGES and layer.kind in [Kind.IMAGE, Kind.COMPOSITE, Kind.RGB, Kind.MC_IMAGE]:
+        if IMAGE_DISPLAY_MODE == ImageDisplayMode.PIXEL_MATRIX and layer.kind in [
+            Kind.IMAGE,
+            Kind.COMPOSITE,
+            Kind.RGB,
+            Kind.MC_IMAGE,
+        ]:
+            # Circumvent all reprojecting transformations
             layer_node = scene.Node(parent=self.main_map_parent, name=str(layer.uuid))
         else:
+            # Make child of the node with the reprojecting transform
             layer_node = scene.Node(parent=self.main_map, name=str(layer.uuid))
 
         z_transform = STTransform(translate=(0, 0, 0))
@@ -868,6 +878,26 @@ class SceneGraphManager(QObject):
         if presentation.opacity:
             image.opacity = presentation.opacity
 
+    @staticmethod
+    def _calc_subdivision_grid(dataset_info) -> tuple:
+        grid_cell_width = float(config.get("display.grid_cell_width", DEFAULT_GRID_CELL_WIDTH))
+        grid_cell_height = float(config.get("display.grid_cell_height", DEFAULT_GRID_CELL_HEIGHT))
+        pixels_per_cell_x = round(grid_cell_width / abs(dataset_info[Info.CELL_WIDTH]))
+        pixels_per_cell_y = round(grid_cell_height / abs(dataset_info[Info.CELL_HEIGHT]))
+
+        num_cells_x = dataset_info[Info.SHAPE][0] // pixels_per_cell_x
+        num_cells_y = dataset_info[Info.SHAPE][1] // pixels_per_cell_y
+
+        actual_grid_cell_width = dataset_info[Info.SHAPE][0] * abs(dataset_info[Info.CELL_WIDTH]) / num_cells_x
+        actual_grid_cell_height = dataset_info[Info.SHAPE][1] * abs(dataset_info[Info.CELL_HEIGHT]) / num_cells_y
+
+        LOG.debug(
+            f"Gridding to ({num_cells_x} x {num_cells_y}) cells"
+            f" with cell size ({actual_grid_cell_width} m, {actual_grid_cell_height} m) "
+        )
+
+        return num_cells_x, num_cells_y
+
     def add_node_for_image_dataset(self, layer: LayerItem, product_dataset: ProductDataset):
         assert self.layer_nodes[layer.uuid] is not None  # nosec B101
         assert product_dataset.kind in [Kind.IMAGE, Kind.COMPOSITE]  # nosec B101
@@ -877,7 +907,7 @@ class SceneGraphManager(QObject):
         if False:  # Set to True FOR TESTING ONLY DON'T REMOVE!
             self._overwrite_with_test_pattern(image_data)
 
-        if USE_TILED_GEOLOCATED_IMAGES:
+        if IMAGE_DISPLAY_MODE == ImageDisplayMode.TILED_GEOLOCATED:
             image = TiledGeolocatedImage(
                 image_data,
                 product_dataset.info[Info.ORIGIN_X],
@@ -895,6 +925,20 @@ class SceneGraphManager(QObject):
             )
             image.transform = PROJ4Transform(product_dataset.info[Info.PROJ], inverse=True)
             image.determine_reference_points()
+        elif IMAGE_DISPLAY_MODE == ImageDisplayMode.SIMPLE_GEOLOCATED:
+            grid = self._calc_subdivision_grid(product_dataset.info)
+            image = Image(
+                image_data,
+                name=str(product_dataset.uuid),
+                interpolation="nearest",
+                method="subdivide",
+                grid=grid,
+                parent=self.layer_nodes[layer.uuid],
+            )
+            image.transform = PROJ4Transform(product_dataset.info[Info.PROJ], inverse=True) * STTransform(
+                scale=(product_dataset.info[Info.CELL_WIDTH], product_dataset.info[Info.CELL_HEIGHT], 1),
+                translate=(product_dataset.info[Info.ORIGIN_X], product_dataset.info[Info.ORIGIN_Y], 0),
+            )
         else:
             image = Image(
                 image_data,
@@ -928,7 +972,7 @@ class SceneGraphManager(QObject):
 
         img_data = self.workspace.get_content(product_dataset.uuid, kind=product_dataset.kind)
 
-        if USE_TILED_GEOLOCATED_IMAGES:
+        if IMAGE_DISPLAY_MODE == ImageDisplayMode.TILED_GEOLOCATED:
             image = TiledGeolocatedImage(
                 img_data,
                 product_dataset.info[Info.ORIGIN_X],
@@ -952,7 +996,21 @@ class SceneGraphManager(QObject):
             )
             image.transform = PROJ4Transform(product_dataset.info[Info.PROJ], inverse=True)
             image.determine_reference_points()
-        else:
+        elif IMAGE_DISPLAY_MODE == ImageDisplayMode.SIMPLE_GEOLOCATED:
+            grid = self._calc_subdivision_grid(product_dataset.info)
+            image = Image(
+                img_data,
+                name=str(product_dataset.uuid),
+                interpolation="nearest",
+                method="subdivide",
+                grid=grid,
+                parent=self.layer_nodes[layer.uuid],
+            )
+            image.transform = PROJ4Transform(product_dataset.info[Info.PROJ], inverse=True) * STTransform(
+                scale=(product_dataset.info[Info.CELL_WIDTH], product_dataset.info[Info.CELL_HEIGHT], 1),
+                translate=(product_dataset.info[Info.ORIGIN_X], product_dataset.info[Info.ORIGIN_Y], 0),
+            )
+        else:  # IMAGE_DISPLAY_MODE == ImageDisplayMode.PIXEL_MATRIX
             image = Image(
                 img_data,
                 name=str(product_dataset.uuid),
@@ -978,7 +1036,7 @@ class SceneGraphManager(QObject):
             for curr_input_uuid in product_dataset.input_datasets_uuids
         )
 
-        if USE_TILED_GEOLOCATED_IMAGES:
+        if IMAGE_DISPLAY_MODE == ImageDisplayMode.TILED_GEOLOCATED:
             composite = RGBCompositeImage(
                 images_data,
                 product_dataset.info[Info.ORIGIN_X],
@@ -999,6 +1057,23 @@ class SceneGraphManager(QObject):
             )
             composite.transform = PROJ4Transform(product_dataset.info[Info.PROJ], inverse=True)
             composite.determine_reference_points()
+        elif IMAGE_DISPLAY_MODE == ImageDisplayMode.SIMPLE_GEOLOCATED:
+            grid = self._calc_subdivision_grid(product_dataset.info)
+            composite = MultiChannelImage(
+                images_data,
+                name=str(product_dataset.uuid),
+                clim=layer.presentation.climits,
+                gamma=layer.presentation.gamma,
+                interpolation="nearest",
+                method="subdivide",
+                grid=grid,
+                cmap=None,
+                parent=self.layer_nodes[layer.uuid],
+            )
+            composite.transform = PROJ4Transform(product_dataset.info[Info.PROJ], inverse=True) * STTransform(
+                scale=(product_dataset.info[Info.CELL_WIDTH], product_dataset.info[Info.CELL_HEIGHT], 1),
+                translate=(product_dataset.info[Info.ORIGIN_X], product_dataset.info[Info.ORIGIN_Y], 0),
+            )
         else:
             composite = MultiChannelImage(
                 images_data,
