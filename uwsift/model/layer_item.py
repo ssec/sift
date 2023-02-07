@@ -10,7 +10,7 @@ from uwsift import config
 from uwsift.common import INVALID_COLOR_LIMITS, N_A, Info
 from uwsift.common import LayerModelColumns as LMC
 from uwsift.common import LayerVisibility, Presentation
-from uwsift.model.composite_recipes import Recipe
+from uwsift.model.composite_recipes import AlgebraicRecipe, Recipe
 from uwsift.model.document import units_conversion
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.workspace.workspace import frozendict
@@ -424,7 +424,19 @@ class LayerItem:
         return tuple(actual_range)
 
     def determine_initial_clims(self):
-        """Returns a range based on available metadata either of the layer self or its owned first dataset"""
+        """Get a min/max value pair to be used as limits for colour mapping.
+
+        Except for Algebraics composites the preferred candidate range is the valid range stored in the layer metadata,
+        which has been determined elsewhere. If that is missing, it is tried to determine a range from the first
+        dataset of the layer.
+
+        For Algebraics the range is the min/max value pair calculated from all datasets of the layer.
+
+        If all of the above fail, return invalid colour limits (+inf, -inf) (!)."""
+
+        if isinstance(self.recipe, AlgebraicRecipe):
+            return self.get_actual_range_from_layer()
+
         if self.valid_range:
             return self.valid_range
         elif self.get_first_active_product_dataset():

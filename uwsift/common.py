@@ -89,7 +89,7 @@ PROBE_UNIT = "Unit"
 
 LAYER_TREE_VIEW_HEADER = [VISIBILITY, SOURCE, NAME, WAVELENGTH, PROBE_VALUE, PROBE_UNIT]
 
-INVALID_COLOR_LIMITS = (float("inf"), float("-inf"))
+INVALID_COLOR_LIMITS = (float("inf"), float("-inf"))  # Yes, (+inf, -inf), this is the smallest imaginable range
 FALLBACK_RANGE = (0.0, 255.0)
 
 
