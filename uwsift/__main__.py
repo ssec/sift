@@ -920,7 +920,6 @@ class Main(QtWidgets.QMainWindow):
         return engine.rootContext()
 
     def _init_arrange_panes(self):
-        self.tabifyDockWidget(self.ui.datasetStatisticsPaneDockWidget, self.ui.areaProbePane)
         self.tabifyDockWidget(self.ui.layerDetailsPaneDockWidget, self.ui.rgbConfigPane)
         self.tabifyDockWidget(self.ui.layerDetailsPaneDockWidget, self.ui.algebraicConfigPane)
 

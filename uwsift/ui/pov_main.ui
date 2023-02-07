@@ -1031,8 +1031,35 @@
     </item>
    </layout>
   </widget>
-  <widget class="QMenuBar" name="menubar"/>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1296</width>
+     <height>22</height>
+    </rect>
+   </property>
+  </widget>
   <widget class="QStatusBar" name="statusbar"/>
+  <widget class="QDockWidget" name="datasetStatisticsPaneDockWidget">
+   <property name="features">
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+   </property>
+   <property name="windowTitle">
+    <string>Statistics</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>1</number>
+   </attribute>
+   <widget class="QWidget" name="datasetStatisticsPaneDockWidgetContents">
+    <layout class="QVBoxLayout" name="verticalLayout_9">
+     <item>
+      <widget class="DatasetStatisticsPane" name="datasetStatisticsPane" native="true"/>
+     </item>
+    </layout>
+   </widget>
+  </widget>
   <widget class="QDockWidget" name="areaProbePane">
    <property name="features">
     <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
@@ -1041,7 +1068,7 @@
     <string>Area Probe Graphs</string>
    </property>
    <attribute name="dockWidgetArea">
-    <number>2</number>
+    <number>1</number>
    </attribute>
    <widget class="QWidget" name="probeWidget">
     <property name="sizePolicy">
@@ -1110,6 +1137,44 @@ Checking this deactivates the Update button.</string>
     </layout>
    </widget>
   </widget>
+  <widget class="QDockWidget" name="LayerModelDockWidget">
+   <property name="minimumSize">
+    <size>
+     <width>90</width>
+     <height>135</height>
+    </size>
+   </property>
+   <property name="features">
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+   </property>
+   <property name="windowTitle">
+    <string>Layer Manager</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>2</number>
+   </attribute>
+   <widget class="QWidget" name="dockWidgetContents_3">
+    <layout class="QHBoxLayout" name="horizontalLayout_10">
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout_11">
+       <item>
+        <widget class="LayerTreeView" name="treeView">
+         <property name="contextMenuPolicy">
+          <enum>Qt::CustomContextMenu</enum>
+         </property>
+         <property name="dragDropMode">
+          <enum>QAbstractItemView::InternalMove</enum>
+         </property>
+         <property name="alternatingRowColors">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </widget>
+  </widget>
   <widget class="QDockWidget" name="rgbConfigPane">
    <property name="sizePolicy">
     <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -1162,7 +1227,7 @@ Checking this deactivates the Update button.</string>
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>278</width>
+          <width>221</width>
           <height>612</height>
          </rect>
         </property>
@@ -1616,7 +1681,7 @@ Checking this deactivates the Update button.</string>
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>260</width>
+          <width>203</width>
           <height>299</height>
          </rect>
         </property>
@@ -1736,24 +1801,6 @@ Checking this deactivates the Update button.</string>
     </layout>
    </widget>
   </widget>
-  <widget class="QDockWidget" name="datasetStatisticsPaneDockWidget">
-   <property name="features">
-    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
-   </property>
-   <property name="windowTitle">
-    <string>Statistics</string>
-   </property>
-   <attribute name="dockWidgetArea">
-    <number>2</number>
-   </attribute>
-   <widget class="QWidget" name="datasetStatisticsPaneDockWidgetContents">
-    <layout class="QVBoxLayout" name="verticalLayout_9">
-     <item>
-      <widget class="DatasetStatisticsPane" name="datasetStatisticsPane" native="true"/>
-     </item>
-    </layout>
-   </widget>
-  </widget>
   <widget class="QDockWidget" name="layerDetailsPaneDockWidget">
    <property name="features">
     <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
@@ -1768,44 +1815,6 @@ Checking this deactivates the Update button.</string>
     <layout class="QVBoxLayout" name="verticalLayout_16">
      <item>
       <widget class="SingleLayerInfoPane" name="layerDetailsPane" native="true"/>
-     </item>
-    </layout>
-   </widget>
-  </widget>
-  <widget class="QDockWidget" name="LayerModelDockWidget">
-   <property name="minimumSize">
-    <size>
-     <width>90</width>
-     <height>135</height>
-    </size>
-   </property>
-   <property name="features">
-    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
-   </property>
-   <property name="windowTitle">
-    <string>Layer Manager</string>
-   </property>
-   <attribute name="dockWidgetArea">
-    <number>2</number>
-   </attribute>
-   <widget class="QWidget" name="dockWidgetContents_3">
-    <layout class="QHBoxLayout" name="horizontalLayout_10">
-     <item>
-      <layout class="QVBoxLayout" name="verticalLayout_11">
-       <item>
-        <widget class="LayerTreeView" name="treeView">
-         <property name="contextMenuPolicy">
-          <enum>Qt::CustomContextMenu</enum>
-         </property>
-         <property name="dragDropMode">
-          <enum>QAbstractItemView::InternalMove</enum>
-         </property>
-         <property name="alternatingRowColors">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-      </layout>
      </item>
     </layout>
    </widget>
