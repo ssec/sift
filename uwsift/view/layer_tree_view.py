@@ -82,6 +82,8 @@ class LayerTreeView(QTreeView):
             if not self.isPersistentEditorOpen(model_idx):
                 self.openPersistentEditor(model_idx)
 
+            self.setCurrentIndex(model_idx)
+
     def _open_layer_context_menu(self, position):
 
         menu = QMenu()
