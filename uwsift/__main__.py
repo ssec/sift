@@ -940,6 +940,10 @@ class Main(QtWidgets.QMainWindow):
         self.ui.datasetStatisticsPaneDockWidget.show()
         self.ui.datasetStatisticsPaneDockWidget.raise_()
 
+        self.ui.areaProbePaneDockWidget.hide()
+        self.ui.algebraicConfigPaneDockWidget.hide()
+        self.ui.rgbConfigPaneDockWidget.hide()
+
         # refer to objectName'd entities as self.ui.objectName
         self.setAcceptDrops(True)
 
