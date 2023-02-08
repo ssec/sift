@@ -1060,7 +1060,7 @@
     </layout>
    </widget>
   </widget>
-  <widget class="QDockWidget" name="areaProbePane">
+  <widget class="QDockWidget" name="areaProbePaneDockWidget">
    <property name="features">
     <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
    </property>
@@ -1132,7 +1132,7 @@ Checking this deactivates the Update button.</string>
     </layout>
    </widget>
   </widget>
-  <widget class="QDockWidget" name="LayerModelDockWidget">
+  <widget class="QDockWidget" name="layerManagerPaneDockWidget">
    <property name="minimumSize">
     <size>
      <width>90</width>
@@ -1170,7 +1170,7 @@ Checking this deactivates the Update button.</string>
     </layout>
    </widget>
   </widget>
-  <widget class="QDockWidget" name="rgbConfigPane">
+  <widget class="QDockWidget" name="rgbConfigPaneDockWidget">
    <property name="sizePolicy">
     <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
      <horstretch>0</horstretch>
@@ -1630,7 +1630,7 @@ Checking this deactivates the Update button.</string>
     </layout>
    </widget>
   </widget>
-  <widget class="QDockWidget" name="algebraicConfigPane">
+  <widget class="QDockWidget" name="algebraicConfigPaneDockWidget">
    <property name="sizePolicy">
     <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
      <horstretch>0</horstretch>

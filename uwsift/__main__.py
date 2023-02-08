@@ -621,9 +621,12 @@ class Main(QtWidgets.QMainWindow):
 
         # disable close button on panes
         panes = [
-            self.ui.areaProbePane,
-            self.ui.rgbConfigPane,
-            self.ui.algebraicConfigPane,
+            self.ui.algebraicConfigPaneDockWidget,
+            self.ui.areaProbePaneDockWidget,
+            self.ui.datasetStatisticsPaneDockWidget,
+            self.ui.layerDetailsPaneDockWidget,
+            self.ui.layerManagerPaneDockWidget,
+            self.ui.rgbConfigPaneDockWidget,
         ]
         for pane in panes:
             pane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable | QtWidgets.QDockWidget.DockWidgetMovable)
@@ -744,7 +747,7 @@ class Main(QtWidgets.QMainWindow):
         self.ui.panZoomToolButton.toggled.connect(partial(self._change_tool, name=Tool.PAN_ZOOM))
         self.ui.pointSelectButton.toggled.connect(partial(self._change_tool, name=Tool.POINT_PROBE))
         self.ui.regionSelectButton.toggled.connect(partial(self._change_tool, name=Tool.REGION_PROBE))
-        self.ui.regionSelectButton.toggled.connect(self.ui.areaProbePane.raise_)
+        self.ui.regionSelectButton.toggled.connect(self.ui.areaProbePaneDockWidget.raise_)
         self._change_tool(True)
 
         def update_full_data_selection():
@@ -776,7 +779,7 @@ class Main(QtWidgets.QMainWindow):
         menu = QtWidgets.QMenu(parent=self)
         select_full_data_action = QtWidgets.QAction("Select Full Data", parent=menu)
         select_full_data_action.triggered.connect(update_full_data_selection)
-        select_full_data_action.triggered.connect(self.ui.areaProbePane.raise_)
+        select_full_data_action.triggered.connect(self.ui.areaProbePaneDockWidget.raise_)
         select_full_data_action.triggered.connect(self.graphManager.on_region_probe_tool_selected)
         menu.addAction(select_full_data_action)
         self.ui.regionSelectButton.setMenu(menu)
@@ -926,8 +929,8 @@ class Main(QtWidgets.QMainWindow):
         return engine.rootContext()
 
     def _init_arrange_panes(self):
-        self.tabifyDockWidget(self.ui.layerDetailsPaneDockWidget, self.ui.rgbConfigPane)
-        self.tabifyDockWidget(self.ui.layerDetailsPaneDockWidget, self.ui.algebraicConfigPane)
+        self.tabifyDockWidget(self.ui.layerDetailsPaneDockWidget, self.ui.rgbConfigPaneDockWidget)
+        self.tabifyDockWidget(self.ui.layerDetailsPaneDockWidget, self.ui.algebraicConfigPaneDockWidget)
 
         self.ui.layerDetailsPaneDockWidget.show()
         self.ui.layerDetailsPaneDockWidget.raise_()
@@ -1228,11 +1231,11 @@ class Main(QtWidgets.QMainWindow):
         composite = QtWidgets.QAction("Create Composite", self)
         composite.setShortcut("C")
         composite.triggered.connect(self.layer_model.start_rgb_composite_creation)
-        composite.triggered.connect(self.ui.rgbConfigPane.raise_)
+        composite.triggered.connect(self.ui.rgbConfigPaneDockWidget.raise_)
 
         algebraic = QtWidgets.QAction("Create Algebraic", self)
         algebraic.triggered.connect(self.layer_model.start_algebraic_composite_creation)
-        algebraic.triggered.connect(self.ui.algebraicConfigPane.raise_)
+        algebraic.triggered.connect(self.ui.algebraicConfigPaneDockWidget.raise_)
 
         toggle_point = QtWidgets.QAction("Toggle Point Probe", self)
         toggle_point.setShortcut("X")
