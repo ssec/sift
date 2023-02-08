@@ -117,8 +117,10 @@ class ProbeGraphManager(QObject):
 
         # hang on to the tab widget
         self.tab_widget_object = tab_widget
-        if self.tab_widget_object.count() != 1:
-            LOG.info("Unexpected number of tabs in the QTabWidget used for the Area Probe Graphs.")
+        self.new_tab_button = QtWidgets.QToolButton()
+        self.new_tab_button.setText("+")
+        self.tab_widget_object.setCornerWidget(self.new_tab_button, corner=Qt.TopLeftCorner)
+        self.tab_widget_object.clear()  # Delete all tabs that may have been created in the Designer
         self.auto_update_checkbox = auto_update_checkbox
         self.update_button = update_button
         # hold on to point probe locations (point probes are shared across tabs)
@@ -126,16 +128,15 @@ class ProbeGraphManager(QObject):
 
         # set up the first tab
         self.graphs: list = []
-        self.selected_graph_index = 0
+        self.selected_graph_index = -1
         self.max_tab_letter = "A"
-        self.set_up_tab(self.selected_graph_index, do_increment_tab_letter=False)
 
         # hook things up so we know when the selected tab changes
-        self.tab_widget_object.currentChanged[int].connect(self.handle_tab_change)
+        self.tab_widget_object.currentChanged[int].connect(self._handle_tab_change)
         self.drawChildGraph.connect(self._draw_child)
 
-        # hook up the various layer_model signals that would mean we need to
-        # reload things
+        # hook up signals relating to changes in the number of tabs
+        self.new_tab_button.clicked.connect(self._add_tab)
 
         # hook up auto update vs manual update changes
         self.update_button.clicked.connect(self.handleActiveProductDatasetsChanged)
@@ -283,30 +284,39 @@ class ProbeGraphManager(QObject):
         """Set the UUIDs for the current graph if it doesn't have a polygon"""
         return self.graphs[self.selected_graph_index].set_default_layer_selections(layer_uuids)
 
-    def handle_tab_change(self):
-        """deal with the fact that the tab changed in the tab widget"""
+    def on_region_probe_tool_selected(self):
+        if len(self.graphs) > 0:
+            return
+        # There is no graph tab yet, we must create one
+        self.set_up_tab(self.tab_widget_object.count(), do_increment_tab_letter=False)
 
-        newTabIndex = self.tab_widget_object.currentIndex()
+        current_name = self.graphs[self.selected_graph_index].getName()
+        self.didChangeTab.emit((current_name,))
 
-        # if this is the last tab, make a new tab and switch to that
-        if newTabIndex == (self.tab_widget_object.count() - 1):
-            LOG.info("Creating new area probe graph tab.")
+    def _add_tab(self):
+        LOG.info("Creating new area probe graph tab.")
 
-            old_name = self.graphs[self.selected_graph_index].getName()
-            self.set_up_tab(newTabIndex)
+        old_name = self.graphs[self.selected_graph_index].getName()
+        self.set_up_tab(self.tab_widget_object.count())
 
-            # notify everyone that we cloned a polygon (if we did)
-            if self.graphs[self.selected_graph_index].polygon is not None:
-                new_name = self.graphs[-1].getName()
-                self.didClonePolygon.emit(old_name, new_name)
+        # notify everyone that we cloned a polygon (if we did)
+        if self.graphs[self.selected_graph_index].polygon is not None:
+            new_name = self.graphs[-1].getName()
+            self.didClonePolygon.emit(old_name, new_name)
 
-        # otherwise, just update our current index and make sure the graph is fresh
-        else:
-            self.selected_graph_index = newTabIndex
-            self.graphs[self.selected_graph_index].rebuildPlot()
+        current_name = self.graphs[self.selected_graph_index].getName()
+        self.didChangeTab.emit((current_name,))
 
-        currentName = self.graphs[self.selected_graph_index].getName()
-        self.didChangeTab.emit((currentName,))
+    def _handle_tab_change(self):
+        """Deal with the fact that the tab changed in the tab widget"""
+
+        new_tab_index = self.tab_widget_object.currentIndex()
+
+        self.selected_graph_index = new_tab_index
+        self.graphs[self.selected_graph_index].rebuildPlot()
+
+        current_name = self.graphs[self.selected_graph_index].getName()
+        self.didChangeTab.emit((current_name,))
 
     def _on_auto_update_checkbox_state_changed(self, state):
         if self.auto_update_checkbox.isChecked():
