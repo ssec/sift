@@ -442,9 +442,6 @@ class Ui_MainWindow(object):
         self.probeTabWidget = QtWidgets.QTabWidget(self.probeWidget)
         self.probeTabWidget.setMaximumSize(QtCore.QSize(16777215, 16777215))
         self.probeTabWidget.setObjectName("probeTabWidget")
-        self.tab_plus = QtWidgets.QWidget()
-        self.tab_plus.setObjectName("tab_plus")
-        self.probeTabWidget.addTab(self.tab_plus, "")
         self.verticalLayout_12.addWidget(self.probeTabWidget)
         self.horizontalLayout_11 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_11.setObjectName("horizontalLayout_11")
@@ -822,7 +819,7 @@ class Ui_MainWindow(object):
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.layerDetailsPaneDockWidget)
 
         self.retranslateUi(MainWindow)
-        self.probeTabWidget.setCurrentIndex(0)
+        self.probeTabWidget.setCurrentIndex(-1)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
@@ -861,7 +858,6 @@ class Ui_MainWindow(object):
         self.progressBar.setToolTip(_translate("MainWindow", "Activity Progress"))
         self.datasetStatisticsPaneDockWidget.setWindowTitle(_translate("MainWindow", "Statistics"))
         self.areaProbePane.setWindowTitle(_translate("MainWindow", "Area Probe Graphs"))
-        self.probeTabWidget.setTabText(self.probeTabWidget.indexOf(self.tab_plus), _translate("MainWindow", "+"))
         self.autoUpdateCheckbox.setToolTip(
             _translate(
                 "MainWindow",

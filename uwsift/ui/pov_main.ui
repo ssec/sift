@@ -1087,13 +1087,8 @@
         </size>
        </property>
        <property name="currentIndex">
-        <number>0</number>
+        <number>-1</number>
        </property>
-       <widget class="QWidget" name="tab_plus">
-        <attribute name="title">
-         <string>+</string>
-        </attribute>
-       </widget>
       </widget>
      </item>
      <item>
