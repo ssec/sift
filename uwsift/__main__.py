@@ -629,7 +629,7 @@ class Main(QtWidgets.QMainWindow):
             self.ui.rgbConfigPaneDockWidget,
         ]
         for pane in panes:
-            pane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable | QtWidgets.QDockWidget.DockWidgetMovable)
+            pane.setFeatures(QtWidgets.QDockWidget.AllDockWidgetFeatures)
         # Make the panes on the right side 375px wide
         self.resizeDocks(panes, [375] * len(panes), QtCore.Qt.Horizontal)
 
