@@ -1020,7 +1020,7 @@
             <string>Activity Progress</string>
            </property>
            <property name="value">
-            <number>100</number>
+            <number>0</number>
            </property>
           </widget>
          </item>

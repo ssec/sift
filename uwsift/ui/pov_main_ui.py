@@ -398,7 +398,7 @@ class Ui_MainWindow(object):
         self.progressText.setObjectName("progressText")
         self.horizontalLayout_8.addWidget(self.progressText)
         self.progressBar = QtWidgets.QProgressBar(self.frame)
-        self.progressBar.setProperty("value", 100)
+        self.progressBar.setProperty("value", 0)
         self.progressBar.setObjectName("progressBar")
         self.horizontalLayout_8.addWidget(self.progressBar)
         self.verticalLayout.addLayout(self.horizontalLayout_8)
