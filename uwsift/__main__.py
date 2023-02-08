@@ -313,6 +313,7 @@ class Main(QtWidgets.QMainWindow):
     _max_tolerable_dataset_age: float = -1
 
     didFinishLoading = QtCore.pyqtSignal(list)
+    didSelectRegionProbeTool = QtCore.pyqtSignal()
 
     def _interactive_open_files(self, *args, files=None, **kwargs):
         self.scene_manager.animation_controller.animating = False
@@ -392,6 +393,8 @@ class Main(QtWidgets.QMainWindow):
     def _change_tool(self, checked, name=Tool.PAN_ZOOM):
         if checked is not True:
             return
+        if name == Tool.REGION_PROBE:
+            self.didSelectRegionProbeTool.emit()
         self.scene_manager.change_tool(name)
 
     def _update_recent_file_menu(self, *args, **kwargs):
@@ -642,9 +645,9 @@ class Main(QtWidgets.QMainWindow):
 
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
 
+        self._init_point_polygon_probes()
         self._init_tool_controls()
         self._init_menu()
-        self._init_point_polygon_probes()
 
         # Set the projection based on the document's default
         self.document.change_projection()
@@ -697,6 +700,8 @@ class Main(QtWidgets.QMainWindow):
         self.graphManager.pointProbeChanged.connect(self.scene_manager.on_point_probe_set)
         self.graphManager.pointProbeChanged.connect(self.layer_model.on_point_probe_set)
         self.graphManager.pointProbeChanged.connect(self._update_point_probe_text)
+
+        self.didSelectRegionProbeTool.connect(self.graphManager.on_region_probe_tool_selected)
 
         self.scene_manager.newPointProbe.connect(self.graphManager.update_point_probe)
 
@@ -772,6 +777,7 @@ class Main(QtWidgets.QMainWindow):
         select_full_data_action = QtWidgets.QAction("Select Full Data", parent=menu)
         select_full_data_action.triggered.connect(update_full_data_selection)
         select_full_data_action.triggered.connect(self.ui.areaProbePane.raise_)
+        select_full_data_action.triggered.connect(self.graphManager.on_region_probe_tool_selected)
         menu.addAction(select_full_data_action)
         self.ui.regionSelectButton.setMenu(menu)
 

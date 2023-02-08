@@ -128,9 +128,8 @@ class ProbeGraphManager(QObject):
 
         # set up the first tab
         self.graphs: list = []
-        self.selected_graph_index = 0
+        self.selected_graph_index = -1
         self.max_tab_letter = "A"
-        self.set_up_tab(self.selected_graph_index, do_increment_tab_letter=False)
 
         # hook things up so we know when the selected tab changes
         self.tab_widget_object.currentChanged[int].connect(self._handle_tab_change)
@@ -284,6 +283,15 @@ class ProbeGraphManager(QObject):
     def set_default_layer_selections(self, layer_uuids):
         """Set the UUIDs for the current graph if it doesn't have a polygon"""
         return self.graphs[self.selected_graph_index].set_default_layer_selections(layer_uuids)
+
+    def on_region_probe_tool_selected(self):
+        if len(self.graphs) > 0:
+            return
+        # There is no graph tab yet, we must create one
+        self.set_up_tab(self.tab_widget_object.count(), do_increment_tab_letter=False)
+
+        current_name = self.graphs[self.selected_graph_index].getName()
+        self.didChangeTab.emit((current_name,))
 
     def _add_tab(self):
         LOG.info("Creating new area probe graph tab.")
