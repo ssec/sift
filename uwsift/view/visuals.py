@@ -851,7 +851,8 @@ class MultiChannelImageVisual(ImageVisual):
                 # Since VisPy v0.12.0
                 from vispy.gloo.texture import downcast_to_32bit_if_needed
 
-                data = downcast_to_32bit_if_needed(data)
+                if data is not None:
+                    data = downcast_to_32bit_if_needed(data)
             except ImportError:
                 # Before VisPy v0.12.0
                 from vispy.gloo.texture import should_cast_to_f32
