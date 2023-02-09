@@ -256,8 +256,6 @@ class ABI_AHI_Guidebook(Guidebook):
             standard_name = "Refl"
         elif standard_name == "toa_brightness_temperature":
             standard_name = "BT"
-        else:
-            standard_name = ""
 
         if display_time is None:
             display_time = info.get(Info.DISPLAY_TIME, self._default_display_time(info))
