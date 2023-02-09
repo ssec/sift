@@ -251,17 +251,15 @@ class ABI_AHI_Guidebook(Guidebook):
         inst = info[Info.INSTRUMENT]
         name = info.get(Info.SHORT_NAME, "-unknown-")
 
-        label = info.get(Info.STANDARD_NAME, "")
-        if label == "toa_bidirectional_reflectance":
-            label = "Refl"
-        elif label == "toa_brightness_temperature":
-            label = "BT"
+        standard_name = info.get(Info.STANDARD_NAME, "")
+        if standard_name == "toa_bidirectional_reflectance":
+            standard_name = "Refl"
+        elif standard_name == "toa_brightness_temperature":
+            standard_name = "BT"
         else:
-            label = ""
+            standard_name = ""
 
         if display_time is None:
             display_time = info.get(Info.DISPLAY_TIME, self._default_display_time(info))
-        name = "{sat} {inst} {name} {standard_name} {dtime}".format(
-            sat=sat.value, inst=inst.value, name=name, standard_name=label, dtime=display_time
-        )
+        name = f"{sat.value} {inst.value} {name} {standard_name} {display_time}"
         return name
