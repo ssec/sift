@@ -54,7 +54,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 from rasterio import Affine
 from shapely.geometry.polygon import LinearRing
 
-from uwsift.common import FALLBACK_RANGE, Flags, Info, Kind
+from uwsift.common import FALLBACK_RANGE, Flags, Info, Instrument, Kind, Platform
 from uwsift.model.shapes import content_within_shape
 
 from .importer import SatpyImporter, generate_guidebook_metadata
@@ -465,11 +465,20 @@ class BaseWorkspace(QObject):
 
         uuid = uuidgen()
         info[Info.UUID] = uuid
-        for k in (Info.PLATFORM, Info.INSTRUMENT, Info.SCENE):
+
+        mixed_info = {
+            Info.PLATFORM: Platform.MIXED,
+            Info.INSTRUMENT: Instrument.MIXED,
+            Info.SCENE: None,
+        }
+        for k in mixed_info.keys():
             if md_list[0].get(k) is None:
                 continue
             if all(x.get(k) == md_list[0].get(k) for x in md_list[1:]):
                 info.setdefault(k, md_list[0][k])
+            else:
+                info.setdefault(k, mixed_info[k])
+
         info.setdefault(Info.KIND, Kind.COMPOSITE)
         info.setdefault(Info.SHORT_NAME, "<unknown>")
         info.setdefault(Info.DATASET_NAME, info[Info.SHORT_NAME])
