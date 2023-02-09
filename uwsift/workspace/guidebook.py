@@ -247,8 +247,8 @@ class ABI_AHI_Guidebook(Guidebook):
 
     def _default_display_name(self, info, display_time=None):
         # FUTURE: This can be customized by the user
-        sat = info[Info.PLATFORM]
-        inst = info[Info.INSTRUMENT]
+        sat = info.get(Info.PLATFORM, "-unknown-")
+        inst = info.get(Info.INSTRUMENT, "-unknown-")
         name = info.get(Info.SHORT_NAME, "-unknown-")
 
         standard_name = info.get(Info.STANDARD_NAME, "")
