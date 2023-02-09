@@ -71,6 +71,7 @@ class ProductDataset:
             Info.CELL_WIDTH,
             Info.CELL_HEIGHT,
             Info.PROJ,
+            Info.SHAPE,
             Info.SCHED_TIME,
             Info.DISPLAY_TIME,
         ]
@@ -102,6 +103,7 @@ class ProductDataset:
                 Info.CELL_WIDTH: infos_to_compare[-1].get(Info.CELL_WIDTH),
                 Info.CELL_HEIGHT: infos_to_compare[-1].get(Info.CELL_HEIGHT),
                 Info.PROJ: infos_to_compare[-1].get(Info.PROJ),
+                Info.SHAPE: infos_to_compare[-1].get(Info.SHAPE),
                 Info.SCHED_TIME: infos_to_compare[-1].get(Info.SCHED_TIME),
                 Info.DISPLAY_TIME: infos_to_compare[-1].get(Info.DISPLAY_TIME),
                 Info.CENTRAL_WAVELENGTH: central_wavelength,
