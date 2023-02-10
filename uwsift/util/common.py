@@ -124,7 +124,7 @@ def _unit_format_func(info, units):
             if np.isnan(val):
                 return f"{NAN}{unit_str}"
             else:
-                return "{:.02f}{units}".format(val, units=unit_str)
+                return f"{val:.02f}{unit_str}"
 
     elif "flag_values" in info:
         _format_unit = _unit_format_func_for_flags(info)
@@ -132,10 +132,11 @@ def _unit_format_func(info, units):
     else:
         # default formatting string
         def _format_unit(val, numeric=True, include_units=True):
+            unit_str = units if include_units else ""
             if np.isnan(val):
-                return "{:s} {units:s}".format(NAN, units=units if include_units else "")
+                return f"{NAN}{unit_str}"
             else:
-                return "{:.03f} {units:s}".format(val, units=units if include_units else "")
+                return f"{val:.03f}{unit_str}"
 
     return _format_unit
 
@@ -153,13 +154,13 @@ def _unit_format_func_for_flags(info):
 
             val = int(val)
             if numeric:
-                return "{:s}".format(str(val))
+                return f"{val}"
 
             meanings = []
             for fmean, fval, fmask in flag_info:
                 if (val & fmask) == fval:
                     meanings.append(fmean)
-            return "{:s} ({:s})".format(str(val), ", ".join(meanings))
+            return f"{val} ({', '.join(meanings)})"
 
     else:
 
@@ -167,7 +168,7 @@ def _unit_format_func_for_flags(info):
             if np.isnan(val):
                 return NAN
             else:
-                return "{:d}".format(int(val))
+                return f"{val}"
 
     return _format_unit
 
