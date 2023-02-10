@@ -141,8 +141,6 @@ def _unit_format_func(info, units):
 
 
 def _unit_format_func_for_flags(info):
-    def check_for_nan(val):
-        return NAN if np.isnan(val) else str(val)
 
     # flag values don't have units
     if "flag_meanings" in info:
@@ -150,15 +148,18 @@ def _unit_format_func_for_flags(info):
         flag_info = tuple(zip(info["flag_meanings"], info["flag_values"], flag_masks))
 
         def _format_unit(val, numeric=True, include_units=True, flag_info=flag_info):
+            if np.isnan(val):
+                return NAN
+
             val = int(val)
             if numeric:
-                return "{:s}".format(check_for_nan(val))
+                return "{:s}".format(str(val))
 
             meanings = []
             for fmean, fval, fmask in flag_info:
                 if (val & fmask) == fval:
                     meanings.append(fmean)
-            return "{:s} ({:s})".format(check_for_nan(val), ", ".join(meanings))
+            return "{:s} ({:s})".format(str(val), ", ".join(meanings))
 
     else:
 
