@@ -78,6 +78,7 @@ DEFAULT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 # MAX_EXCURSION_X = C_EQ/2.0
 
 N_A = "n/a"
+NAN = str(float("nan"))
 
 # LayerModel column display names
 VISIBILITY = ""

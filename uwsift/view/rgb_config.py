@@ -442,7 +442,6 @@ class RGBLayerConfigPane(QObject):
                 widget.setCurrentIndex(0)
 
             for idx, layer_uuid in enumerate(self._layer_uuids):
-                LOG.info(f"Length of Layer Items {len(self._layer_uuids)}")
                 layer: LayerItem = self.model.get_layer_by_uuid(layer_uuid)
                 display_name = layer.descriptor
 

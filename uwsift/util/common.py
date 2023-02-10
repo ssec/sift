@@ -10,7 +10,7 @@ import satpy.readers.hrit_base
 from satpy import DataID, Scene
 
 from uwsift import config as config
-from uwsift.common import INVALID_COLOR_LIMITS, N_A, Info, Kind
+from uwsift.common import INVALID_COLOR_LIMITS, NAN, Info, Kind
 
 LOG = logging.getLogger(__name__)
 
@@ -122,9 +122,9 @@ def _unit_format_func(info, units):
         def _format_unit(val, numeric=True, include_units=True):
             unit_str = units if include_units else ""
             if np.isnan(val):
-                return f"{N_A}{unit_str}"
+                return f"{NAN}{unit_str}"
             else:
-                return "{:.02f}{units}".format(val, units=unit_str)
+                return f"{val:.02f}{unit_str}"
 
     elif "flag_values" in info:
         _format_unit = _unit_format_func_for_flags(info)
@@ -132,17 +132,16 @@ def _unit_format_func(info, units):
     else:
         # default formatting string
         def _format_unit(val, numeric=True, include_units=True):
+            unit_str = units if include_units else ""
             if np.isnan(val):
-                return "{:s} {units:s}".format(N_A, units=units if include_units else "")
+                return f"{NAN}{unit_str}"
             else:
-                return "{:.03f} {units:s}".format(val, units=units if include_units else "")
+                return f"{val:.03f}{unit_str}"
 
     return _format_unit
 
 
 def _unit_format_func_for_flags(info):
-    def check_for_nan(val):
-        return N_A if np.isnan(val) else str(val)
 
     # flag values don't have units
     if "flag_meanings" in info:
@@ -150,23 +149,26 @@ def _unit_format_func_for_flags(info):
         flag_info = tuple(zip(info["flag_meanings"], info["flag_values"], flag_masks))
 
         def _format_unit(val, numeric=True, include_units=True, flag_info=flag_info):
+            if np.isnan(val):
+                return NAN
+
             val = int(val)
             if numeric:
-                return "{:s}".format(check_for_nan(val))
+                return f"{val}"
 
             meanings = []
             for fmean, fval, fmask in flag_info:
                 if (val & fmask) == fval:
                     meanings.append(fmean)
-            return "{:s} ({:s})".format(check_for_nan(val), ", ".join(meanings))
+            return f"{val} ({', '.join(meanings)})"
 
     else:
 
         def _format_unit(val, numeric=True, include_units=True, flag_info=None):
             if np.isnan(val):
-                return N_A
+                return NAN
             else:
-                return "{:d}".format(int(val))
+                return f"{val}"
 
     return _format_unit
 
