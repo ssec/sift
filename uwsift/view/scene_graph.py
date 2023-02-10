@@ -882,21 +882,32 @@ class SceneGraphManager(QObject):
     def _calc_subdivision_grid(dataset_info) -> tuple:
         grid_cell_width = float(config.get("display.grid_cell_width", DEFAULT_GRID_CELL_WIDTH))
         grid_cell_height = float(config.get("display.grid_cell_height", DEFAULT_GRID_CELL_HEIGHT))
-        pixels_per_cell_x = round(grid_cell_width / abs(dataset_info[Info.CELL_WIDTH]))
-        pixels_per_cell_y = round(grid_cell_height / abs(dataset_info[Info.CELL_HEIGHT]))
 
-        num_cells_x = dataset_info[Info.SHAPE][0] // pixels_per_cell_x
-        num_cells_y = dataset_info[Info.SHAPE][1] // pixels_per_cell_y
+        if "longlat" in dataset_info[Info.PROJ]:
+            # The cell size unit is not metres but degrees, thus we do a rough unit conversion
+            EARTH_CIRCUMFERENCE: float = 40075017.0  # metres
+            pixel_width_metres = abs(dataset_info[Info.CELL_WIDTH]) * EARTH_CIRCUMFERENCE / 360.0
+            pixel_height_metres = abs(dataset_info[Info.CELL_HEIGHT]) * EARTH_CIRCUMFERENCE / 360.0
 
-        actual_grid_cell_width = dataset_info[Info.SHAPE][0] * abs(dataset_info[Info.CELL_WIDTH]) / num_cells_x
-        actual_grid_cell_height = dataset_info[Info.SHAPE][1] * abs(dataset_info[Info.CELL_HEIGHT]) / num_cells_y
+        else:
+            pixel_width_metres = abs(dataset_info[Info.CELL_WIDTH])
+            pixel_height_metres = abs(dataset_info[Info.CELL_HEIGHT])
+
+        pixels_per_grid_cell_x = round(grid_cell_width / pixel_width_metres)
+        pixels_per_grid_cell_y = round(grid_cell_height / pixel_height_metres)
+
+        num_grid_cells_x = dataset_info[Info.SHAPE][0] // pixels_per_grid_cell_x
+        num_grid_cells_y = dataset_info[Info.SHAPE][1] // pixels_per_grid_cell_y
+
+        actual_grid_cell_width = dataset_info[Info.SHAPE][0] * abs(dataset_info[Info.CELL_WIDTH]) / num_grid_cells_x
+        actual_grid_cell_height = dataset_info[Info.SHAPE][1] * abs(dataset_info[Info.CELL_HEIGHT]) / num_grid_cells_y
 
         LOG.debug(
-            f"Gridding to ({num_cells_x} x {num_cells_y}) cells"
+            f"Gridding to ({num_grid_cells_x} x {num_grid_cells_y}) cells"
             f" with cell size ({actual_grid_cell_width} m, {actual_grid_cell_height} m) "
         )
 
-        return num_cells_x, num_cells_y
+        return num_grid_cells_x, num_grid_cells_y
 
     def add_node_for_image_dataset(self, layer: LayerItem, product_dataset: ProductDataset):
         assert self.layer_nodes[layer.uuid] is not None  # nosec B101
