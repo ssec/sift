@@ -57,6 +57,7 @@ from shapely.geometry.polygon import LinearRing
 from uwsift.common import FALLBACK_RANGE, Flags, Info, Instrument, Kind, Platform
 from uwsift.model.shapes import content_within_shape
 
+from ..util.common import is_same_proj
 from .importer import SatpyImporter, generate_guidebook_metadata
 from .metadatabase import (
     Content,
@@ -460,8 +461,8 @@ class BaseWorkspace(QObject):
         Returns: dict of overall metadata (same as `info`)
 
         """
-        if not all(x[Info.PROJ] == md_list[0][Info.PROJ] for x in md_list[1:]):
-            raise ValueError("Algebraic inputs must all be the same projection")
+        if not all(is_same_proj(x[Info.PROJ], md_list[0][Info.PROJ]) for x in md_list[1:]):
+            raise ValueError("Algebraic inputs must all be the same projection.")
 
         uuid = uuidgen()
         info[Info.UUID] = uuid
