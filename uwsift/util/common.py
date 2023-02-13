@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional, Set
@@ -20,6 +21,47 @@ def is_datetime_format(format_str):
         return False
     format_result = datetime.today().strftime(format_str)
     return format_str != format_result
+
+
+def is_same_proj(proj_a: str, proj_b: str) -> bool:
+    """
+    Compare the given proj strings and consider them the same if numeric
+    parameters do not differ in the first 9 significant digits.
+
+    The order of proj parameters and possible differences in case are ignored.
+    """
+    if proj_a == proj_b:
+        return True
+
+    proj_a_args = proj_a.casefold().split()
+    proj_b_args = proj_b.casefold().split()
+    if len(proj_a_args) != len(proj_b_args):
+        return False
+
+    proj_a_args.sort()
+    proj_b_args.sort()
+    for arg_a, arg_b in zip(proj_a_args, proj_b_args):
+        if arg_a == arg_b:
+            continue
+
+        arg_a_parameter, arg_a_value = arg_a.split("=", 1)
+        arg_b_parameter, arg_b_value = arg_a.split("=", 1)
+        if arg_a_parameter != arg_b_parameter:
+            return False
+
+        if arg_a_value == arg_b_value:
+            continue
+
+        try:
+            a = float(arg_a_value)
+            b = float(arg_b_value)
+        except ValueError:
+            return False
+
+        if not math.isclose(a, b, rel_tol=1e-09):
+            return False
+
+    return True
 
 
 def get_reader_kwargs_dict(reader_names):

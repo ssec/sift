@@ -247,17 +247,19 @@ class ABI_AHI_Guidebook(Guidebook):
 
     def _default_display_name(self, info, display_time=None):
         # FUTURE: This can be customized by the user
-        sat = info.get(Info.PLATFORM, "-unknown-")
-        inst = info.get(Info.INSTRUMENT, "-unknown-")
-        name = info.get(Info.SHORT_NAME, "-unknown-")
+        platform = info.get(Info.PLATFORM, "-unknown-")
+        instrument = info.get(Info.INSTRUMENT, "-unknown-")
+        short_name = info.get(Info.SHORT_NAME, "-unknown-")
 
         standard_name = info.get(Info.STANDARD_NAME, "")
         if standard_name == "toa_bidirectional_reflectance":
-            standard_name = "Refl"
+            label = " Refl"  # Don't remove the leading space
         elif standard_name == "toa_brightness_temperature":
-            standard_name = "BT"
+            label = " BT"  # Don't remove the leading space
+        else:
+            label = ""
 
         if display_time is None:
             display_time = info.get(Info.DISPLAY_TIME, self._default_display_time(info))
-        name = f"{sat.value} {inst.value} {name} {standard_name} {display_time}"
-        return name
+        display_name = f"{platform.value} {instrument.value} {short_name}{label} {display_time}"
+        return display_name
