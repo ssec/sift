@@ -112,7 +112,7 @@ def get_point_style_by_name(point_style_name: str) -> Dict[str, str]:
 
 # Matches a CSS <length> (https://drafts.csswg.org/css-values-3/#length-value)
 # but (for now) only for units 'px' and '%' (case insensitively)
-STYLE_LENGTH_REGEX = re.compile(r"^(\d+)(?i:(px|%))")
+STYLE_LENGTH_REGEX = re.compile(r"^(\d+(?:\.\d+)?)(?i:(px|%))")
 
 STYLE_KEYWORD_SYMBOL = "symbol"
 STYLE_KEYWORD_SIZE = "size"
