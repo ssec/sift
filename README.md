@@ -30,9 +30,10 @@ Developer documentation can be found on https://sift.readthedocs.io/en/latest/.
 
 ## History
 
-SIFT was originally created and designed at SSEC/CIMSS at the University of
-Wisconsin - Madison as a training tool for US NWS forecasters. Later, EUMETSAT,
-European Organization for the Exploitation of Meteorological Satellites,
+SIFT was originally created and designed at [SSEC/CIMSS at the University of
+Wisconsin - Madison](https://cimss.ssec.wisc.edu/) as a training tool for US
+NWS forecasters. Later, [EUMETSAT, European Organization for the Exploitation
+of Meteorological Satellites](https://www.eumetsat.int/),
 joined the project contributing many new features and refactoring various
 portions of the project to support instrument calibration/validation workflows
 as well as additional scientific analysis. CIMSS and EUMETSAT now work on the
@@ -40,7 +41,7 @@ project together as well as accepting contributions from users outside these
 groups.
 
 EUMETSAT contributions, leading up to SIFT 2.0, were carried out by
-ask – Innovative Visualisierungslösungen GmbH.
+[ask – Innovative Visualisierungslösungen GmbH](https://askvisual.de/).
 
 ## Data Access and Reading
 
