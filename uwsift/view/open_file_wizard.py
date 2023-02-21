@@ -371,6 +371,7 @@ class OpenFileWizard(QtWidgets.QWizard):
 
             self.file_dialog.currentChanged.connect(self.directoryChanged)
             self.file_dialog.directoryEntered.connect(self.directoryChanged)
+            self.file_dialog.fileSelected.connect(self.directoryChanged)
 
         self.file_dialog.open()
 
