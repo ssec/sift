@@ -39,6 +39,9 @@ as well as additional scientific analysis. CIMSS and EUMETSAT now work on the
 project together as well as accepting contributions from users outside these
 groups.
 
+EUMETSAT contributions, leading up to SIFT 2.0, were carried out by
+ask – Innovative Visualisierungslösungen GmbH.
+
 ## Data Access and Reading
 
 SIFT uses the open source python library Satpy to read input data. By using
