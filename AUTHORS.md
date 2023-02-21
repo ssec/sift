@@ -16,3 +16,7 @@ The following people have made contributions to this project:
 - [Eva Schiffer (evas-ssec)](https://github.com/evas-ssec)
 - [Andrea Meraner (ameraner)](https://github.com/ameraner)
 - [Johan Strandgren (strandgren)](https://github.com/strandgren)
+- [Alexander Rettig (arcanerr)](https://github.com/arcanerr)
+- [Alexandra Melzer (armelzer)](https://github.com/armelzer)
+- [Max Kreischer (MaxKreischer)](https://github.com/MaxKreischer)
+- [Nicolai Kellerer (nbke)](https://github.com/nbke)
