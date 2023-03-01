@@ -21,7 +21,7 @@ requirements:
 
 outputs:
 
-  - name: sift-deps
+  - name: uwsift-deps
     requirements:
       run:
         - python {{PY_VER}}*
@@ -63,12 +63,12 @@ outputs:
       - "**/uwsift/**/*"
     requirements:
       run:
-        - sift-deps
+        - uwsift-deps
 
-  - name: sift-devel-deps
+  - name: uwsift-devel-deps
     requirements:
       run:
-        - sift-deps
+        - uwsift-deps
 
         - cmake
         - conda-build

@@ -11,16 +11,16 @@ How to Install SIFT from Conda Packages
 
 To get SIFT in a Conda environment you can choose from two packages.
 
-The first one - *sift* - installs the software ready to be run. It is
+The first one - *uwsift* - installs the software ready to be run. It is
 intended for "end" users of the software who are not interested in developing
 it.
 
-The other package - *sift-devel-deps* - actually doesn't even provide
+The other package - *uwsift-devel-deps* - actually doesn't even provide
 SIFT but only makes sure, that the dependencies necessary to develop and
 package it are installed. SIFT itself must be provided as source tree
 e.g. by cloning from its Git repository or by extracting it from a tarball.
 
-There is a third Conda package - *sift-deps*. It is not meant to be
+There is a third Conda package - *uwsift-deps*. It is not meant to be
 installed directly but it is pulled automatically when one of the other ones
 is installed to provide their common dependencies.
 
@@ -29,7 +29,7 @@ Common Preparations
 
 It is best to keep Conda environments intended for just using SIFT
 separate from ones for developing it. In detail, you should not install
-*sift* but only *sift-devel-deps* into an development environment, since
+*uwsift* but only *uwsift-devel-deps* into an development environment, since
 otherwise the installed SIFT software may interfere with the version from
 the sources. And vice versa.
 
@@ -54,16 +54,16 @@ environment for the desired task::
 Installation for using SIFT
 +++++++++++++++++++++++++++++++
 
-Install the package *sift* into an environment called e.g. ``work`` and
+Install the package *uwsift* into an environment called e.g. ``work`` and
 prepared as described above::
 
-  (work)%> conda install sift
+  (work)%> conda install uwsift
 
 Now you can start SIFT like so::
 
   (work)%> python -m uwsift
 
-.. _install-conda-sift-devel:
+.. _install-conda-uwsift-devel:
 
 Installation for developing SIFT
 +++++++++++++++++++++++++++++++++++++
@@ -71,7 +71,7 @@ Installation for developing SIFT
 Set up the Conda environment as above - let's call it ``devel`` - and then
 install all dependencies for developing SIFT as follows::
 
-  (devel)%> conda install sift-devel-deps
+  (devel)%> conda install uwsift-devel-deps
 
 PIP-install SIFT in editable mode by run the following in the root
 directory of the SIFT sources::

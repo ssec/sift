@@ -17,9 +17,9 @@ Bootstrapping
 -------------
 
 This procedure is (only) necessary as long as there is no Conda package
-*sift-devel-deps* available for the current platform. When the package is
+*uwsift-devel-deps* available for the current platform. When the package is
 available you may skip this part and jump instead to
-:ref:`install-conda-sift-devel` and then continue with
+:ref:`install-conda-uwsift-devel` and then continue with
 :ref:`conda-and-pyinstaller-packaging`.
 
 Prerequisites
@@ -106,10 +106,10 @@ Each of these *package-target*\ s can be build by running::
 The Target *conda-packages*
 +++++++++++++++++++++++++++
 
-The target *conda-packages* creates three Conda packages: *sift*,
-*sift-devel-deps* and *sift-deps*.
+The target *conda-packages* creates three Conda packages: *uwsift*,
+*uwsift-devel-deps* and *uwsift-deps*.
 
-Only *sift* and *sift-devel-deps* are meant to be directly installed
+Only *uwsift* and *uwsift-devel-deps* are meant to be directly installed
 from an appropriate Conda channel *sift-channel* [#f6]_. However, the two
 packages should not be installed into the same Conda environment together.
 
