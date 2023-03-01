@@ -41,7 +41,7 @@ analogously.
 	vispy:
 	  level: INFO
 
-With this configuration all log messages go to the file ``/tmp/mtgsift.log`` and
+With this configuration all log messages go to the file ``/tmp/sift.log`` and
 all modules output messages of all levels except for the module ``vispy`` which
 only outputs messages of level ``INFO`` and higher.
 
