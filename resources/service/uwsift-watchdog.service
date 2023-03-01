@@ -2,7 +2,7 @@
 # then activate auto-start: systemctl --user enable uwsift-watchdog.service
 
 [Unit]
-Description=Watchdog for MTG-SIFT
+Description=Watchdog for SIFT
 After=uwsift.service
 
 [Service]

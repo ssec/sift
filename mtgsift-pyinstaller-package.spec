@@ -2,9 +2,9 @@
 
 # During spec file development run like so:
 #   export PYTHONHASHSEED=1
-#   pyinstaller --clean --noconfirm --debug all mtgsift-pyinstaller-package.spec
+#   pyinstaller --clean --noconfirm --debug all sift-pyinstaller-package.spec
 # To generate a self-contained executable:
-#   pyinstaller --clean --noconfirm             mtgsift-pyinstaller-package.spec
+#   pyinstaller --clean --noconfirm             sift-pyinstaller-package.spec
 
 import sys
 sys.setrecursionlimit(5000)
@@ -22,7 +22,7 @@ import xarray
 import zarr
 
 block_cipher = None
-exe_name = "mtgsift"
+exe_name = "sift"
 main_script_pathname = os.path.join("uwsift", "__main__.py")
 _script_base = os.path.dirname(os.path.realpath(sys.argv[0]))
 
@@ -122,7 +122,7 @@ if not is_win:
 
 #-------------------------------------------------------------------------------
 # For Windows add empty dummy directories which some dependencies insist to add
-# via os.add_dll_directory. As consequence mtgsift fails to start on Windows
+# via os.add_dll_directory. As consequence SIFT fails to start on Windows
 # if those directories are missing.
 if is_win:
     data_files.append((os.path.join('resources', 'pyinstaller'), '.'))
