@@ -824,7 +824,7 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "MTG-SIFT |X.X.X|"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "SIFT |X.X.X|"))
         self.panZoomToolButton.setToolTip(_translate("MainWindow", "Pan/Zoom Tool"))
         self.panZoomToolButton.setStatusTip(_translate("MainWindow", "Left mouse click and drag pans the scene"))
         self.panZoomToolButton.setText(_translate("MainWindow", "Pan/Zoom"))
