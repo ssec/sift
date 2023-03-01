@@ -2,7 +2,7 @@ How to get started using the CMake build system
 ===============================================
 
 The following documentation gives a step-by-step introduction how to initially
-set up a MTG-SIFT development environment from scratch using the CMake-based
+set up a SIFT development environment from scratch using the CMake-based
 build system.
 
 The description is platform independent [#f1]_ but based on the usual Linux
@@ -11,15 +11,15 @@ workflows of course.
 
 It is assumed that the reader knows how to install and initialize a Conda
 environment (refer to :ref:`install-conda-packages` otherwise) and how to get
-the MTG-SIFT sources from the Git repository or from an archive.
+the SIFT sources from the Git repository or from an archive.
 
 Bootstrapping
 -------------
 
 This procedure is (only) necessary as long as there is no Conda package
-*mtgsift-devel-deps* available for the current platform. When the package is
+*sift-devel-deps* available for the current platform. When the package is
 available you may skip this part and jump instead to
-:ref:`install-conda-mtgsift-devel` and then continue with
+:ref:`install-conda-sift-devel` and then continue with
 :ref:`conda-and-pyinstaller-packaging`.
 
 Prerequisites
@@ -59,14 +59,14 @@ Activate the *base* environment::
 
   %> conda activate base
 
-In the top-level directory of the MTG-SIFT sources run *cmake* with a generator
+In the top-level directory of the SIFT sources run *cmake* with a generator
 for the chosen build system::
 
   (base)%> cmake -G "Unix Makefiles" .
 
 Then follow the advice given by the messages showing up. When doing so, a new
 Conda environment *devel-<python version>* (by default *devel-3.10*) [#f4]_ will
-be created and populated with all packages necessary for MTG-SIFT development
+be created and populated with all packages necessary for SIFT development
 and packaging::
 
   (base)%> make devel-bootstrap
@@ -87,7 +87,7 @@ If not already done, execute the steps::
   (devel-3.10)%> cmake -G "Unix Makefiles" .
 
 The system is now ready to create Conda and PyInstaller packages for
-MTG-SIFT. The according targets can be found in the target lists printed by
+SIFT. The according targets can be found in the target lists printed by
 running::
 
   (devel-3.10)%> make help
@@ -106,11 +106,11 @@ Each of these *package-target*\ s can be build by running::
 The Target *conda-packages*
 +++++++++++++++++++++++++++
 
-The target *conda-packages* creates three Conda packages: *mtgsift*,
-*mtgsift-devel-deps* and *mtgsift-deps*.
+The target *conda-packages* creates three Conda packages: *sift*,
+*sift-devel-deps* and *sift-deps*.
 
-Only *mtgsift* and *mtgsift-devel-deps* are meant to be directly installed
-from an appropriate Conda channel *mtgsift-channel* [#f6]_. However, the two
+Only *sift* and *sift-devel-deps* are meant to be directly installed
+from an appropriate Conda channel *sift-channel* [#f6]_. However, the two
 packages should not be installed into the same Conda environment together.
 
 The third one is a meta-package which only pulls common dependencies for two
@@ -129,7 +129,7 @@ environment from which the path is accessible::
 The target *pyinstaller-package*
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-Using this target you can create an executable which allow to run MTG-SIFT
+Using this target you can create an executable which allow to run SIFT
 without any additional installation of dependencies. All dependencies are
 provided.
 
