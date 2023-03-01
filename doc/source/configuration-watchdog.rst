@@ -2,7 +2,7 @@ Configuring Watchdog Functionality
 ----------------------------------
 
 The *Watchdog* is a script (``uwsift/util/watchdog.py``) running separately from
-MTG-SIFT and has the responsibility to assess, whether SIFT running as
+SIFT and has the responsibility to assess, whether SIFT running as
 monitoring tool (with ``auto_update.active: True``) is working correctly and to
 "bark" otherwise by calling an adaptor script *raiseEvent.sh* to notify
 GEMS. The location of this script has to be configured as ``notification_cmd``.
