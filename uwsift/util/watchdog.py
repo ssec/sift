@@ -213,7 +213,7 @@ class Watchdog:
         use case, but by doing so the ``systemctl stop uwsift`` command can't
         reliably terminate the program in case of a hang.
 
-        :param pid: PID of MTG-SIFT as int
+        :param pid: PID of SIFT as int
         """
         try:
             os.kill(pid, signal.SIGUSR1)
