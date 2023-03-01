@@ -66,28 +66,28 @@ HERE=$(unset CDPATH; cd "$CDIR"; pwd)
 export SIFT_HOME=$(unset CDPATH; cd "$HERE/.."; pwd)
 
 #set SIFT VARs
-SIFT_LOGS="$MTGSIFT_HOME/logs"
+SIFT_LOGS="$SIFT_HOME/logs"
 
 
 #run update settings file
 echo "Create default settings if necessary:"
 echo "--------------------------------------------"
-"$MTGSIFT_HOME"/etc/update_setting.py
+"$SIFT_HOME"/etc/update_setting.py
 echo "--------------------------------------------"
 echo ""
 
 #run the back of file before setting the auto_update
 echo "Backuping the default auto_update.yaml and catalogue.yaml settings:"
 echo "--------------------------------------------"
-"$MTGSIFT_HOME"/etc/copy_autoupdate_settings.py update
+"$SIFT_HOME"/etc/copy_autoupdate_settings.py update
 echo "--------------------------------------------"
 echo ""
 
-echo "Launching MTGSift in AUTO UPDATE MODE"
+echo "Launching SIFT in AUTO UPDATE MODE"
 
-cd "$MTGSIFT_HOME"/lib
-#./mtgsift >"$MTGSIFT_LOGS/mtgsift.log" 2>&1
-./mtgsift
+cd "$SIFT_HOME"/lib
+#./sift >"$SIFT_LOGS/sift.log" 2>&1
+./sift
 res="$?"
 
 

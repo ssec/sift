@@ -59,21 +59,21 @@ SIFT_LOGS="$SIFT_HOME/logs"
 #run update settings file
 echo "Create default settings if necessary:"
 echo "--------------------------------------------"
-"$MTGSIFT_HOME"/etc/update_setting.py
+"$SIFT_HOME"/etc/update_setting.py
 echo "--------------------------------------------"
 echo ""
 
 echo "Check if there is a backup available of auto_update.yaml and catalogue.yaml to restore:"
 echo "--------------------------------------------"
-"$MTGSIFT_HOME"/etc/copy_autoupdate_settings.py restore_interactive
+"$SIFT_HOME"/etc/copy_autoupdate_settings.py restore_interactive
 echo "--------------------------------------------"
 echo ""
 
-cd "$MTGSIFT_HOME"/lib
-echo "Launching MTGSift"
+cd "$SIFT_HOME"/lib
+echo "Launching SIFT"
 
-#./mtgsift >"$MTGSIFT_LOGS/mtgsift.log" 2>&1
-./mtgsift
+#./sift >"$SIFT_LOGS/sift.log" 2>&1
+./sift
 res="$?"
 
 exit $res

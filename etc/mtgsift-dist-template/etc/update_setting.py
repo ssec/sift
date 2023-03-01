@@ -147,7 +147,7 @@ def run():
 
     home_dir = get_home()
 
-    mtgsift_root_dir = get_home_dir_path()
+    sift_root_dir = get_home_dir_path()
 
     # settings directory in ~/.config/SIFT
     setting_root_dir = CONF_ROOT_DIR.format(home_dir)
@@ -162,7 +162,7 @@ def run():
         # copy the content of the default setting dir in CONF_ROOT_DIR
         print("The file doesn't exist.")
 
-        input_dir = "{}/resources/config/SIFT/settings".format(mtgsift_root_dir)
+        input_dir = "{}/resources/config/SIFT/settings".format(sift_root_dir)
         output_dir = "{}/{}".format(setting_root_dir, get_random_name())
 
         # make the dir if necessary

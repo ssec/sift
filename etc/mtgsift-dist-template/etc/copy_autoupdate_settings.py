@@ -22,17 +22,17 @@ def get_home_dir_path():
     sift_dir = os.getenv("SIFT_HOME", None)
 
     # check by default in user[HOME]
-    if not mtgsift_dir:
+    if not sift_dir:
         print(
-            "Error, no ENV variable $MTGSIFT_HOME defined. "
-            "Please set the $MTGSIFT_HOME to root directory of the MTGSIFT distribution."
+            "Error, no ENV variable $SIFT_HOME defined. "
+            "Please set the $SIFT_HOME to root directory of the SIFT distribution."
         )
         sys.exit(1)
 
     # create dir if not there
-    makedirs(mtgsift_dir)
+    makedirs(sift_dir)
 
-    return mtgsift_dir
+    return sift_dir
 
 
 # A UTC class.
@@ -140,10 +140,10 @@ def copy_and_backup():
     """Default copy and backup."""
     home_dir = get_home()
 
-    mtgsift_root_dir = get_home_dir_path()
-    work_dir = WORK_DIR.format(mtgsift_root_dir)
-    default_auto_update = DEFAULT_AUTO_UPDATE.format(mtgsift_root_dir)
-    default_catalogue = DEFAULT_CATALOGUE.format(mtgsift_root_dir)
+    sift_root_dir = get_home_dir_path()
+    work_dir = WORK_DIR.format(sift_root_dir)
+    default_auto_update = DEFAULT_AUTO_UPDATE.format(sift_root_dir)
+    default_catalogue = DEFAULT_CATALOGUE.format(sift_root_dir)
 
     # settings directory in ~/.config/SIFT
     setting_root_dir = CONF_ROOT_DIR.format(home_dir)
@@ -178,8 +178,8 @@ def restore(a_ask_for_inputs=False):
     """Restore files in setting dir of the user."""
     home_dir = get_home()
 
-    mtgsift_root_dir = get_home_dir_path()
-    work_dir = WORK_DIR.format(mtgsift_root_dir)
+    sift_root_dir = get_home_dir_path()
+    work_dir = WORK_DIR.format(sift_root_dir)
     work_auto_update = "{}/auto_update.yaml".format(work_dir)
     work_catalogue = "{}/catalogue.yaml".format(work_dir)
 
