@@ -6,7 +6,7 @@
 set -x
 set -e
 
-track_dir=/opt/mtg-sift/track
+track_dir=/opt/sift/track
 inc_file="$track_dir/include_files"
 exc_file="$track_dir/exclude_files"
 
@@ -14,8 +14,8 @@ exc_file="$track_dir/exclude_files"
 src_dir="/tcenas/fbf/EUMETCAST/in/TCE_bas/EUMETSAT_Data_Channel_2"
 #seviri native
 src_dir="/tcenas/fbf/MSG/in/MSG4/OPE4/SEVI-MSG15"
-#src_dir="/opt/mtg-sift/Data/MSG-2"
-dst_dir="/opt/mtg-sift/Data/MSG-Incoming"
+#src_dir="/opt/sift/Data/MSG-2"
+dst_dir="/opt/sift/Data/MSG-Incoming"
 
 mkdir -p "$track_dir"
 touch $exc_file

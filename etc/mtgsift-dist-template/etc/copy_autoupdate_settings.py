@@ -19,7 +19,7 @@ DEFAULT_CATALOGUE = "{}/conf/auto_update_settings/catalogue.yaml"
 
 def get_home_dir_path():
     """Get the software root dir."""
-    mtgsift_dir = os.getenv("MTGSIFT_HOME", None)
+    sift_dir = os.getenv("SIFT_HOME", None)
 
     # check by default in user[HOME]
     if not mtgsift_dir:

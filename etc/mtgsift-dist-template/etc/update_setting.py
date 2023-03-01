@@ -22,20 +22,20 @@ def get_home_dir_path():
     """
     Get the software root dir
     """
-    mtgsift_dir = os.getenv("MTGSIFT_HOME", None)
+    sift_dir = os.getenv("SIFT_HOME", None)
 
     # check by default in user[HOME]
-    if not mtgsift_dir:
+    if not sift_dir:
         print(
-            "Error, no ENV variable $MTGSIFT_HOME defined. "
-            "Please set the $MTGSIFT_HOME to root directory of the MTGSIFT distribution."
+            "Error, no ENV variable $SIFT_HOME defined. "
+            "Please set the $SIFT_HOME to root directory of the SIFT distribution."
         )
         sys.exit(1)
 
     # create dir if not there
-    makedirs(mtgsift_dir)
+    makedirs(sift_dir)
 
-    return mtgsift_dir
+    return sift_dir
 
 
 # A UTC class.
