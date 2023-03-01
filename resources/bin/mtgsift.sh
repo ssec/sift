@@ -3,7 +3,7 @@
 set -e
 set -u
 
-PROJ_NAME='mtgsift'
+PROJ_NAME='sift'
 
 BASE_DIR="$(dirname -- "$0")/.."
 cd "$BASE_DIR" || exit
