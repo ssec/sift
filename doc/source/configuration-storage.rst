@@ -6,7 +6,7 @@ Storage Configuration
 Activate File Based Inventory Database and Caching
 --------------------------------------------------
 
-MTG-SIFT can either run with a file system based inventory database or without
+SIFT can either run with a file system based inventory database or without
 it.  The first operation mode is useful if certain data files are loaded
 repeatedly while the latter is preferable when the system operates automatically
 and usually loads each file only once.
@@ -65,9 +65,8 @@ logging to inform the GEMS monitoring system about events.
 
 The paths given for ``directories`` may contain a placeholder in the form
 ``$$CACHE_DIR$$``. When used, this part is expanded to the default cache
-directory for the application according to the XDG standard (MTG-SIFT calls
-itself still ``SIFT``, thus for now ``$$CACHE_DIR$$`` expands to
-``~/.cache/SIFT`` on Linux systems).
+directory for the application according to the XDG standard
+(``$$CACHE_DIR$$`` expands to ``~/.cache/SIFT`` on Linux systems).
 
 
 **Example**

@@ -1,7 +1,7 @@
 Auto Update Mode
 ================
 
-MTG-SIFT can be operated in *Auto Update Mode* for operational monitoring of
+SIFT can be operated in *Auto Update Mode* for operational monitoring of
 incoming data.
 
 In that mode the graphical user interfaces shows three time displays instead of
@@ -15,7 +15,7 @@ Both *Date Time* and *Import Time* are coloured green as long as the according
 times are sufficiently recent but change the colour to red when there is
 significant delay.
 
-To run MTG-SIFT in *Auto Update Mode* according settings must be added to the
+To run SIFT in *Auto Update Mode* according settings must be added to the
 application configuration, see :ref:`auto_update_mode_activation`.
 
 Since in auto update mode no files are load interactively a *Catalogue* must

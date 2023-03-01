@@ -3,7 +3,7 @@
 Configuring Area Definitions
 ----------------------------
 
-MTG-SIFT allows only map projections which are provided by configuration via
+SIFT allows only map projections which are provided by configuration via
 Satpy. All or some of them must be "activated" for use by configuring
 ``area_definitions`` as follows::
 
@@ -21,7 +21,7 @@ The area definitions appear in the *Projection:* picklist in the same order they
 are listed in the ``area_definitions`` configuration, the first entry is
 selected at application start.
 
-One additional area definition is appended as fallback by MTG-SIFT if no area
+One additional area definition is appended as fallback by SIFT if no area
 definition or none with a pseudo lat/lon projection (Plate Carree) is
 found. This is to make sure there is always projection showing the whole world
 selectable in the application, which is useful for examining data of yet unknown

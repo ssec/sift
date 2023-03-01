@@ -53,7 +53,7 @@ Configuring Point Styles Based on the Dataset Standard Name
 
 Analogous to the default colormap configuration the style of the markers used to
 render a dataset can (and - since there are no default definitions in the
-MTG-SIFT's internal *Guidebook* for this - should) be configured by associating a
+SIFT's internal *Guidebook* for this - should) be configured by associating a
 named points style to the standard name of each points dataset::
 
     default_point_styles:

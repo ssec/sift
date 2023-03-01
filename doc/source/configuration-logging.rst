@@ -34,7 +34,7 @@ analogously.
 **Example** ::
 
     logging:
-      filename: /tmp/mtgsift.log
+      filename: /tmp/sift.log
       loggers:
         all:
           level: DEBUG
@@ -49,4 +49,4 @@ only outputs messages of level ``INFO`` and higher.
 .. rubric:: Footnotes
 
 .. [#abspath] Accepting a relative path could lead to stray log files in every
-	      directory which is current when MTG-SIFT is started.
+	      directory which is current when SIFT is started.

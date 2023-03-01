@@ -1,7 +1,7 @@
 Configuring a Colormap and its Colorlimits Based on the Dataset Standard Name
 -------------------------------------------------------
 
-MTG-SIFT automatically associates a colormap and a value range to a newly
+SIFT automatically associates a colormap and a value range to a newly
 loaded dataset based on the standard name of each dataset via its internal
 *Guidebook*. The colormap is applied to the values in the range, values
 outside this range get the first respectively last color of the colormap.
@@ -35,7 +35,7 @@ happens for all standard names which are not listed in the configuration.
 
     When file based caching is active changing the associated default colormap or clims
     by configuration will not affect data which is already cached from an
-    earlier run of MTG-SIFT because the colormap is stored as meta-data in the
+    earlier run of SIFT because the colormap is stored as meta-data in the
     cache.  In such a case you may destroy the cache (usually at
     ``~/.cache/SIFT``) or manually choose the wanted colormap after loading the
     data.

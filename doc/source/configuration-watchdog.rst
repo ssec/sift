@@ -2,13 +2,13 @@ Configuring Watchdog Functionality
 ----------------------------------
 
 The *Watchdog* is a script (``uwsift/util/watchdog.py``) running separately from
-MTG-SIFT and has the responsibility to assess, whether MTG-SIFT running as
+MTG-SIFT and has the responsibility to assess, whether SIFT running as
 monitoring tool (with ``auto_update.active: True``) is working correctly and to
 "bark" otherwise by calling an adaptor script *raiseEvent.sh* to notify
 GEMS. The location of this script has to be configured as ``notification_cmd``.
 
-The Watchdog does not directly interact with the running MTG-SIFT instance but
-monitors a file to be configured as ``heartbeat_file``, which MTG-SIFT updates
+The Watchdog does not directly interact with the running SIFT instance but
+monitors a file to be configured as ``heartbeat_file``, which SIFT updates
 with the data timestamp (i.e. the ``start_time`` is written into the file) every
 time it loads new data. From this information and the filesystem change time of
 the heartbeat file the Watchdog can determine, when the monitoring system is not
@@ -20,7 +20,7 @@ gives alarm, when the data timestamp stored is older than
 updated is longer ago than the ``max_tolerable_idle_time``. These three time
 span related configurations are in seconds.
 
-To work around the memory leak in MTG-SIFT, the watchdog is able to issue a
+To work around the memory leak in SIFT, the watchdog is able to issue a
 restart request once the ``auto_restart_interval`` is over. If the user denies
 this request by cklicking on the *cancel* button in the popup window, the
 watchdog will send another request every ``auto_restart_ask_again_interval``
@@ -28,7 +28,7 @@ seconds. Both configuration options are in seconds and can be disabled with
 the value *0*.
 
 Furthermore the watchdog is capable of monitoring the memory consumption of the
-MTG-SIFT application. If the application exceeds the amount specified by
+SIFT application. If the application exceeds the amount specified by
 ``max_memory_consumption``, a restart request is issued. The units ``M``
 (*Mebibytes*) and ``G`` (*Gibiabytes*) can be used. If this setting is not
 given, the watchdog won't trigger a restart based on excessive memory
@@ -55,6 +55,5 @@ A complete watchdog configuration looks as follows:
 
 Note the part ``$$CACHE_DIR$$`` of the path for the heartbeat file. When used,
 this part is expanded to the default cache directory for the application
-according to the XDG standard (MTG-SIFT calls itself still ``SIFT``, thus for
-now ``$$CACHE_DIR$$`` expands to ``~/.cache/SIFT`` on Linux systems). A normal
-absolute file path works too.
+according to the XDG standard (``$$CACHE_DIR$$`` expands to ``~/.cache/SIFT``
+on Linux systems). A normal absolute file path works too.
