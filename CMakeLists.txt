@@ -92,7 +92,7 @@ option( DIST_Conda "If set, a target for building installers with Conda is creat
 if( DIST_Conda )
 
 set( ${PROJECT_NAME}_CONDA_RECIPE "${PROJECT_NAME}" ) # Name of the Conda recipe, i.e. the directory name to look for 'meta.yaml' in
-set( ${PROJECT_NAME}_CONDA_DIST_DIR "$ENV{HOME}/conda-channels/mtgvis" CACHE STRING "Path to local conda packages directory." )
+set( ${PROJECT_NAME}_CONDA_DIST_DIR "$ENV{HOME}/conda-channels/uwsift" CACHE STRING "Path to local conda packages directory." )
 
 add_custom_target( conda-packages
   COMMAND ${Conda_EXECUTABLE} build -c ${${PROJECT_NAME}_DEPENDENCIES_CHANNEL} --python ${PYTHON_VERSION} --prefix-length 30 --output-folder "${${PROJECT_NAME}_CONDA_DIST_DIR}" "conda-recipe/${${PROJECT_NAME}_CONDA_RECIPE}"

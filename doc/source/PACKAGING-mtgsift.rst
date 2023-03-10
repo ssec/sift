@@ -118,11 +118,11 @@ others and is automatically installed when any of them is installed. Please
 refer to :ref:`install-conda-packages` regarding how to install and use them.
 
 The three Conda packages are created in a directory, by default
-``~/conda-channels/mtgvis/`` [#f7]_. This directory is also indexed as a Conda
+``~/conda-channels/uwsift/`` [#f7]_. This directory is also indexed as a Conda
 repository thus it can be used as a local Conda channel in each Conda
 environment from which the path is accessible::
 
-  (MY_ENV)%> conda config --add channels ~/conda-channels/mtgvis/
+  (MY_ENV)%> conda config --add channels ~/conda-channels/uwsift/
 
 .. _pyinstaller-packaging:
 

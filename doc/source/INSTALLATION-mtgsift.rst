@@ -48,7 +48,7 @@ environment for the desired task::
 
 .. [#f1] You need to ask for the URL or name of this ``SIFT_CHANNEL``. If you
 	 build packages yourself, the local build directory can be used as
-	 this channel, by default it is ``~/conda-channels/mtgvis/`` (see
+	 this channel, by default it is ``~/conda-channels/uwsift/`` (see
 	 :ref:`conda-packaging`)
 
 Installation for using SIFT
