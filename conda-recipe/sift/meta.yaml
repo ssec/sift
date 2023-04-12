@@ -86,7 +86,7 @@ test:
     - python -m uwsift -h
 
 about:
-  home: https://gitlab.eumetsat.int/webservices/mtg-sift
+  home: https://github.com/ssec/sift
   license: "GNU Lesser General Public License v3 or later (LGPLv3+)"
   summary: "Visualization tool for MTG satellite imagery data"
 
