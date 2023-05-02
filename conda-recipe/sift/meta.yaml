@@ -88,7 +88,7 @@ test:
 about:
   home: https://github.com/ssec/sift
   license: "GNU Lesser General Public License v3 or later (LGPLv3+)"
-  summary: "Visualization tool for MTG satellite imagery data"
+  summary: "Visualization tool for satellite imagery data"
 
 extra:
   maintainers: SIFT Developers
