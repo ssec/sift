@@ -54,7 +54,7 @@ class Watchdog:
 
         :param config_dirs: List of search paths for the watchdog YAML
              configuration files
-        :param cache_dir: Path to the MTG-SIFT caching directory, which is
+        :param cache_dir: Path to the SIFT caching directory, which is
              used as the default location of the heartbeat file.
         """
         self.hostname = gethostname()
@@ -202,7 +202,7 @@ class Watchdog:
         may choose to ignore this request.
 
         Don't use SIGTERM, because ``systemctl --user stop uwsift`` should
-        terminate MTG-SIFT without asking the user. However the application
+        terminate SIFT without asking the user. However the application
         should be able to save its state, so don't use SIGKILL either.
 
         This function doesn't use the command ``systemctl restart uwsift``,
@@ -213,7 +213,7 @@ class Watchdog:
         use case, but by doing so the ``systemctl stop uwsift`` command can't
         reliably terminate the program in case of a hang.
 
-        :param pid: PID of MTG-SIFT as int
+        :param pid: PID of SIFT as int
         """
         try:
             os.kill(pid, signal.SIGUSR1)

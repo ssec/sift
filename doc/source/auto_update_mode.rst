@@ -1,7 +1,7 @@
 Auto Update Mode
 ================
 
-MTG-SIFT can be operated in *Auto Update Mode* for operational monitoring of
+SIFT can be operated in *Auto Update Mode* for operational monitoring of
 incoming data.
 
 In that mode the graphical user interfaces shows three time displays instead of
@@ -15,7 +15,7 @@ Both *Date Time* and *Import Time* are coloured green as long as the according
 times are sufficiently recent but change the colour to red when there is
 significant delay.
 
-To run MTG-SIFT in *Auto Update Mode* according settings must be added to the
+To run SIFT in *Auto Update Mode* according settings must be added to the
 application configuration, see :ref:`auto_update_mode_activation`.
 
 Since in auto update mode no files are load interactively a *Catalogue* must
@@ -26,23 +26,23 @@ should be loaded and where to find them. For details please see
 Disk Space Management Tools
 ---------------------------
 
-MTG-SIFT creates temporary files during ingestion of new data. Some of these
-files are written by libraries MTG-SIFT depends on, e.g. intermediate files are
+SIFT creates temporary files during ingestion of new data. Some of these
+files are written by libraries SIFT depends on, e.g. intermediate files are
 created by Satpy when it decompresses data stored in compressed file
-formats. But also MTG-SIFT itself creates intermediate files which are only used
+formats. But also SIFT itself creates intermediate files which are only used
 once and are not of permanent value.
 
-Especially when MTG-SIFT runs in *Auto Update Mode* and repeatedly loads new
+Especially when SIFT runs in *Auto Update Mode* and repeatedly loads new
 data these files could fill up the file system. Two tools are provided to manage
 this:
 
-* The *Disk Management* tool to identify which files are written by MTG-SIFT
+* The *Disk Management* tool to identify which files are written by SIFT
 
 * The *Storage Agent* which actually cleans up configured directories which have
-  been identified as containing intermediate files from MTG-SIFT
+  been identified as containing intermediate files from SIFT
 
 The recommended approach is to use the *Disk Management* tool to analyse into
-which directories MTG-SIFT writes temporary files and use this information to
+which directories SIFT writes temporary files and use this information to
 configure the *Storage Agent* to watch these directories and purge obsolete
 temporary files from them. The analysis step has to be done only during
 development of the software or initially after installing or updating the
@@ -52,7 +52,7 @@ Disk Management
 ~~~~~~~~~~~~~~~
 
 ``disk_management.py`` allows to collect a list of files accessed by a
-program. To analyse the files opened by the MTG-SIFT process started via
+program. To analyse the files opened by the SIFT process started via
 commandline
 
 .. code-block:: bash

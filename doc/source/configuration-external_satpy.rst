@@ -4,7 +4,7 @@ Configuring External Satpy Components
 Replacing Satpy by External Installation
 ========================================
 
-MTG-SIFT can be instructed to import Satpy modules from another location than
+SIFT can be instructed to import Satpy modules from another location than
 from the site packages of the active Python environment when the following
 setting points to an appropriate package directory::
 
@@ -15,7 +15,7 @@ GitHub to ``/home/me/development/satpy`` by configuring::
 
    satpy_import_path: "/home/me/development/satpy/satpy"
 
-or setting the according environment variable before starting MTG-SIFT::
+or setting the according environment variable before starting SIFT::
 
    export UWSIFT_SATPY_IMPORT_PATH="/home/me/development/satpy/satpy"
 
@@ -46,7 +46,7 @@ For example assuming that the repository has been cloned as follows::
 
 the readers for the *FCI L1 Landmark Locations Catalogue*, *FCI L1 GEOOBS
 Landmarks* (landmark locations) and *FCI L1 GEOOBS Landmark Matching Results*
-(landmark navigation error) can be made available in MTG-SIFT with::
+(landmark navigation error) can be made available in SIFT with::
 
     satpy_extra_readers_import_path: /path/to/clone/of/satpy/local_readers
 

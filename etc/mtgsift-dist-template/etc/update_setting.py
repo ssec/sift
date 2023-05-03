@@ -22,20 +22,20 @@ def get_home_dir_path():
     """
     Get the software root dir
     """
-    mtgsift_dir = os.getenv("MTGSIFT_HOME", None)
+    sift_dir = os.getenv("SIFT_HOME", None)
 
     # check by default in user[HOME]
-    if not mtgsift_dir:
+    if not sift_dir:
         print(
-            "Error, no ENV variable $MTGSIFT_HOME defined. "
-            "Please set the $MTGSIFT_HOME to root directory of the MTGSIFT distribution."
+            "Error, no ENV variable $SIFT_HOME defined. "
+            "Please set the $SIFT_HOME to root directory of the SIFT distribution."
         )
         sys.exit(1)
 
     # create dir if not there
-    makedirs(mtgsift_dir)
+    makedirs(sift_dir)
 
-    return mtgsift_dir
+    return sift_dir
 
 
 # A UTC class.
@@ -147,7 +147,7 @@ def run():
 
     home_dir = get_home()
 
-    mtgsift_root_dir = get_home_dir_path()
+    sift_root_dir = get_home_dir_path()
 
     # settings directory in ~/.config/SIFT
     setting_root_dir = CONF_ROOT_DIR.format(home_dir)
@@ -162,7 +162,7 @@ def run():
         # copy the content of the default setting dir in CONF_ROOT_DIR
         print("The file doesn't exist.")
 
-        input_dir = "{}/resources/config/SIFT/settings".format(mtgsift_root_dir)
+        input_dir = "{}/resources/config/SIFT/settings".format(sift_root_dir)
         output_dir = "{}/{}".format(setting_root_dir, get_random_name())
 
         # make the dir if necessary

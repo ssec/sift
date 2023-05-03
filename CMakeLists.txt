@@ -6,7 +6,7 @@
 cmake_minimum_required( VERSION 3.10 ) # May be relaxed to allow older CMake versions but not below 3.8 because we use COMMAND_EXPAND_LISTS
 
 # 'LANGUAGES' might be changed to Python when a Python toolchain becomes available
-project( mtgsift LANGUAGES NONE )
+project( sift LANGUAGES NONE )
 
 #-------------------------------------------------------------------------------------------------
 # Global Settings
@@ -14,7 +14,7 @@ project( mtgsift LANGUAGES NONE )
 
 list( APPEND CMAKE_MODULE_PATH "cmake/" )
 
-set( PYTHON_VERSION 3.10 CACHE STRING "Version of Python to setup/build MTG-SIFT for." )
+set( PYTHON_VERSION 3.10 CACHE STRING "Version of Python to setup/build SIFT for." )
 
 #-------------------------------------------------------------------------------------------------
 # Dependencies
@@ -54,7 +54,7 @@ option( WITH_xRITDecompress "If set, integrate xRITDecompress in the development
 
 add_custom_target( devel-bootstrap
   COMMAND ${Conda_EXECUTABLE} create  --name ${${PROJECT_NAME}_CONDA_ENVIRONMENT} --channel conda-forge --strict-channel-priority python=${PYTHON_VERSION}
-  COMMAND ${Conda_EXECUTABLE} install --name ${${PROJECT_NAME}_CONDA_ENVIRONMENT} --channel conda-forge --strict-channel-priority --file conda-envs/mtgsift-devel-minimal.pkgs
+  COMMAND ${Conda_EXECUTABLE} install --name ${${PROJECT_NAME}_CONDA_ENVIRONMENT} --channel conda-forge --strict-channel-priority --file conda-envs/sift-devel-minimal.pkgs
   COMMAND ${CMAKE_COMMAND} -E $<IF:$<BOOL:${WITH_xRITDecompress}>,env,true> ${Conda_EXECUTABLE} install --name ${${PROJECT_NAME}_CONDA_ENVIRONMENT} --channel eumetsat --strict-channel-priority public-decomp-wt
   COMMAND echo "You may want to run the following commands manually:"
   COMMAND echo "  conda activate ${${PROJECT_NAME}_CONDA_ENVIRONMENT}"
@@ -92,7 +92,7 @@ option( DIST_Conda "If set, a target for building installers with Conda is creat
 if( DIST_Conda )
 
 set( ${PROJECT_NAME}_CONDA_RECIPE "${PROJECT_NAME}" ) # Name of the Conda recipe, i.e. the directory name to look for 'meta.yaml' in
-set( ${PROJECT_NAME}_CONDA_DIST_DIR "$ENV{HOME}/conda-channels/mtgvis" CACHE STRING "Path to local conda packages directory." )
+set( ${PROJECT_NAME}_CONDA_DIST_DIR "$ENV{HOME}/conda-channels/uwsift" CACHE STRING "Path to local conda packages directory." )
 
 add_custom_target( conda-packages
   COMMAND ${Conda_EXECUTABLE} build -c ${${PROJECT_NAME}_DEPENDENCIES_CHANNEL} --python ${PYTHON_VERSION} --prefix-length 30 --output-folder "${${PROJECT_NAME}_CONDA_DIST_DIR}" "conda-recipe/${${PROJECT_NAME}_CONDA_RECIPE}"
@@ -146,7 +146,7 @@ add_custom_target( pyinstaller-package
   BYPRODUCTS "${_pyi_dir_}/dist/${PROJECT_NAME}.zip"
   WORKING_DIRECTORY "${_pyi_dir_}/dist"
   VERBATIM
-  COMMENT "Package PyInstaller output for mtgsift"
+  COMMENT "Package PyInstaller output for SIFT"
 )
 
 endif( DIST_PyInstaller )

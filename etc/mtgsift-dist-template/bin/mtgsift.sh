@@ -16,12 +16,12 @@ export FONTCONFIG_PATH=/etc/fonts
 
 #get script path and then one directory up
 SCRIPT_PATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
-MTGSIFT_HOME="$(dirname "$SCRIPT_PATH")"
+SIFT_HOME="$(dirname "$SCRIPT_PATH")"
 
-echo "MTGSIFT_HOME directory is $MTGSIFT_HOME."
+echo "SIFT_HOME directory is $SIFT_HOME."
 
 #set XRIT_DECOMPRESS_PATH
-export XRIT_DECOMPRESS_PATH="$MTGSIFT_HOME/etc/xRITDecompress/xRITDecompress"
+export XRIT_DECOMPRESS_PATH="$SIFT_HOME/etc/xRITDecompress/xRITDecompress"
 
 #use perl by default. if perl is not there, default to readlink
 PERL_EXISTS=`which perl`
@@ -51,31 +51,29 @@ fi
 
 #to re-create the absolute path
 HERE=$(unset CDPATH; cd "$CDIR"; pwd)
-export MTGSIFT_HOME=$(unset CDPATH; cd "$HERE/.."; pwd)
+export SIFT_HOME=$(unset CDPATH; cd "$HERE/.."; pwd)
 
-#set MTGSIFT VARs
-#MTGSIFT_HOME="/home/gmv/Dev/pyinstaller/distrib"
-#MTGSIFT_HOME="/tcenas/home/gaubert/mtg-sift/mtgsift-distrib"
-MTGSIFT_LOGS="$MTGSIFT_HOME/logs"
+#set SIFT VARs
+SIFT_LOGS="$SIFT_HOME/logs"
 
 #run update settings file
 echo "Create default settings if necessary:"
 echo "--------------------------------------------"
-"$MTGSIFT_HOME"/etc/update_setting.py
+"$SIFT_HOME"/etc/update_setting.py
 echo "--------------------------------------------"
 echo ""
 
 echo "Check if there is a backup available of auto_update.yaml and catalogue.yaml to restore:"
 echo "--------------------------------------------"
-"$MTGSIFT_HOME"/etc/copy_autoupdate_settings.py restore_interactive
+"$SIFT_HOME"/etc/copy_autoupdate_settings.py restore_interactive
 echo "--------------------------------------------"
 echo ""
 
-cd "$MTGSIFT_HOME"/lib
-echo "Launching MTGSift"
+cd "$SIFT_HOME"/lib
+echo "Launching SIFT"
 
-#./mtgsift >"$MTGSIFT_LOGS/mtgsift.log" 2>&1
-./mtgsift
+#./sift >"$SIFT_LOGS/sift.log" 2>&1
+./sift
 res="$?"
 
 exit $res

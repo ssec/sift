@@ -2,7 +2,7 @@
 # then activate auto-start: systemctl --user enable uwsift.service
 
 [Unit]
-Description=MTG-SIFT in monitoring mode
+Description=SIFT in monitoring mode
 After=graphical-session.target
 
 [Service]

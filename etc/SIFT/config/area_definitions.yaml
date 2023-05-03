@@ -16,5 +16,5 @@ area_definitions:
 
   MTG FCI FDSS 2km: mtg_fci_fdss_2km
 
-#---- MTG-SIFT doesn't implement proj=eqc correctly/completely ----
+#---- SIFT doesn't implement proj=eqc correctly/completely ----
 #  Plate Carree 3km: worldeqc3km

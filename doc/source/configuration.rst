@@ -1,7 +1,7 @@
 Configuration
 -------------
 
-Many aspects of MTG-SIFT can or must be configured.
+Many aspects of SIFT can or must be configured.
 
 The software comes with a default - *system* - configuration split in several
 separate files in a directory structure below the directory
@@ -40,7 +40,7 @@ The *user* configuration can be empty or only be partial: it is merged with the
 It is not necessary to keep the configuration in individual files, it can be
 put into larger files as you wish.
 
-MTG-SIFT uses the Donfig config library, for additional details on how to write
+SIFT uses the Donfig config library, for additional details on how to write
 configurations have a look here: https://donfig.readthedocs.io/en/latest/.
 
 .. toctree::

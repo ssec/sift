@@ -1,7 +1,7 @@
-MTG-SIFT Profiling
+SIFT Profiling
 ==================
 
-MTG-SIFT can be started with a custom Heap Profiler, which is using the Python
+SIFT can be started with a custom Heap Profiler, which is using the Python
 tracemalloc module underneath. When done so it creates a directory
 ``<YYYYddmm_HH-MM>_uwsift_heap_profile`` in the current working directory and stores
 memory usage snapshot data into it. The command to take a snapshot every 2.0
