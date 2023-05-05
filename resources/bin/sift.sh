@@ -17,8 +17,6 @@ fi
 PATH="$BASE_DIR/bin:$PATH"
 export PATH
 
-mkdir -p "$BASE_DIR/logs"
-
 cd "$BASE_DIR/lib" || exit
 
-"./$PROJ_NAME" "$@" >"$BASE_DIR/logs/$PROJ_NAME.log" 2>"$BASE_DIR/logs/$PROJ_NAME.log"
+"./$PROJ_NAME" "$@"

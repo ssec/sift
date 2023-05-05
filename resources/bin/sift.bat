@@ -4,17 +4,9 @@ set base_dir=%~dp0
 
 set PATH=%base_dir%;%PATH%
 
-IF NOT EXIST "%base_dir%..\logs\" mkdir "%base_dir%..\logs" || goto NOLOG
-
-cd "%base_dir%..\lib" || goto NOPACKAGE
-.\sift.exe %* >"%base_dir%..\logs\sift.log" 2>&1
-goto END
-
-:NOLOG
-echo Cannot create log directory at %base_dir%..\logs\
-echo Print program output to console instead.
 cd "%base_dir%..\lib" || goto NOPACKAGE
 .\sift.exe %*
+goto END
 
 :END
 cd "%base_dir%"
