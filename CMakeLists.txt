@@ -55,12 +55,17 @@ option( WITH_xRITDecompress "If set, integrate xRITDecompress in the development
 add_custom_target( devel-bootstrap
   COMMAND ${Conda_EXECUTABLE} create  --name ${${PROJECT_NAME}_CONDA_ENVIRONMENT} --channel conda-forge --strict-channel-priority python=${PYTHON_VERSION}
   COMMAND ${Conda_EXECUTABLE} install --name ${${PROJECT_NAME}_CONDA_ENVIRONMENT} --channel conda-forge --strict-channel-priority --file conda-envs/sift-devel-minimal.pkgs
+
   COMMAND ${CMAKE_COMMAND} -E $<IF:$<BOOL:${WITH_xRITDecompress}>,env,true> ${Conda_EXECUTABLE} install --name ${${PROJECT_NAME}_CONDA_ENVIRONMENT} --channel eumetsat --strict-channel-priority public-decomp-wt
   COMMAND echo "You may want to run the following commands manually:"
   COMMAND echo "  conda activate ${${PROJECT_NAME}_CONDA_ENVIRONMENT}"
   COMMAND echo "  conda config --env --add channels conda-forge"
   COMMAND echo "  conda config --env --set channel_priority strict"
   COMMAND echo "  ${CMAKE_COMMAND} ."
+  COMMAND echo "To make sure that GRIB and BUFR readers work correctly, run the following commands manually:"
+  COMMAND echo "  pip install ecmwflibs"
+  COMMAND echo "  pip install eccodes"
+  COMMAND echo "  pip install cfgrib"
   VERBATIM
   COMMAND_EXPAND_LISTS
   COMMENT "Setting up conda environment for development ..."
