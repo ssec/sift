@@ -19,7 +19,7 @@ import satpy
 import vispy.glsl
 import vispy.io
 import xarray
-import zarr
+from gribapi import bindings
 
 block_cipher = None
 exe_name = "sift"
@@ -119,7 +119,22 @@ else:
 if not is_win:
     data_files.append((os.path.join(share_dir, 'eccodes'), os.path.join('share', 'eccodes')))
 
+#-------------------------------------------------------------------------------
+# fix eccodes imports
 
+# copy .h files from gribapi (make these lines work
+# https://github.com/ecmwf/eccodes-python/blob/4135b7ec3a218c5967bfe5aa6a4f357cb0fc7d94/gribapi/bindings.py#L41-L42 )
+data_files.append((os.path.join(os.path.dirname(bindings.__file__), "grib_api.h"),  'gribapi'))
+data_files.append((os.path.join(os.path.dirname(bindings.__file__), "eccodes.h"),  'gribapi'))
+
+# copy .dll files from ecmwflibs (make these lines work
+# https://github.com/ecmwf/eccodes-python/blob/4135b7ec3a218c5967bfe5aa6a4f357cb0fc7d94/gribapi/bindings.py#L33-L35 )
+if is_win:
+    try:
+        import ecmwflibs
+        data_files.append((os.path.join(os.path.dirname(ecmwflibs.__file__), "eccodes.dll"), 'ecmwflibs'))
+    except:
+        pass
 #-------------------------------------------------------------------------------
 # For Windows add empty dummy directories which some dependencies insist to add
 # via os.add_dll_directory. As consequence SIFT fails to start on Windows
