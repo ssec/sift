@@ -14,10 +14,9 @@ from typing import Dict, List, Optional, Set
 import appdirs
 from donfig import Config
 
-LOG = logging.getLogger(__name__)
+from uwsift.util.default_paths import APPLICATION_NAME, APPLICATION_AUTHOR
 
-APPLICATION_DIR = "SIFT"
-APPLICATION_AUTHOR = "CIMSS-SSEC"
+LOG = logging.getLogger(__name__)
 
 
 class FileMetadata:
@@ -82,7 +81,7 @@ class StorageAgent:
             LOG.log(level, text)
         else:
             machine = shlex.quote(self.hostname)
-            process_name = shlex.quote(f"{APPLICATION_DIR}-storage-agent")
+            process_name = shlex.quote(f"{APPLICATION_NAME}-storage-agent")
             severity = shlex.quote(logging.getLevelName(level))
             text = shlex.quote(text)
             cmd = f"{self.notification_cmd}" f" {machine} {process_name} {severity} {text}"
@@ -245,8 +244,8 @@ class StorageAgent:
 
 
 if __name__ == "__main__":
-    user_cache_dir = appdirs.user_cache_dir(APPLICATION_DIR, APPLICATION_AUTHOR)
-    user_config_dir = appdirs.user_config_dir(APPLICATION_DIR, APPLICATION_AUTHOR, roaming=True)
+    user_cache_dir = appdirs.user_cache_dir(APPLICATION_NAME, APPLICATION_AUTHOR)
+    user_config_dir = appdirs.user_config_dir(APPLICATION_NAME, APPLICATION_AUTHOR, roaming=True)
     config_dir = os.path.join(user_config_dir, "settings", "config")
 
     config = Config("uwsift", paths=[config_dir])
