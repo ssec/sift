@@ -20,6 +20,7 @@ except ImportError:
     warnings.warn(
         "Satpy <0.23.0 will not be supported in future versions. " "Please update your version of Satpy.",
         DeprecationWarning,
+        stacklevel=2,
     )
     from satpy import DatasetID as DataID
 

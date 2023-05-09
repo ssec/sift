@@ -211,6 +211,7 @@ class MultiChannelGPUScaledTexture2D:
                 "Multiple texture arrays were passed, but so was "
                 "sub-texture index in 'offset'. Ignoring that index.",
                 UserWarning,
+                stacklevel=4,
             )
             offset = offset[1:]
         if is_multi and len(data) != self.num_channels:
