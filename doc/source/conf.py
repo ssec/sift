@@ -49,8 +49,6 @@ extensions = [
 ]
 
 autodoc_mock_imports = [
-    "netCDF4",
-    "h5py",
     "pyshp",
     "shapely",
     "rasterio",
