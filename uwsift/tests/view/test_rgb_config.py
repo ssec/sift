@@ -41,6 +41,7 @@ def test_slider_change(qtbot):
         Info.DISPLAY_FAMILY: "family1",
         Info.UNIT_CONVERSION: (lambda x, inverse=False: x, lambda x, inverse=False: x),
     }
+    layer_one.valid_range = (0.0, 150.0)
 
     layer_two.uuid = "some_other_uuid"
     layer_two.kind = Kind.IMAGE
@@ -51,6 +52,7 @@ def test_slider_change(qtbot):
         Info.DISPLAY_FAMILY: "family2",
         Info.UNIT_CONVERSION: (lambda x, inverse=False: x, lambda x, inverse=False: x),
     }
+    layer_two.valid_range = (0.0, 150.0)
 
     layer_model.layers.append(layer_one)
     layer_model.layers.append(layer_two)

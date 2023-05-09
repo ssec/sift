@@ -26,7 +26,7 @@ def test_config_satpy_import_path(tmp_path):
 
     # get the folder structure of the config directory
     uwsift_module = importlib.import_module("uwsift")
-    relative_config_dir = os.path.relpath(uwsift_module.BASE_CONFIG_DIR, appdirs.user_config_dir())
+    relative_config_dir = os.path.relpath(uwsift_module.USER_CONFIG_PATHS[0], appdirs.user_config_dir())
 
     # Don't import the `uwsift` module using the current Python Interpreter, because the code
     # in the __init__.py is just executed once. Use a subprocess, such that the code can be
@@ -48,7 +48,7 @@ def test_config_satpy_import_path(tmp_path):
             get_python_path(),
             "-c",
             "import sys, uwsift, satpy, satpy.readers\n"
-            "print({'base_config_dir': uwsift.BASE_CONFIG_DIR, "
+            "print({'base_config_dir': uwsift.USER_CONFIG_PATHS[0], "
             "'overwritten_satpy_import_path': uwsift.config.get('satpy_import_path', None), "
             "'satpy_init_path': satpy.__file__}, file=sys.stderr)",
         ]
@@ -66,7 +66,7 @@ def test_config_satpy_import_path(tmp_path):
     # If the environment variable `XDG_CONFIG_HOME` isn't set, then we search for the config in the user
     # specific config directory. If the file exists, we search for the `satpy_import_path`. Otherwise the
     # `satpy_import_path` must be None, in which case we don't overwrite the default Satpy import path.
-    user_general_settings_path = os.path.join(uwsift_module.BASE_CONFIG_DIR, "general_settings.yml")
+    user_general_settings_path = os.path.join(uwsift_module.USER_CONFIG_PATHS[0], "general_settings.yml")
     if os.path.exists(user_general_settings_path):
         if os.path.isfile(user_general_settings_path):
             with open(user_general_settings_path) as file:
@@ -83,7 +83,7 @@ def test_config_satpy_import_path(tmp_path):
             raise FileNotFoundError(f"general_settings.yml isn't a file: {user_general_settings_path}")
     else:
         user_satpy_import_path = None
-    check_uwsift_paths(None, uwsift_module.BASE_CONFIG_DIR, user_satpy_import_path, satpy_module.__file__)
+    check_uwsift_paths(None, uwsift_module.USER_CONFIG_PATHS[0], user_satpy_import_path, satpy_module.__file__)
 
     # recreate that folder structure inside the temp directory `config`
     tmp_config_dir = os.path.join(tmp_path, "config")
