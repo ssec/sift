@@ -1,14 +1,6 @@
 uwsift.view package
 ===================
 
-Subpackages
------------
-
-.. toctree::
-   :maxdepth: 4
-
-   uwsift.view.timeline
-
 Submodules
 ----------
 
@@ -36,18 +28,18 @@ uwsift.view.colormap module
    :undoc-members:
    :show-inheritance:
 
-uwsift.view.colormap\_dialogs module
-------------------------------------
-
-.. automodule:: uwsift.view.colormap_dialogs
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 uwsift.view.colormap\_editor module
 -----------------------------------
 
 .. automodule:: uwsift.view.colormap_editor
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+uwsift.view.dataset\_statistics\_pane module
+--------------------------------------------
+
+.. automodule:: uwsift.view.dataset_statistics_pane
    :members:
    :undoc-members:
    :show-inheritance:
@@ -80,14 +72,6 @@ uwsift.view.open\_file\_wizard module
 -------------------------------------
 
 .. automodule:: uwsift.view.open_file_wizard
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-uwsift.view.open\_file\_wizard\_2 module
-----------------------------------------
-
-.. automodule:: uwsift.view.open_file_wizard_2
    :members:
    :undoc-members:
    :show-inheritance:
