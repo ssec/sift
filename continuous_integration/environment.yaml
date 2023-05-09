@@ -57,3 +57,6 @@ dependencies:
     - trollimage
     - pyspectral
     - pyorbital
+    - ecmwflibs
+    - eccodes
+    - cfgrib

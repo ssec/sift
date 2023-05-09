@@ -220,6 +220,9 @@ setup(
         "trollsift",
         "vispy>=0.10.0",
         'pygrib;sys_platform=="linux" or sys_platform=="darwin"',
+        "ecmwflibs",
+        "eccodes",
+        "cfgrib"
     ],
     tests_requires=["pytest", "pytest-qt", "pytest-mock"],
     python_requires=">=3.8",

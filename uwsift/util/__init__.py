@@ -27,10 +27,13 @@ def check_imageio_deps():
 
 def check_grib_definition_dir():
     # patch GRIB API C library when frozen
-    var_name = "ECCODES_DEFINITION_PATH"
+    # second variable introduced after following commit raises a warning
+    # https://github.com/ecmwf/ecmwflibs/commit/f97bc933e4f952670d1db60ffbe6fb92b5f93234
+    var_names = ["ECCODES_DEFINITION_PATH", "ECMWFLIBS_ECCODES_DEFINITION_PATH"]
     grib_paths = []
-    if os.getenv(var_name):
-        grib_paths.append(os.getenv(var_name))
+    for var_name in var_names:
+        if os.getenv(var_name):
+            grib_paths.append(os.getenv(var_name))
 
     # Add NCEP specific definition locations
     grib_paths.append(os.path.realpath(os.path.join(get_package_data_dir(), "grib_definitions")))
@@ -44,8 +47,9 @@ def check_grib_definition_dir():
 
     if grib_paths:
         grib_var_value = ":".join(grib_paths)
-        LOG.info("Setting GRIB definition path to %s", grib_var_value)
-        os.environ[var_name] = grib_var_value
+        for var_name in var_names:
+            LOG.info(f"Setting {var_name} definition path to {grib_var_value}")
+            os.environ[var_name] = grib_var_value
 
 
 def get_package_data_dir():
