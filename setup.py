@@ -149,12 +149,12 @@ class BumpCommand(Command):
         add_args = ["git", "add", version_pathname, iss_pathname]
         commit_args = ["git", "commit", "-m", "Bump version from {} to {}".format(version_str, new_version_str)]
         if self.commit:
-            import subprocess
+            import subprocess  # nosec
 
             print("Adding files to git staging area...")
-            subprocess.check_call(add_args)
+            subprocess.check_call(add_args)  # nosec
             print("Committing changes...")
-            subprocess.check_call(commit_args)
+            subprocess.check_call(commit_args)  # nosec
         else:
             commit_args[-1] = '"' + commit_args[-1] + '"'
             print("To appropriate files:")
@@ -165,7 +165,7 @@ class BumpCommand(Command):
         tag_args = ["git", "tag", "-a", new_version_str, "-m", "Version {}".format(new_version_str)]
         if self.tag:
             print("Tagging commit...")
-            subprocess.check_call(tag_args)
+            subprocess.check_call(tag_args)  # nosec
         else:
             tag_args[-1] = '"' + tag_args[-1] + '"'
             print("To tag:")
@@ -222,7 +222,7 @@ setup(
         'pygrib;sys_platform=="linux" or sys_platform=="darwin"',
         "ecmwflibs",
         "eccodes",
-        "cfgrib"
+        "cfgrib",
     ],
     tests_requires=["pytest", "pytest-qt", "pytest-mock"],
     python_requires=">=3.8",
