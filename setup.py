@@ -182,7 +182,7 @@ setup(
     description="Satellite Information Familiarization Tool",
     long_description=readme,
     long_description_content_type="text/markdown",
-    author="R.K.Garcia, University of Wisconsin - Madison Space Science & Engineering Center",
+    author="SIFT Developers",
     author_email="rkgarcia@wisc.edu",
     url="https://github.com/ssec/sift",
     classifiers=[

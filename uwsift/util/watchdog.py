@@ -14,13 +14,10 @@ import appdirs
 from donfig import Config
 from psutil import NoSuchProcess, Process
 
+from uwsift.util.default_paths import APPLICATION_NAME, APPLICATION_AUTHOR
+
 LOG = logging.getLogger(__name__)
 
-# These two constants are used to locate the application specific cache
-# directory and must be kept in sync with the definition in the following
-# file: uwsift/util/default_paths.py
-APPLICATION_DIR = "SIFT"
-APPLICATION_AUTHOR = "CIMSS-SSEC"
 
 # This constant must be kept in sync with the definition in the following
 # file: uwsift/__main__.py
@@ -149,7 +146,7 @@ class Watchdog:
             LOG.log(level, text)
         else:
             machine = shlex.quote(self.hostname)
-            process_name = shlex.quote(f"{APPLICATION_DIR}-watchdog")
+            process_name = shlex.quote(f"{APPLICATION_NAME}-watchdog")
             severity = shlex.quote(logging.getLevelName(level))
             text = shlex.quote(text)
             cmd = [self.notification_cmd, machine, process_name, severity, text]
@@ -322,8 +319,8 @@ class Watchdog:
 
 
 if __name__ == "__main__":
-    user_cache_dir = appdirs.user_cache_dir(APPLICATION_DIR, APPLICATION_AUTHOR)
-    user_config_dir = appdirs.user_config_dir(APPLICATION_DIR, APPLICATION_AUTHOR, roaming=True)
+    user_cache_dir = appdirs.user_cache_dir(APPLICATION_NAME, APPLICATION_AUTHOR)
+    user_config_dir = appdirs.user_config_dir(APPLICATION_NAME, APPLICATION_AUTHOR, roaming=True)
     config_dir = os.path.join(user_config_dir, "settings", "config")
 
     try:
