@@ -1,6 +1,0 @@
-# Activate auto update and set interval (in seconds) in which
-# the search path specified in catalogue settings is queried.
-
-auto_update:
-  active: True
-  interval: 15
