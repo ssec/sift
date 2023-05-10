@@ -18,7 +18,7 @@ from pathlib import Path
 
 import appdirs
 
-APPLICATION_AUTHOR = "SIFT-DEV"
+APPLICATION_AUTHOR = False  # used only in Windows, passing False avoids an unnecessary extra parent folder
 APPLICATION_NAME = "SIFT"
 
 USER_CACHE_DIR = appdirs.user_cache_dir(APPLICATION_NAME, APPLICATION_AUTHOR)
