@@ -643,7 +643,8 @@ class SatpyImporter(aImporter):
         # copy satpy metadata keys to SIFT keys
 
         if self.scn.missing_datasets:
-            self.scn = self.scn.resample(resampler="native")
+            # deactivating reduce_data, see https://github.com/pytroll/satpy/issues/2476
+            self.scn = self.scn.resample(resampler="native", reduce_data=False)
 
         for ds in self.scn:
             self._set_name_metadata(ds.attrs)
@@ -1050,7 +1051,9 @@ class SatpyImporter(aImporter):
             # implementation for NetCDF data: otherwise the original data
             # would be garbage collected too early.
             self.scn_original = self.scn  # noqa - Do not simply remove
-            self.scn = self.scn.resample(resampler="native")
+
+            # deactivating reduce_data, see https://github.com/pytroll/satpy/issues/2476
+            self.scn = self.scn.resample(resampler="native", reduce_data=False)
 
         if self.resampling_info:
             self._preprocess_products_with_resampling()
@@ -1261,11 +1264,16 @@ class SatpyImporter(aImporter):
             # would be garbage collected too early.
             if not self.scn_original:
                 self.scn_original = self.scn  # noqa - Do not simply remove
+
+            # deactivating reduce_data, see https://github.com/pytroll/satpy/issues/2476
+            reduce_data = False if resampler=='native' else True
+
             self.scn = self.scn.resample(
                 target_area_def,
                 resampler=resampler,
                 nprocs=nprocs,
                 radius_of_influence=self.resampling_info["radius_of_influence"],
+                reduce_data=reduce_data
             )
 
     def _get_fci_segment_height(self, segment_number: int, segment_width: int) -> int:
