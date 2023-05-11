@@ -1,0 +1,18 @@
+data_reading:
+  # exclude datasets from dataset list in open file wizard
+  exclude_datasets:
+    calibration:
+      - counts
+    name:
+      - latitude # must not be loaded
+      - longitude # must not be loaded
+
+open_file_wizard:
+  default_reader: fci_l1c_nc
+  # define columns in dataset list window
+  id_components:
+    - name
+    - wavelength
+    - resolution
+    - calibration
+    - level

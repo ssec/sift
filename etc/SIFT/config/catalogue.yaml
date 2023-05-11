@@ -1,4 +1,5 @@
-# The Catalogue configuration defines a list of "queries".
+# The Catalogue configuration defines a list of "queries", used in auto update
+# mode.
 #
 # Two queries are given here:
 # - for MTG FCI FDHSI suitable for auto update

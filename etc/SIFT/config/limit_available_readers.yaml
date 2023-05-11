@@ -1,5 +1,5 @@
 data_reading:
-  merge_with_existing: False
+  # define readers to activate in open file wizard
   readers:
     - abi_l1b
     - fci_l1_cat_lmk_loc
@@ -22,9 +22,5 @@ data_reading:
     - vii_l1b_nc
     - gld360_ualf2
     - modis_l1b
-  exclude_datasets:
-    calibration:
-      - counts
-    name:
-      - latitude # must not be loaded
-      - longitude # must not be loaded
+
+

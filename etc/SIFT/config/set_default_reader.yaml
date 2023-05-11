@@ -1,8 +1,0 @@
-open_file_wizard:
-  default_reader: fci_l1c_nc
-  id_components:
-    - name
-    - wavelength
-    - resolution
-    - calibration
-    - level
