@@ -1,0 +1,8 @@
+data_reading:
+  modis_l2_fire_hdf:
+    group_keys: ['acquisition_time']
+    filter_patterns:
+      - 'M{platform_indicator:1s}D14.A{acquisition_time:%Y%j.%H%M}.{collection:03d}.{production_time:%Y%j%H%M%S}.hdf'
+    kind: 'POINTS'
+    style_attributes:
+      fill: ['FP_power']

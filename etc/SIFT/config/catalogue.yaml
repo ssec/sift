@@ -48,7 +48,7 @@ catalogue:
   # "brightness temperature" for the current and previous hour from the
   # configured search path
 
-  - reader: 'fci_l1c_fdhsi'
+  - reader: 'fci_l1c_nc'
     search_path: '/path/to/fci/data/'
 
     # Constraints items must match replacement fields as defined in readers/fci_l1c_fdhsi.yaml
@@ -56,9 +56,12 @@ catalogue:
       spacecraft_id: 1
       data_source: FCI
       processing_level: 1C
+      subtype: FDHSI
+      coverage: FD
+      purpose: ''
       start_time:
         type: recent_datetime
-        H: [0, -1]
+        M: [0, -1, -2, -3, -4, -5]
 
     products:
       ir_105: [brightness_temperature]

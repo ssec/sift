@@ -2,4 +2,4 @@ data_reading:
   seviri_l2_binary:
     filter_patterns: ['{product:s}_{start_time:%Y%m%d%H%M%S}Z_00_{server:s}_{satellite:s}_{mission:s}_{subsat:s}']
     reader_kwargs:
-       with_area_definition: True  # requires Satpy>=0.35 (note that segmented products can't be loaded at all for previous versions)
+       with_area_definition: True

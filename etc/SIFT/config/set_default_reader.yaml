@@ -1,5 +1,5 @@
 open_file_wizard:
-  default_reader: seviri_l1b_hrit
+  default_reader: fci_l1c_nc
   id_components:
     - name
     - wavelength
