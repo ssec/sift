@@ -164,7 +164,7 @@ def filter_dataset_ids(ids_to_filter: Iterable[DataID]) -> Generator[DataID, Non
     """Generate only non-filtered DataIDs based on EXCLUDE_DATASETS global filters."""
     # skip certain DataIDs
     for ds_id in ids_to_filter:
-        for filter_key, filtered_values in config.get("data_reading.exclude_datasets").items():
+        for filter_key, filtered_values in config.get("open_file_wizard.exclude_datasets").items():
             if filtered_values and get_id_value(ds_id, filter_key) in filtered_values:
                 break
         else:
