@@ -2,6 +2,7 @@ data_reading:
   # define readers to activate in open file wizard
   readers:
     - abi_l1b
+    - abi_l2_nc
     - fci_l1_cat_lmk_loc
     - fci_l1_geoobs_lmk_loc
     - fci_l1_geoobs_lmk_nav_err
@@ -14,7 +15,6 @@ data_reading:
     - li_l2_a_nc_sift
     - seviri_l1b_hrit
     - seviri_l1b_native
-    - seviri_l1b_nc
     - seviri_l2_binary
     - seviri_l2_bufr
     - seviri_l2_grib
@@ -22,5 +22,6 @@ data_reading:
     - vii_l1b_nc
     - gld360_ualf2
     - modis_l1b
-
-
+    - modis_l2
+    - viirs_l1b
+    - viirs_l2
