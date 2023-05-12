@@ -1,8 +1,0 @@
-open_file_wizard:
-  default_reader: seviri_l1b_hrit
-  id_components:
-    - name
-    - wavelength
-    - resolution
-    - calibration
-    - level

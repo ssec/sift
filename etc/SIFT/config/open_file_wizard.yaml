@@ -1,0 +1,15 @@
+open_file_wizard:
+  # exclude datasets from dataset list in open file wizard
+  exclude_datasets:
+    calibration:
+      - counts
+    name:
+      - latitude # must not be loaded
+      - longitude # must not be loaded
+  # define columns in dataset list window
+  id_components:
+    - name
+    - wavelength
+    - resolution
+    - calibration
+    - level

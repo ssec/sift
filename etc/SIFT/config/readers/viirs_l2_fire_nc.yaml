@@ -1,0 +1,8 @@
+data_reading:
+  viirs_l2_fire_nc:
+    group_keys: ['start_time']
+    filter_patterns:
+      - 'V{platform_shortname:2s}14IMG.A{start_time:%Y%j.%H%M}.{collection_number:3d}.{creation_time:%Y%j%H%M%S}{creator}.nc'
+    kind: 'POINTS'
+    style_attributes:
+      fill: ['FP_power']

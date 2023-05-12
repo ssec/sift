@@ -16,10 +16,13 @@ display:
   #  to be interpreted analogously to the pixel_width/pixel_height parameters
   #  of and AreaDefinition, i.e. it is usually only valid for the sub-satellite
   #  point
-  grid_cell_width: 24000
-  grid_cell_height: 24000
+  grid_cell_width: 12000
+  grid_cell_height: 12000
 
   # Settings relevant only for mode 'tiled_geolocated'
 
   # tess_level: 20        # not yet configurable
   # image_mesh_size: 100  # not yet configurable
+
+latlon_grid:
+  resolution: 5.0

@@ -1,0 +1,3 @@
+data_reading:
+  modis_l1b:
+    geometry_definition: SwathDefinition

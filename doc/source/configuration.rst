@@ -32,7 +32,7 @@ tree::
 
 where USER_SIFT_CONFIG_DIR is the the standard operation system configuration
 path for the application SIFT
-(Windows: ``C:\Users\<user>\AppData\Roaming\CIMSS-SSEC\SIFT\``,
+(Windows: ``C:\Users\<user>\AppData\Roaming\SIFT\``,
 Linux: ``~/.config/SIFT/``).
 
 The *user* configuration can be empty or only be partial: it is merged with the

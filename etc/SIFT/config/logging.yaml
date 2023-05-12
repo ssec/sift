@@ -12,7 +12,7 @@ logging:
   # for all loggers.
   loggers:
     all:
-      level: INFO
+      level: DEBUG
     vispy:
       level: INFO
     sqlalchemy:
