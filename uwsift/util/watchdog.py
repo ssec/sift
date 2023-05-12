@@ -4,7 +4,7 @@ import logging
 import os
 import shlex
 import signal
-import subprocess
+import subprocess  # nosec: B404
 from datetime import datetime, timedelta, timezone
 from socket import gethostname
 from time import sleep
@@ -14,7 +14,7 @@ import appdirs
 from donfig import Config
 from psutil import NoSuchProcess, Process
 
-from uwsift.util.default_paths import APPLICATION_NAME, APPLICATION_AUTHOR
+from uwsift.util.default_paths import APPLICATION_AUTHOR, APPLICATION_NAME
 
 LOG = logging.getLogger(__name__)
 
@@ -152,7 +152,7 @@ class Watchdog:
             cmd = [self.notification_cmd, machine, process_name, severity, text]
 
             try:
-                subprocess.run(cmd, shell=True, check=True)
+                subprocess.run(cmd, shell=True, check=True)  # nosec: B602
             except subprocess.CalledProcessError as err:
                 LOG.error(f"Can't run the notification command: {err}")
                 LOG.log(level, text)
