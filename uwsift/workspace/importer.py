@@ -1266,14 +1266,14 @@ class SatpyImporter(aImporter):
                 self.scn_original = self.scn  # noqa - Do not simply remove
 
             # deactivating reduce_data, see https://github.com/pytroll/satpy/issues/2476
-            reduce_data = False if resampler=='native' else True
+            reduce_data = False if resampler == "native" else True
 
             self.scn = self.scn.resample(
                 target_area_def,
                 resampler=resampler,
                 nprocs=nprocs,
                 radius_of_influence=self.resampling_info["radius_of_influence"],
-                reduce_data=reduce_data
+                reduce_data=reduce_data,
             )
 
     def _get_fci_segment_height(self, segment_number: int, segment_width: int) -> int:
