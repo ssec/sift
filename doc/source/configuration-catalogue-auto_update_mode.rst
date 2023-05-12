@@ -1,10 +1,10 @@
 Configuring Catalogue and Auto Update Mode
-------------------------------------------
+==========================================
 
 .. _auto_update_catalogue_config:
 
 Catalogue Query Configuration
-=============================
+-----------------------------
 
 The Catalogue configuration defines a list of "queries".
 
@@ -124,7 +124,7 @@ PRO files have this at the *channel* part of their filenames.
 .. _auto_update_mode_activation:
 
 Activation of Auto Update Mode
-==============================
+------------------------------
 
 To activate the auto update mode the following entry must be available in the
 configuration settings::

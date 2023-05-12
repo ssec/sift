@@ -133,7 +133,7 @@ def fill_dir_periodically_fci(data_dir: str, tmp_dir: str, sleep_time: float) ->
             files_and_start_ts.append((file_name, start_t))
         except Exception:
             # FIXME(mk): filter pattern does not work for TRAILER file...
-            warnings.warn("FCI TRAIL files not yet supported by parser, skipping...")
+            warnings.warn("FCI TRAIL files not yet supported by parser, skipping...", UserWarning, stacklevel=2)
             pass
 
     files_and_start_ts = sorted(files_and_start_ts, key=lambda tup: tup[1])

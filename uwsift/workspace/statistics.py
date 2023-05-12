@@ -81,15 +81,15 @@ class ContinuousBasicStats:
     def get_stats(self):
         """Send the statistical data to a statistics dictionary.
 
-        The output dictionary shall have the following format:
+        The output dictionary shall have the following format::
 
-        stats_dict = {
-            stats: {
-                'statistical_metric_i': [statistical_value_i],
-                'statistical_metric_j': [statistical_value_j],
-                'statistical_metric_k': [statistical_value_k],
+            stats_dict = {
+                stats: {
+                    'statistical_metric_i': [statistical_value_i],
+                    'statistical_metric_j': [statistical_value_j],
+                    'statistical_metric_k': [statistical_value_k],
+                }
             }
-        }
 
         where i, j, k represents the different statistical metrics.
         """
@@ -136,16 +136,16 @@ class CategoricalBasicStats:
     def get_stats(self):
         """Put the statistical data in a list of lists and send together with header to a statistics dictionary.
 
-        The output dictionary shall have the following format:
+        The output dictionary shall have the following format::
 
-        stats_dict = {
-            header: ['value', 'meaning', 'count / -', 'fraction / %']
-            stats: [
-                [value_i, meaning_i, count_i, fraction_i],
-                [value_j, meaning_j, count_j, fraction_j],
-                [value_k, meaning_k, count_k, fraction_k],
-            ]
-        }
+            stats_dict = {
+                header: ['value', 'meaning', 'count / -', 'fraction / %']
+                stats: [
+                    [value_i, meaning_i, count_i, fraction_i],
+                    [value_j, meaning_j, count_j, fraction_j],
+                    [value_k, meaning_k, count_k, fraction_k],
+                ]
+            }
 
         where i, j, k represents the values representing the different categories.
         """

@@ -28,14 +28,6 @@ uwsift.workspace.collector module
    :undoc-members:
    :show-inheritance:
 
-uwsift.workspace.goesr\_pug module
-----------------------------------
-
-.. automodule:: uwsift.workspace.goesr_pug
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 uwsift.workspace.guidebook module
 ---------------------------------
 
@@ -52,14 +44,6 @@ uwsift.workspace.importer module
    :undoc-members:
    :show-inheritance:
 
-uwsift.workspace.matrix module
-------------------------------
-
-.. automodule:: uwsift.workspace.matrix
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 uwsift.workspace.metadatabase module
 ------------------------------------
 
@@ -72,6 +56,14 @@ uwsift.workspace.simple\_workspace module
 -----------------------------------------
 
 .. automodule:: uwsift.workspace.simple_workspace
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+uwsift.workspace.statistics module
+----------------------------------
+
+.. automodule:: uwsift.workspace.statistics
    :members:
    :undoc-members:
    :show-inheritance:

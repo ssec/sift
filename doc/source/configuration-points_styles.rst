@@ -49,7 +49,7 @@ The following would be an explicit definition of the default marker style::
         stroke-width: 1px
 
 Configuring Point Styles Based on the Dataset Standard Name
----------------------------------------------------------
+-----------------------------------------------------------
 
 Analogous to the default colormap configuration the style of the markers used to
 render a dataset can (and - since there are no default definitions in the

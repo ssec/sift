@@ -1,5 +1,5 @@
 Configuring a Colormap and its Colorlimits Based on the Dataset Standard Name
--------------------------------------------------------
+-----------------------------------------------------------------------------
 
 SIFT automatically associates a colormap and a value range to a newly
 loaded dataset based on the standard name of each dataset via its internal

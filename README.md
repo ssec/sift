@@ -5,6 +5,7 @@
 ![CI](https://github.com/ssec/sift/actions/workflows/ci.yaml/badge.svg)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.2587907.svg)](https://doi.org/10.5281/zenodo.2587907)
 [![Gitter chat](https://badges.gitter.im/gitterHQ/gitter.png)](https://gitter.im/gitterHQ/gitter)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/ssec/sift/master.svg)](https://results.pre-commit.ci/latest/github/ssec/sift/master)
 
 
 Satellite Information Familiarization Tool (SIFT) was designed by the Space

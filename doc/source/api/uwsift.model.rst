@@ -36,14 +36,6 @@ uwsift.model.document module
    :undoc-members:
    :show-inheritance:
 
-uwsift.model.layer module
--------------------------
-
-.. automodule:: uwsift.model.layer
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 uwsift.model.layer\_item module
 -------------------------------
 
