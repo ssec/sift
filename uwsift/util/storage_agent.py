@@ -4,7 +4,7 @@ import os
 import random
 import shlex
 import string
-import subprocess
+import subprocess  # nosec: B404
 import time
 from datetime import datetime, timedelta
 from itertools import chain
@@ -14,7 +14,7 @@ from typing import Dict, List, Optional, Set
 import appdirs
 from donfig import Config
 
-from uwsift.util.default_paths import APPLICATION_NAME, APPLICATION_AUTHOR
+from uwsift.util.default_paths import APPLICATION_AUTHOR, APPLICATION_NAME
 
 LOG = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ class StorageAgent:
             cmd = f"{self.notification_cmd}" f" {machine} {process_name} {severity} {text}"
 
             try:
-                subprocess.run(cmd, shell=True, check=True)
+                subprocess.run(cmd, shell=True, check=True)  # nosec: 602
             except subprocess.CalledProcessError as err:
                 LOG.error(f"Can't run the notification command: {err}")
                 LOG.log(level, text)
@@ -105,7 +105,7 @@ class StorageAgent:
         for _ in range(attempts):
             # don't use upper and lower case because NTFS/Windows is case insensitive
             char_set = string.ascii_lowercase + string.digits
-            random_name = "".join(random.choices(char_set, k=25))
+            random_name = "".join(random.choices(char_set, k=25))  # nosec: B311
             path = os.path.join(dir_path, random_name)
 
             try:
