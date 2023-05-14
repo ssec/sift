@@ -82,7 +82,6 @@ class AreaDefinitionsManager:
         for area_def in cls._available_area_defs_by_id.values():
             proj: str = area_def.proj_dict["proj"]
             if proj in ("latlon", "latlong", "lonlat", "longlat"):
-                print(f"FOUND {proj}")
                 return
 
         # Add default area definition(s)?

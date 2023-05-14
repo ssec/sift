@@ -782,7 +782,6 @@ class SceneGraphManager(QObject):
 
         for pixel in pixels:
             data[pixel["y"], pixel["x"]] = pixel["color"].value
-            print(f'{pixel["desc"]} ({pixel["color"].name}) -> x: {pixel["x"]} y: {pixel["y"]}')
 
         return data
 
