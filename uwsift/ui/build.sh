@@ -1,5 +1,9 @@
 #!/bin/bash
 set -ex
-for fn in *.ui; do 
-  pyuic4 ${fn} >${fn//.ui}_ui.py
+
+ui_files=${@:-*.ui}
+
+for fn in ${ui_files[@]}; do
+  fn="${fn%.ui}.ui"  # enforce file extension '.ui'
+  pyuic5 "${fn}" >"${fn%.ui}_ui.py"
 done

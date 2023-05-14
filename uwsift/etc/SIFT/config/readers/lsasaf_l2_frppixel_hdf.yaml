@@ -1,0 +1,8 @@
+data_reading:
+  lsasaf_l2_frppixel_hdf:
+    group_keys: ['start_time']
+    filter_patterns:
+      - 'HDF5_LSASAF_MSG_FRP-PIXEL-ListProduct_MSG-Disk_{start_time:%Y%m%d%H%M}'
+    kind: 'POINTS'
+    style_attributes:
+      fill: ['FRP']

@@ -1,11 +1,17 @@
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QComboBox, QSlider, QDoubleSpinBox, QWizardPage, QTableWidget, QListWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWidgets import (
+    QComboBox,
+    QDoubleSpinBox,
+    QListWidget,
+    QSlider,
+    QTableWidget,
+    QWizardPage,
+)
 
 
 class QNoScrollComboBox(QComboBox):
-    """Special subclass of QComboBox to stop it from taking focus on scroll over
-    """
+    """Special subclass of QComboBox to stop it from taking focus on scroll over"""
 
     def __init__(self, *args, **kwargs):
         super(QNoScrollComboBox, self).__init__(*args, **kwargs)
@@ -15,10 +21,6 @@ class QNoScrollComboBox(QComboBox):
         # If we want it to scroll when it has focus then uncomment
         # Currently not desired for Projection combo box, but may
         # be desired for RGB layer selector
-        # if not self.hasFocus():
-        #    ev.ignore()
-        # else:
-        #    super(QNoScrollComboBox, self).wheelEvent(ev)
         ev.ignore()
 
 
@@ -94,6 +96,21 @@ class AnyWizardPage(QWizardPage):
             else:
                 return False
         return True
+
+    def completeChangedSlot(self, *args, **kwargs):
+        self.completeChanged.emit()
+
+
+class InitiallyIncompleteWizardPage(QWizardPage):
+    """QWizardPage that is only complete once 'page_complete' is set to True"""
+
+    def __init__(self, *args, **kwargs):
+        self.page_complete = False
+        super(InitiallyIncompleteWizardPage, self).__init__(*args, **kwargs)
+
+    # override default behaviour by allowing the code to disable 'Next'/'Finish' buttons
+    def isComplete(self):
+        return self.page_complete
 
     def completeChangedSlot(self, *args, **kwargs):
         self.completeChanged.emit()

@@ -12,7 +12,7 @@ SETLOCAL
 REM ** CUSTOMIZE ** Specify where to find rsync and related files (C:\CWRSYNC)
 SET CWRSYNCHOME=C:\cwrsync
 
-REM Set HOME variable to your windows home directory. That makes sure 
+REM Set HOME variable to your windows home directory. That makes sure
 REM that ssh command creates known_hosts in a directory you have access.
 SET HOME=%HOMEDRIVE%%HOMEPATH%
 

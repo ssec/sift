@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>599</width>
-    <height>461</height>
+    <width>1100</width>
+    <height>800</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -31,20 +31,54 @@
   <property name="subTitleFormat">
    <enum>Qt::AutoText</enum>
   </property>
-  <widget class="AnyWizardPage" name="fileSelectionPage">
+  <widget class="InitiallyIncompleteWizardPage" name="fileSelectionPage">
    <property name="layoutDirection">
     <enum>Qt::LeftToRight</enum>
    </property>
    <property name="title">
-    <string>Select Files</string>
+    <string>Select Files to Open</string>
    </property>
    <property name="subTitle">
-    <string>Add data files to be opened</string>
+    <string>Select reader &amp; folder. Click column headers to sort files. Click'n'drag with mouse for easier row selection. Hold control key to extend selection. Use filter combo-box to choose from predefined patterns or write your own.</string>
    </property>
-   <layout class="QVBoxLayout" name="verticalLayout_3">
+   <layout class="QVBoxLayout" name="verticalLayout_2">
     <item>
-     <layout class="QHBoxLayout" name="horizontalLayout_3">
-      <item>
+     <layout class="QGridLayout" name="gridLayout">
+      <item row="1" column="0">
+       <widget class="QLabel" name="filterPatternLabel">
+        <property name="text">
+         <string>Filter:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="folderLabel">
+        <property name="text">
+         <string>Folder:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QLineEdit" name="folderTextBox">
+        <property name="text">
+         <string/>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1" colspan="2">
+       <widget class="QComboBox" name="filterPatternComboBox">
+        <property name="editable">
+         <bool>true</bool>
+        </property>
+        <property name="sizeAdjustPolicy">
+         <enum>QComboBox::AdjustToMinimumContentsLength</enum>
+        </property>
+        <property name="minimumContentsLength">
+         <number>150</number>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="0">
        <widget class="QLabel" name="readerLabel">
         <property name="maximumSize">
          <size>
@@ -57,126 +91,57 @@
         </property>
        </widget>
       </item>
-      <item>
+      <item row="0" column="1" colspan="2">
        <widget class="QComboBox" name="readerComboBox"/>
       </item>
-     </layout>
-    </item>
-    <item>
-     <widget class="QLabel" name="inputFilesLabel">
-      <property name="font">
-       <font>
-        <underline>true</underline>
-       </font>
-      </property>
-      <property name="text">
-       <string>Input Files</string>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QListWidget" name="fileList">
-      <property name="selectionMode">
-       <enum>QAbstractItemView::ExtendedSelection</enum>
-      </property>
-      <property name="sortingEnabled">
-       <bool>true</bool>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <layout class="QHBoxLayout" name="horizontalLayout">
-      <item>
-       <widget class="QPushButton" name="addButton">
+      <item row="2" column="2">
+       <widget class="QPushButton" name="selectFolderButton">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
           <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
         </property>
-        <property name="minimumSize">
-         <size>
-          <width>25</width>
-          <height>25</height>
-         </size>
-        </property>
-        <property name="maximumSize">
-         <size>
-          <width>25</width>
-          <height>25</height>
-         </size>
-        </property>
         <property name="toolTip">
          <string>Add files/dirs to list</string>
         </property>
         <property name="text">
-         <string>+</string>
+         <string>...</string>
         </property>
         <property name="checkable">
          <bool>false</bool>
         </property>
        </widget>
       </item>
-      <item>
-       <spacer name="horizontalSpacer_2">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeType">
-         <enum>QSizePolicy::Maximum</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>5</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item>
-       <widget class="QPushButton" name="removeButton">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="minimumSize">
-         <size>
-          <width>25</width>
-          <height>25</height>
-         </size>
-        </property>
-        <property name="maximumSize">
-         <size>
-          <width>25</width>
-          <height>25</height>
-         </size>
-        </property>
-        <property name="toolTip">
-         <string>Remove file from list</string>
-        </property>
-        <property name="text">
-         <string>-</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <spacer name="horizontalSpacer">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeType">
-         <enum>QSizePolicy::Maximum</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>10</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QTableWidget" name="fileTable">
+      <property name="sizeAdjustPolicy">
+       <enum>QAbstractScrollArea::AdjustToContents</enum>
+      </property>
+      <property name="editTriggers">
+       <set>QAbstractItemView::NoEditTriggers</set>
+      </property>
+      <property name="selectionBehavior">
+       <enum>QAbstractItemView::SelectRows</enum>
+      </property>
+      <property name="sortingEnabled">
+       <bool>true</bool>
+      </property>
+      <attribute name="horizontalHeaderMinimumSectionSize">
+       <number>20</number>
+      </attribute>
+      <attribute name="verticalHeaderMinimumSectionSize">
+       <number>14</number>
+      </attribute>
+      <attribute name="verticalHeaderDefaultSectionSize">
+       <number>14</number>
+      </attribute>
+     </widget>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayout">
       <item>
        <widget class="QLabel" name="statusMessage">
         <property name="minimumSize">
@@ -186,7 +151,7 @@
          </size>
         </property>
         <property name="text">
-         <string>Reading Status</string>
+         <string/>
         </property>
        </widget>
       </item>
@@ -203,11 +168,43 @@
         </property>
        </spacer>
       </item>
+      <item>
+       <widget class="QLabel" name="groupingModeLabel">
+        <property name="text">
+         <string>Grouping:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="groupingModeComboBox">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <item>
+         <property name="text">
+          <string>By Group Keys</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Keep Separate</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Merge All</string>
+         </property>
+        </item>
+       </widget>
+      </item>
      </layout>
     </item>
    </layout>
   </widget>
-  <widget class="AnyWizardPage" name="productSelectionPage">
+  <widget class="InitiallyIncompleteWizardPage" name="productSelectionPage">
    <property name="title">
     <string>Select Products</string>
    </property>
@@ -231,25 +228,142 @@
         </property>
         <property name="sizeHint" stdset="0">
          <size>
-          <width>40</width>
+          <width>5</width>
           <height>20</height>
          </size>
         </property>
        </spacer>
       </item>
+      <item>
+       <widget class="QLabel" name="resamplingMethodLabel">
+        <property name="text">
+         <string>Resampling Method:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="resamplingMethodComboBox">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+          <horstretch>1</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="sizeIncrement">
+         <size>
+          <width>1</width>
+          <height>0</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="radiusOfInfluenceLabel">
+        <property name="text">
+         <string>Radius of Influence:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QSpinBox" name="radiusOfInfluenceSpinBox">
+        <property name="suffix">
+         <string> m</string>
+        </property>
+        <property name="minimum">
+         <number>100</number>
+        </property>
+        <property name="maximum">
+         <number>10000000</number>
+        </property>
+        <property name="singleStep">
+         <number>100</number>
+        </property>
+        <property name="value">
+         <number>5000</number>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="projectionLabel">
+        <property name="text">
+         <string>Projection:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="projectionComboBox">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+          <horstretch>1</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="sizeIncrement">
+         <size>
+          <width>1</width>
+          <height>0</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="resamplingShapeLabel">
+        <property name="text">
+         <string>Shape:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QSpinBox" name="resamplingShapeRowSpinBox">
+        <property name="minimum">
+         <number>1</number>
+        </property>
+        <property name="maximum">
+         <number>100000</number>
+        </property>
+        <property name="value">
+         <number>1000</number>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QSpinBox" name="resamplingShapeColumnSpinBox">
+        <property name="minimum">
+         <number>1</number>
+        </property>
+        <property name="maximum">
+         <number>100000</number>
+        </property>
+        <property name="value">
+         <number>1000</number>
+        </property>
+       </widget>
+      </item>
      </layout>
     </item>
     <item>
      <widget class="QTableWidget" name="selectIDTable">
-      <property name="dragEnabled">
-       <bool>false</bool>
+      <property name="sizeAdjustPolicy">
+       <enum>QAbstractScrollArea::AdjustToContents</enum>
+      </property>
+      <property name="editTriggers">
+       <set>QAbstractItemView::NoEditTriggers</set>
       </property>
       <property name="selectionBehavior">
        <enum>QAbstractItemView::SelectRows</enum>
       </property>
       <property name="sortingEnabled">
-       <bool>false</bool>
+       <bool>true</bool>
       </property>
+      <attribute name="horizontalHeaderMinimumSectionSize">
+       <number>20</number>
+      </attribute>
+      <attribute name="verticalHeaderMinimumSectionSize">
+       <number>14</number>
+      </attribute>
+      <attribute name="verticalHeaderDefaultSectionSize">
+       <number>14</number>
+      </attribute>
      </widget>
     </item>
    </layout>
@@ -257,12 +371,21 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>AnyWizardPage</class>
+   <class>InitiallyIncompleteWizardPage</class>
    <extends>QWizardPage</extends>
    <header>uwsift/ui/custom_widgets.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>
+ <tabstops>
+  <tabstop>readerComboBox</tabstop>
+  <tabstop>filterPatternComboBox</tabstop>
+  <tabstop>folderTextBox</tabstop>
+  <tabstop>selectFolderButton</tabstop>
+  <tabstop>fileTable</tabstop>
+  <tabstop>selectAllButton</tabstop>
+  <tabstop>selectIDTable</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

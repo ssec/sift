@@ -1,0 +1,24 @@
+# copy this file to ~/.local/share/systemd/user/uwsift.service
+# then activate auto-start: systemctl --user enable uwsift.service
+
+[Unit]
+Description=SIFT in monitoring mode
+After=graphical-session.target
+
+[Service]
+Type=exec
+# `User` and `Group` can't be used in a --user service
+Environment="DISPLAY=:1"
+WorkingDirectory=/home/username/documents/eumSIFT
+ExecStart=/var/local/miniconda3/envs/devel-default/bin/python -m uwsift
+Restart=always
+
+OOMPolicy=kill
+OOMScoreAdjust=100
+
+# soft and hard memory limits, no restart request
+MemoryHigh=5G
+MemoryMax=6G
+
+[Install]
+WantedBy=default.target

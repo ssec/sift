@@ -18,44 +18,20 @@ numba
 :copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
+import logging
+from dataclasses import dataclass
 from enum import Enum
-from typing import MutableSequence, Tuple, Optional, Iterable, Any, NamedTuple
+from typing import List, NamedTuple, Optional, Union
 from uuid import UUID
 
-import os
-import sys
-from datetime import datetime, timedelta
-import logging
 from pyproj import Proj
 
 LOG = logging.getLogger(__name__)
 
 # separator for family::category::serial representation of product identity
-FCS_SEP = '::'
+FCS_SEP = "::"
 # standard N/A string used in FCS
-NOT_AVAILABLE = FCS_NA = 'N/A'
-
-
-def get_font_size(pref_size):
-    """Get a font size that looks good on this platform.
-
-    This is a HACK and can be replaced by PyQt5 font handling after migration.
-
-    """
-    # win = 7
-    # osx = 12
-    env_factor = os.getenv("SIFT_FONT_FACTOR", None)
-    if env_factor is not None:
-        factor = float(env_factor)
-    elif sys.platform.startswith('win'):
-        factor = 1.
-    elif 'darwin' in sys.platform:
-        factor = 1.714
-    else:
-        factor = 1.3
-
-    return pref_size * factor
-
+NOT_AVAILABLE = FCS_NA = "N/A"
 
 PREFERRED_SCREEN_TO_TEXTURE_RATIO = 1.0  # screenpx:texturepx that we want to keep, ideally, by striding
 
@@ -65,7 +41,7 @@ DEFAULT_TILE_HEIGHT = 512
 DEFAULT_TILE_WIDTH = 512
 DEFAULT_TEXTURE_HEIGHT = 2
 DEFAULT_TEXTURE_WIDTH = 16
-DEFAULT_ANIMATION_DELAY = 100.0  # milliseconds
+DEFAULT_ANIMATION_DELAY = 500.0  # milliseconds
 # The values below are taken from the test geotiffs that are projected to the `DEFAULT_PROJECTION` below.
 # These units are in meters in mercator projection space
 DEFAULT_X_PIXEL_SIZE = 4891.969810251281160
@@ -80,12 +56,18 @@ C_POL = p(0, 89.9)[1] - p(0, -89.9)[1]
 MAX_EXCURSION_Y = C_POL / 2.0
 MAX_EXCURSION_X = C_EQ / 2.0
 # how many 'tessellation' tiles in one texture tile? 2 = 2 rows x 2 cols
-TESS_LEVEL = 20
-IMAGE_MESH_SIZE = 10
+TESS_LEVEL = 200
+IMAGE_MESH_SIZE = 100
 # smallest difference between two image extents (in canvas units)
 # before the image is considered "out of view"
 CANVAS_EXTENTS_EPSILON = 1e-4
 
+# For simple geolocated image
+# Size of a image quad subdivision grid cell in meters
+DEFAULT_GRID_CELL_WIDTH = 96000
+DEFAULT_GRID_CELL_HEIGHT = 96000
+
+DEFAULT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 # R_EQ = 6378.1370  # km
 # R_POL = 6356.7523142  # km
@@ -94,6 +76,50 @@ CANVAS_EXTENTS_EPSILON = 1e-4
 
 # MAX_EXCURSION_Y = C_POL/4.0
 # MAX_EXCURSION_X = C_EQ/2.0
+
+N_A = "n/a"
+NAN = str(float("nan"))
+
+# LayerModel column display names
+VISIBILITY = ""
+SOURCE = "Satellite & Instrument"
+NAME = "Name"
+WAVELENGTH = "λ"
+PROBE_VALUE = "Probe"
+PROBE_UNIT = "Unit"
+
+LAYER_TREE_VIEW_HEADER = [VISIBILITY, SOURCE, NAME, WAVELENGTH, PROBE_VALUE, PROBE_UNIT]
+
+INVALID_COLOR_LIMITS = (float("inf"), float("-inf"))  # Yes, (+inf, -inf), this is the smallest imaginable range
+FALLBACK_RANGE = (0.0, 255.0)
+
+
+class ImageDisplayMode(str, Enum):
+    SIMPLE_GEOLOCATED = "simple_geolocated"
+    TILED_GEOLOCATED = "tiled_geolocated"
+    PIXEL_MATRIX = "pixel_matrix"
+
+
+# Calculate and provide LayerModel column indices from LAYER_TREE_VIEW_HEADER
+class LayerModelColumns:
+    VISIBILITY = LAYER_TREE_VIEW_HEADER.index(VISIBILITY)  # noqa
+    SOURCE = LAYER_TREE_VIEW_HEADER.index(SOURCE)  # noqa
+    NAME = LAYER_TREE_VIEW_HEADER.index(NAME)  # noqa
+    WAVELENGTH = LAYER_TREE_VIEW_HEADER.index(WAVELENGTH)  # noqa
+    PROBE_VALUE = LAYER_TREE_VIEW_HEADER.index(PROBE_VALUE)  # noqa
+    PROBE_UNIT = LAYER_TREE_VIEW_HEADER.index(PROBE_UNIT)  # noqa
+
+
+LATLON_GRID_DATASET_NAME = "Geo-Grid"  # noqa
+BORDERS_DATASET_NAME = "Borders"
+DEFAULT_GAMMA_VALUE = 1.0
+
+
+class LayerVisibility(NamedTuple):
+    """Combine the two parameters controlling the visibility of layers."""
+
+    visible: bool
+    opacity: float
 
 
 class Box(NamedTuple):
@@ -105,6 +131,7 @@ class Box(NamedTuple):
 
 class Resolution(NamedTuple):
     """Pixel resolution (km per pixel)."""
+
     dy: float
     dx: float
 
@@ -114,13 +141,9 @@ class Point(NamedTuple):
     x: float
 
 
-class Coordinate(NamedTuple):
-    deg_north: float
-    deg_east: float
-
-
 class ViewBox(NamedTuple):
     """Combination of Box + Resolution."""
+
     bottom: float
     left: float
     top: float
@@ -129,31 +152,15 @@ class ViewBox(NamedTuple):
     dx: float
 
 
-class Span(NamedTuple):
-    s: datetime  # start
-    d: timedelta  # duration
-
-    @property
-    def e(self):
-        return self.s + self.d
-
-    @staticmethod
-    def from_s_e(s: datetime, e: datetime):
-        return Span(s, e - s) if (s is not None) and (e is not None) else None
-
-    @property
-    def is_instantaneous(self):
-        return timedelta(seconds=0) == self.d
-
-
 class Flags(set):
-    """A set of enumerated Flags which may ultimately be represented as a bitfield, but observing set interface
-    """
+    """A set of enumerated Flags which may ultimately be represented as a bitfield, but observing set interface"""
+
     pass
 
 
 class State(Enum):
     """State for products in document."""
+
     UNKNOWN = 0
     POTENTIAL = 1  # product is available as a resource and could be imported or calculated
     ARRIVING = 2  # import or calculation in progress
@@ -166,6 +173,7 @@ class State(Enum):
 
 class Tool(Enum):
     """Names for cursor tools."""
+
     PAN_ZOOM = "pan_zoom"
     POINT_PROBE = "point_probe"
     REGION_PROBE = "region_probe"
@@ -173,59 +181,71 @@ class Tool(Enum):
 
 class Kind(Enum):
     """Kind of entities we're working with."""
+
     UNKNOWN = 0
     IMAGE = 1
     OUTLINE = 2
     SHAPE = 3
     RGB = 4
     COMPOSITE = 1  # deprecated: use Kind.IMAGE instead
-    CONTOUR = 6
-
-
-class CompositeType(Enum):
-    """Type of non-luminance image layers."""
-    RGB = 1
-    ARITHMETIC = 2
+    LINES = 7
+    VECTORS = 8
+    POINTS = 9
+    MC_IMAGE = 10
 
 
 class Instrument(Enum):
-    UNKNOWN = '???'
-    AHI = 'AHI'
-    ABI = 'ABI'
-    AMI = 'AMI'
-    GFS = 'GFS'
-    NAM = 'NAM'
-    SEVIRI = 'SEVIRI'
-    LI = 'LI'
-    GLM = 'GLM'
+    UNKNOWN = "???"
+    GENERATED = "Generated"  # for auxiliary data loaded/generated by SIFT
+    MIXED = "Mixed"  # for data computed from data from different instruments
+    AHI = "AHI"
+    ABI = "ABI"
+    AMI = "AMI"
+    GFS = "GFS"
+    NAM = "NAM"
+    SEVIRI = "SEVIRI"
+    LI = "LI"
+    GLM = "GLM"
+    FCI = "FCI"
+    AVHRR3 = "AVHRR-3"
 
 
-INSTRUMENT_MAP = {v.value.lower().replace('-', ''): v for v in Instrument}
+INSTRUMENT_MAP = {v.value.lower().replace("-", ""): v for v in Instrument}
 
 
 class Platform(Enum):
-    UNKNOWN = '???'
-    HIMAWARI_8 = 'Himawari-8'
-    HIMAWARI_9 = 'Himawari-9'
-    GOES_16 = 'G16'
-    GOES_17 = 'G17'
-    GOES_18 = 'G18'
-    GOES_19 = 'G19'
-    NWP = 'NWP'
-    MSG8 = 'Meteosat-8'
-    MSG9 = 'Meteosat-9'
-    MSG10 = 'Meteosat-10'
-    MSG11 = 'Meteosat-11'
+    UNKNOWN = "???"
+    SYSTEM = "System"  # for auxiliary data loaded/generated by SIFT
+    MIXED = "Mixed"  # for data computed from data from different platforms
+    HIMAWARI_8 = "Himawari-8"
+    HIMAWARI_9 = "Himawari-9"
+    GOES_16 = "G16"
+    GOES_17 = "G17"
+    GOES_18 = "G18"
+    GOES_19 = "G19"
+    NWP = "NWP"
+    MSG1 = "Meteosat-8"
+    MSG2 = "Meteosat-9"
+    MSG3 = "Meteosat-10"
+    MSG4 = "Meteosat-11"
     GK2A = "GEO-KOMPSAT-2A"
+    MTGI1 = "MTG-I1"
+    M01 = "Metop-B"
+    M02 = "Metop-A"
+    M03 = "Metop-C"
 
 
-PLATFORM_MAP = {v.value.lower().replace('-', ''): v for v in Platform}
-PLATFORM_MAP['h8'] = Platform.HIMAWARI_8
-PLATFORM_MAP['h9'] = Platform.HIMAWARI_9
-PLATFORM_MAP['goes16'] = Platform.GOES_16
-PLATFORM_MAP['goes17'] = Platform.GOES_17
-PLATFORM_MAP['goes18'] = Platform.GOES_18
-PLATFORM_MAP['goes19'] = Platform.GOES_19
+PLATFORM_MAP = {v.value.lower().replace("-", ""): v for v in Platform}
+PLATFORM_MAP["h8"] = Platform.HIMAWARI_8
+PLATFORM_MAP["h9"] = Platform.HIMAWARI_9
+PLATFORM_MAP["goes16"] = Platform.GOES_16
+PLATFORM_MAP["goes17"] = Platform.GOES_17
+PLATFORM_MAP["goes18"] = Platform.GOES_18
+PLATFORM_MAP["goes19"] = Platform.GOES_19
+PLATFORM_MAP["met8"] = Platform.MSG1
+PLATFORM_MAP["met9"] = Platform.MSG2
+PLATFORM_MAP["met10"] = Platform.MSG3
+PLATFORM_MAP["met11"] = Platform.MSG4
 
 
 class Info(Enum):
@@ -233,60 +253,72 @@ class Info(Enum):
     Standard keys for info dictionaries
     Note: some fields correspond to database fields in workspace.metadatabase !
     """
-    UNKNOWN = '???'
+
+    UNKNOWN = "???"
     # full path to the resource that the file came from
     # DEPRECATED since datasets may not have one-to-one pathname mapping
-    PATHNAME = 'path'
+    PATHNAME = "path"
 
     # CF content
-    SHORT_NAME = 'short_name'  # CF short_name
-    LONG_NAME = 'long_name'  # CF long_name
-    STANDARD_NAME = 'standard_name'  # CF compliant standard_name (when possible)
-    UNITS = 'units'  # CF compliant (udunits compliant) units string, original data units
+    SHORT_NAME = "short_name"  # CF short_name
+    LONG_NAME = "long_name"  # CF long_name
+    STANDARD_NAME = "standard_name"  # CF compliant standard_name (when possible)
+    UNITS = "units"  # CF compliant (udunits compliant) units string, original data units
 
     # SIFT bookkeeping
-    DATASET_NAME = 'dataset_name'  # logical name of the file (possibly human assigned)
-    KIND = 'kind'  # Kind enumeration on what kind of layer this makes
-    UUID = 'uuid'  # UUID assigned on import, which follows the layer around the system
+    DATASET_NAME = "dataset_name"  # logical name of the file (possibly human assigned)
+    KIND = "kind"  # Kind enumeration on what kind of layer/dataset this makes
+    UUID = "uuid"  # UUID assigned on import, which follows the layer/dataset around the system
 
     # track determiner is family::category; presentation is determined by family
     # family::category::serial is a unique identifier equivalent to conventional make-model-serialnumber
     # string representing data family, typically instrument:measurement:wavelength but may vary by data content
-    FAMILY = 'family'
-    CATEGORY = 'category'  # string with platform:instrument:target typically but may vary by data content
-    SERIAL = 'serial'  # serial number
+    FAMILY = "family"
+    CATEGORY = "category"  # string with platform:instrument:target typically but may vary by data content
+    SERIAL = "serial"  # serial number
 
     # projection information
-    ORIGIN_X = 'origin_x'
-    ORIGIN_Y = 'origin_y'
-    CELL_WIDTH = 'cell_width'
-    CELL_HEIGHT = 'cell_height'
-    PROJ = 'proj4'
+    ORIGIN_X = "origin_x"
+    ORIGIN_Y = "origin_y"
+    CELL_WIDTH = "cell_width"
+    CELL_HEIGHT = "cell_height"
+    PROJ = "proj4"
+
+    # original data grid layout
+    GRID_ORIGIN = "grid_layout_origin"
+    GRID_FIRST_INDEX_X = "grid_first_index_x"
+    GRID_FIRST_INDEX_Y = "grid_first_index_y"
 
     # colormap amd data range
-    CLIM = 'clim'  # (min,max) color map limits
-    VALID_RANGE = 'valid_range'
-    SHAPE = 'shape'  # (rows, columns) or (rows, columns, levels) data shape
-    COLORMAP = 'colormap'  # name or UUID of a color map
+    CLIM = "clim"  # (min,max) color map limits
+    VALID_RANGE = "valid_range"
+    SHAPE = "shape"  # (rows, columns) or (rows, columns, levels) data shape
+    COLORMAP = "colormap"  # name or UUID of a color map
 
-    SCHED_TIME = 'timeline'  # scheduled time for observation
-    OBS_TIME = 'obstime'  # actual time for observation
-    OBS_DURATION = 'obsduration'  # time from start of observation to end of observation
+    # glyph (marker) or line styling
+    STYLE = "style"  # name (or FUTURE: UUID?) of a SVG/HTML-like style
+
+    SCHED_TIME = "timeline"  # scheduled time for observation
+    OBS_TIME = "obstime"  # actual time for observation
+    OBS_DURATION = "obsduration"  # time from start of observation to end of observation
 
     # instrument and scene information
-    PLATFORM = 'platform'  # full standard name of spacecraft
-    SCENE = 'scene'  # standard scene identifier string for instrument, e.g. FLDK
-    INSTRUMENT = 'instrument'  # Instrument enumeration, or string with full standard name
+    PLATFORM = "platform"  # full standard name of spacecraft
+    SCENE = "scene"  # standard scene identifier string for instrument, e.g. FLDK
+    INSTRUMENT = "instrument"  # Instrument enumeration, or string with full standard name
 
     # human-friendly conventions
-    DISPLAY_NAME = 'display_name'  # preferred name in the layer list
-    DISPLAY_TIME = 'display_time'  # typically from guidebook, used for labeling animation frame
-    UNIT_CONVERSION = 'unit_conversion'  # (preferred CF units, convert_func, format_func)
+    DISPLAY_NAME = "display_name"  # preferred name for displaying
+    DISPLAY_TIME = "display_time"  # typically from guidebook, used for labeling animation frame
+    UNIT_CONVERSION = "unit_conversion"  # (preferred CF units, convert_func, format_func)
     # unit numeric conversion func: lambda x, inverse=False: convert-to-units
     # unit string format func: lambda x, numeric=True, units=True: formatted string
-    CENTRAL_WAVELENGTH = 'nominal_wavelength'
+    CENTRAL_WAVELENGTH = "nominal_wavelength"
     # only in family info dictionaries:
-    DISPLAY_FAMILY = 'display_family'
+    DISPLAY_FAMILY = "display_family"
+
+    # only used by algebraic datasets to save the operation kind
+    ALGEBRAIC = "algebraic"
 
     def __lt__(self, other):
         """
@@ -328,157 +360,15 @@ class Info(Enum):
         raise ValueError("cannot compare {} == {}".format(repr(self), repr(other)))
 
 
-class Presentation(NamedTuple):
-    """Presentation information for a layer.
+@dataclass
+class Presentation:
+    """Presentation information for a layer and dataset."""
 
-    z_order comes from the layerset
-
-    """
-    uuid: UUID  # dataset in the document/workspace
-    kind: Kind  # what kind of layer it is
-    visible: bool  # whether it's visible or not
-    a_order: int  # None for non-animating, 0..n-1 what order to draw in during animation
-    colormap: object  # name or uuid: color map to use; name for default, uuid for user-specified
-    climits: tuple  # valid min and valid max used for color mapping normalization
-    gamma: float  # valid (0 to 5) for gamma correction (default should be 1.0)
-    mixing: object  # mixing mode constant
-
-
-class ZList(MutableSequence):
-    """List indexed from high Z to low Z
-    For z-ordered tracks, we want to have
-    - contiguous Z order values from high to low (negative)
-    - elements assigned negative stay negative, likewise with positive (negative Z implies inactive non-document track)
-    - no Z value is repeated
-    - insertions are correctly handled
-    - append also works, by default arriving as most-negative z-order
-    - assignment off either end gets snapped to the contiguous next value
-    """
-    _zmax: int = 0  # z-index of the first member of _content
-    _content: list
-
-    @property
-    def min_max(self) -> Tuple[int, int]:
-        return (self._zmax + 1 - len(self), self._zmax) if len(self) else (None, None)
-
-    @property
-    def top_z(self) -> Optional[int]:
-        return self._zmax if len(self) else None
-
-    @property
-    def bottom_z(self) -> Optional[int]:
-        return self._zmax + 1 - len(self) if len(self) else None
-
-    def __contains__(self, z) -> bool:
-        n, x = self.min_max
-        return False if (n is None) or (x is None) or (z < n) or (z > x) else True
-
-    def prepend(self, val):
-        self._zmax += 1
-        self._content.insert(0, val)
-
-    def append(self, val, start_negative: bool = False, not_if_present: bool = False):
-        if start_negative and 0 == len(self._content):
-            self._zmax = -1
-        if not_if_present and (val in self._content):
-            return
-        self._content.append(val)
-
-    def items(self) -> Iterable[Tuple[int, Any]]:
-        z = self._zmax
-        for q, v in enumerate(self._content):
-            yield z - q, v
-
-    def index(self, val):
-        ldex = self._content.index(val)
-        z = self._zmax - ldex
-        return z
-
-    def keys(self):
-        yield from range(self._zmax, self._zmax - len(self._content), -1)
-
-    def values(self):
-        yield from iter(self._content)
-
-    def insert(self, z: int, val):
-        """insert a value such that it lands at index z
-        as needed:
-        displace any content with z>=0 upward
-        displace any content with z<0 downward
-        """
-        if len(self._content) == 0:
-            self._zmax = -1 if (z < 0) else 0
-            self._content.append(val)
-        elif z not in self:
-            if z >= 0:
-                self._zmax += 1
-                self._content.insert(0, val)
-            else:
-                self._content.append(val)
-        else:
-            adj = 1 if z >= 0 else 0
-            ldex = max(0, self._zmax - z + adj)
-            self._content.insert(ldex, val)
-            self._zmax += adj
-
-    def move(self, to_z: int, val):
-        old_z = self.index(val)
-        if old_z != to_z:
-            del self[old_z]
-            self.insert(to_z, val)
-
-    def __init__(self, zmax: int = None, content: Iterable[Any] = None):
-        super(ZList, self).__init__()
-        if zmax is not None:
-            self._zmax = zmax
-        self._content = list(content) if content is not None else []
-
-    def __len__(self) -> int:
-        return len(self._content)
-
-    def __setitem__(self, z, val):
-        ldex = self._zmax - z
-        if ldex < 0:
-            self._content.insert(0, val)
-            self._zmax += 1
-        elif ldex >= len(self._content):
-            self._content.append(val)
-        else:
-            self._content[ldex] = val
-
-    def __getitem__(self, z) -> Any:
-        ldex = self._zmax - z
-        if ldex < 0 or ldex >= len(self._content):
-            raise IndexError("Z={} not in ZList".format(z))
-        return self._content[ldex]
-
-    def __delitem__(self, z):
-        if z not in self:
-            raise IndexError("Z={} not in ZList".format(z))
-        ldex = self._zmax - z
-        if z >= 0:
-            self._zmax -= 1
-        del self._content[ldex]
-
-    def merge_subst(self, new_values: Iterable[Tuple[int, Any]]):
-        """batch merge of substitutions
-        raises IndexError if any of them is outside current range
-        """
-        for z, q in new_values:
-            ldex = self._zmax - z
-            self._content[ldex] = q
-
-    def __repr__(self) -> str:
-        return 'ZList({}, {})'.format(self._zmax, repr(self._content))
-
-    def __eq__(self, other) -> bool:
-        return isinstance(other, ZList) and other._zmax == self._zmax and other._content == self._content
-
-    def to_dict(self, inverse=False) -> dict:
-        if not inverse:
-            return dict(self.items())
-        else:
-            zult = dict((b, a) for (a, b) in self.items())
-            if len(zult) != len(self._content):
-                raise RuntimeWarning("ZList.to_dict inverse did not have fully unique keys")
-            return zult
+    uuid: Optional[UUID]  # dataset in the layermodel/document/workspace, None if referring to a system layer
+    kind: Kind  # what kind of layer/dataset it is
+    visible: bool = True  # whether it's visible or not
+    colormap: object = None  # name or uuid: color map to use; name for default, uuid for user-specified
+    style: object = None  # name or uuid: SVG/HTML style to use; name for default, (FUTURE?) uuid for user-specified
+    climits: Union[tuple, list] = INVALID_COLOR_LIMITS  # valid min and valid max used for color mapping normalization
+    gamma: Union[float, List[float]] = 1.0  # valid (0 to 5) for gamma correction
+    opacity: float = 1.0

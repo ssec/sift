@@ -1,0 +1,95 @@
+# The Catalogue configuration defines a list of "queries", used in auto update
+# mode.
+#
+# Two queries are given here:
+# - for MTG FCI FDHSI suitable for auto update
+# - for MSG SEVIRI suitable to load a certain fixed dataset
+# (NOTE: currently only one query at a time is supported, i.e. only the first is
+# active)
+#
+# Each query must define the *reader* to use, the *search_path* where to look
+# for files, optional *constraints*, and a mandatory definition of the desired
+# *products*.
+#
+# From the configration for the given *reader* the *filter_patterns* are taken
+# and used to match files in the given *search_path*. The *constraints* are
+# applied to reduce the result list (for example to see only files where
+# *platform_shortname* is "MSG4"). The given constraint items correspond to the
+# replacement fields of the *filter_patterns* (different *filter_patterns* may
+# have arbitrarily different constraints).
+#
+
+# Very important constraint options are those for defining restrictions for the
+# data time(s). For at most one datetime replacement field from the
+# *filter_patterns* a constraint can be given (all but the first are ignored).
+# This type of constraint is detected, when an according explicit 'type' is
+# defined for them; two of these explicit constraint types are available (for
+# now):
+#
+# * ``type: datetime``
+#   a fixed filter based on the different parts of the data time can be defined,
+#   e.g. data from all 1st days of each month in 2019 at 12:00
+# * ``type: recent_datetime``
+#   a range of time steps relative to the current time ("now") can be defined,
+#   e.g. all data for the current hour and the two before
+#
+#
+# Finally with filename based filtering defined it must be configured, which
+# actual *products* should be loaded/generated from the actual selection.  Each
+# channel (or dataset name as defined in the file) must be given with a
+# (possibly empty) list of derived product names - if the list is empty, the
+# original dataset name is taken as product name.
+#
+# Note, that the order of items in a query is free, but the order of the top
+# level items is recommended as shown here.
+
+catalogue:
+
+  # An example query configuration for loading MTG FCI FDHSI ir_105 product
+  # "brightness temperature" for the current and previous hour from the
+  # configured search path
+
+  - reader: 'fci_l1c_nc'
+    search_path: '/path/to/fci/data/'
+
+    # Constraints items must match replacement fields as defined in readers/fci_l1c_fdhsi.yaml
+    constraints:
+      spacecraft_id: 1
+      data_source: FCI
+      processing_level: 1C
+      subtype: FDHSI
+      coverage: FD
+      purpose: ''
+      start_time:
+        type: recent_datetime
+        M: [0, -1, -2, -3, -4, -5]
+
+    products:
+      ir_105: [brightness_temperature]
+
+  #----------------------------------------------------------------------------
+  # Currently only the first query is evaluated thus this one is inactive
+
+  # An example query configuration for loading SEVIRI IR_108 products
+  # "brightness temperature" and "radiance" for data times 2019-10-21T12:00
+  # until 2019-10-21T13:00 (exclusive) from the configured search path
+
+  - reader: 'seviri_l1b_hrit'
+    search_path: '/path/to/seviri/data/'
+
+    # Constraints items must match replacement fields as defined in readers/seviri_l1b_hrit.yaml:
+    constraints:
+      platform_shortname:
+        - MSG4
+      channel:
+        - ______ # catch EPI and PRO files, for SEVIRI HRIT this must be given in addition when any channel is listed
+        - IR_108
+      start_time:
+        type: datetime
+        Y: 2019
+        m: 10
+        d: 21
+        H: 12
+
+    products:
+      IR_108: [brightness_temperature, radiance]

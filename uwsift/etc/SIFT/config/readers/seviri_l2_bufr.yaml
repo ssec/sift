@@ -1,0 +1,15 @@
+data_reading:
+  seviri_l2_bufr:
+    filter_patterns:
+        - '{filename}'  # generic pattern as default
+        - '{product:s}_{start_time:%Y%m%d%H%M%S}Z_00_{server:s}_{satellite:s}_{mission:s}_{subsat:s}'
+        - '{spacecraft:s}-SEVI-MSG{product:s}-{loc1:s}-{loc2:s}-{start_time:%Y%m%d%H%M%S}.000000000Z{appendix}'
+        - '{spacecraft:s}-SEVI-MSG{product:s}-{loc1:s}-{loc2:s}-{start_time:%Y%m%d%H%M%S}.000000000Z-{time1:%Y%m%d%H%M%S}-{ord1:s}.bfr'
+        - '{spacecraft:s}-SEVI-MSG{product:s}-{loc1:s}-{loc2:s}-{start_time:%Y%m%d%H%M%S}.000000000Z-{time1:%Y%m%d%H%M%S}-{ord1:s}'
+    reader_kwargs:
+       with_area_definition: True
+
+    grid:
+     origin: "SE"
+     first_index_x: 1
+     first_index_y: 1

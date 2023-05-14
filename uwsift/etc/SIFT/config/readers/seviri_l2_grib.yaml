@@ -1,0 +1,13 @@
+data_reading:
+  seviri_l2_grib:
+    filter_patterns:
+        - '{filename}'  # generic pattern as default
+        - '{product:s}_{start_time:%Y%m%d%H%M%S}Z_00_{server:8s}_{spacecraft:5s}_{scan_mode:3s}_{sub_sat:5s}'
+        - '{spacecraft:4s}-SEVI-MSG{product:s}-{id1:4s}-{id2:4s}-{start_time:%Y%m%d%H%M%S}.000000000Z{appendix}'
+        - '{spacecraft:4s}-SEVI-MSG{product:s}-{id1:4s}-{id2:4s}-{start_time:%Y%m%d%H%M%S}.000000000Z-{product_creation_time:%Y%m%d%H%M%S}-{ord_num:7s}'
+        - '{spacecraft:4s}-SEVI-MSG{product:s}-{id1:4s}-{id2:4s}-{start_time:%Y%m%d%H%M%S}.000000000Z-{product_creation_time:%Y%m%d%H%M%S}-{ord_num:7s}.grb'
+
+    grid:
+     origin: "SE"
+     first_index_x: 1
+     first_index_y: 1

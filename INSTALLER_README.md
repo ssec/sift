@@ -61,7 +61,7 @@ Configuration files for the application are stored in the user's
 The downloaded tarball `.tar.gz` can be extracted by running:
 
     tar -xf SIFT_X.Y.Z.tar.gz
-    
+
 SIFT can then be started by running the `SIFT/SIFT` executable. Run
 `SIFT/SIFT -h` for available command line options.
 

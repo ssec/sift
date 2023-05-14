@@ -22,7 +22,11 @@ will slowly replace the low-level documents on the wiki.
    design_overview
    API <api/uwsift>
    Contributing <CONTRIBUTING>
-
+   Installation options for SIFT <INSTALLATION-sift>
+   Initial setup for packaging SIFT with CMake <PACKAGING-sift>
+   Configuring SIFT <configuration>
+   Auto Update Mode <auto_update_mode>
+   profiling
 
 Indices and tables
 ==================
@@ -30,4 +34,3 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-

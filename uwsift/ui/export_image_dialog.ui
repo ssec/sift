@@ -259,7 +259,7 @@
      </rect>
     </property>
     <property name="toolTip">
-     <string>delay based on layer observation time</string>
+     <string>delay based on dataset observation time</string>
     </property>
     <property name="text">
      <string>Time Lapse</string>

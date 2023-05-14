@@ -29,29 +29,32 @@ from uwsift.common import DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH
 
 DEBUG_IMAGE_TILE = bool(os.environ.get("SIFT_DEBUG_TILES", False))
 
-__author__ = 'rayg'
-__docformat__ = 'reStructuredText'
+__author__ = "rayg"
+__docformat__ = "reStructuredText"
 
 LOG = logging.getLogger(__name__)
 
 
 class TextureAtlas2D(GPUScaledTexture2D):
-    """A 2D Texture Array structure implemented as a 2D Texture Atlas.
-    """
+    """A 2D Texture Array structure implemented as a 2D Texture Atlas."""
 
-    def __init__(self, texture_shape,
-                 tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
-                 **texture_kwargs):
+    def __init__(self, texture_shape, tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH), **texture_kwargs):
         # Number of tiles in each direction (y, x)
         self.texture_shape = self._check_texture_shape(texture_shape)
         # Number of rows and columns for each tile
         self.tile_shape = tile_shape
         # Number of rows and columns to hold all of these tiles in one texture
         shape = (self.texture_shape[0] * self.tile_shape[0], self.texture_shape[1] * self.tile_shape[1])
+        if len(tile_shape) == 3:
+            shape = (shape[0], shape[1], tile_shape[2])
         self.texture_size = shape
         self._fill_array = np.tile(np.float32(np.nan), self.tile_shape)
         # create a representative array so the texture can be initialized properly with the right dtype
-        rep_arr = np.zeros((10, 10), dtype=np.float32)
+        rep_arr = (
+            np.zeros((10, 10, tile_shape[2]), dtype=np.float32)
+            if len(tile_shape) == 3
+            else np.zeros((10, 10), dtype=np.float32)
+        )
         # will add self.shape:
         super(TextureAtlas2D, self).__init__(data=rep_arr, **texture_kwargs)
         # GPUScaledTexture2D always uses a "representative" size
@@ -77,16 +80,14 @@ class TextureAtlas2D(GPUScaledTexture2D):
         return row * self.tile_shape[0], col * self.tile_shape[1]
 
     def set_tile_data(self, tile_idx, data, copy=False):
-        """Write a single tile of data into the texture.
-        """
+        """Write a single tile of data into the texture."""
         offset = self._tex_offset(tile_idx)
         if data is None:
             # Special "fill" parameter
             data = self._fill_array
         else:
             # FIXME: Doesn't this always return the shape of the input data?
-            tile_offset = (min(self.tile_shape[0], data.shape[0]),
-                           min(self.tile_shape[1], data.shape[1]))
+            tile_offset = (min(self.tile_shape[0], data.shape[0]), min(self.tile_shape[1], data.shape[1]))
             if tile_offset[0] < self.tile_shape[0] or tile_offset[1] < self.tile_shape[1]:
                 # FIXME: This should be handled by the caller to expand the array to be NaN filled and aligned
                 # Assign a fill value, make sure to copy the data so that we don't overwrite the original
@@ -94,40 +95,36 @@ class TextureAtlas2D(GPUScaledTexture2D):
                 data = np.zeros(self.tile_shape, dtype=data.dtype)
                 # data = data.copy()
                 data[:] = np.nan
-                data[:tile_offset[0], :tile_offset[1]] = data_orig[:tile_offset[0], :tile_offset[1]]
+                data[: tile_offset[0], : tile_offset[1]] = data_orig[: tile_offset[0], : tile_offset[1]]
         if DEBUG_IMAGE_TILE:
-            data[:5, :] = 1000.
-            data[-5:, :] = 1000.
-            data[:, :5] = 1000.
-            data[:, -5:] = 1000.
+            data[:5, :] = 1000.0
+            data[-5:, :] = 1000.0
+            data[:, :5] = 1000.0
+            data[:, -5:] = 1000.0
         super(TextureAtlas2D, self).scale_and_set_data(data, offset=offset, copy=copy)
 
 
 class MultiChannelGPUScaledTexture2D:
-    """Wrapper class around indiviual textures.
+    """Wrapper class around individual textures.
 
     This helper class allows for easier handling of multiple textures that
     represent individual R, G, and B channels of an image.
 
     """
+
     _singular_texture_class = GPUScaledTexture2D
     _ndim = 2
 
     def __init__(self, data, **texture_kwargs):
         # data to sent to texture when not being used
-        self._fill_arr = np.full((10, 10), np.float32(np.nan),
-                                 dtype=np.float32)
+        self._fill_arr = np.full((10, 10), np.float32(np.nan), dtype=np.float32)
 
         self.num_channels = len(data)
         data = [x if x is not None else self._fill_arr for x in data]
-        self._textures = self._create_textures(self.num_channels, data,
-                                               **texture_kwargs)
+        self._textures = self._create_textures(self.num_channels, data, **texture_kwargs)
 
     def _create_textures(self, num_channels, data, **texture_kwargs):
-        return [
-            self._singular_texture_class(data[i], **texture_kwargs)
-            for i in range(num_channels)
-        ]
+        return [self._singular_texture_class(data[i], **texture_kwargs) for i in range(num_channels)]
 
     @property
     def textures(self):
@@ -204,16 +201,24 @@ class MultiChannelGPUScaledTexture2D:
         is_multi = isinstance(data, (list, tuple))
         index_provided = offset is not None and len(offset) == self._ndim + 1
         if not is_multi and not index_provided:
-            raise ValueError("Setting texture data for a single sub-texture "
-                             "requires 'offset' to be passed with the first "
-                             "element specifying the sub-texture index.")
+            raise ValueError(
+                "Setting texture data for a single sub-texture "
+                "requires 'offset' to be passed with the first "
+                "element specifying the sub-texture index."
+            )
         elif is_multi and index_provided:
-            warnings.warn("Multiple texture arrays were passed, but so was "
-                          "sub-texture index in 'offset'. Ignoring that index.", UserWarning)
+            warnings.warn(
+                "Multiple texture arrays were passed, but so was "
+                "sub-texture index in 'offset'. Ignoring that index.",
+                UserWarning,
+                stacklevel=4,
+            )
             offset = offset[1:]
         if is_multi and len(data) != self.num_channels:
-            raise ValueError("Multiple provided arrays must match number of channels. "
-                             f"Got {len(data)}, expected {self.num_channels}.")
+            raise ValueError(
+                "Multiple provided arrays must match number of channels. "
+                f"Got {len(data)}, expected {self.num_channels}."
+            )
 
         if offset is not None and len(offset) == self._ndim + 1:
             tex_indexes = offset[:1]

@@ -1,0 +1,16 @@
+data_reading:
+  seviri_l1b_native:
+    group_keys: ['end_time', 'satid', 'instr']
+    filter_patterns: [
+        '{satid:4s}-{instr:4s}-MSG{product_level:2d}-{processing_version}-NA-{end_time:%Y%m%d%H%M%S.%f}000Z{appendix}',
+        '{satid:4s}-{instr:4s}-MSG{product_level:2d}-{processing_version}-NA-{end_time:%Y%m%d%H%M%S.%f}000Z-{order_id:s}.nat',
+        '{satid:4s}-{instr:4s}-MSG{product_level:2d}-{processing_version}-NA-{end_time:%Y%m%d%H%M%S.%f}000Z-{processing_time:%Y%m%d%H%M%S}-{order_id:s}.nat',
+    ]
+
+    grid:
+      origin: "SE"
+      first_index_x: 1
+      first_index_y: 1
+
+    reader_kwargs:
+      fill_disk: True  # needed to load correctly the HRV channel

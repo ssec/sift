@@ -13,36 +13,57 @@ REQUIRES
 """
 import logging
 import os
-import re
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from datetime import datetime, timedelta
-from typing import Iterable, Generator, Mapping
+from typing import (
+    Callable,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
 
-import yaml
+import dask.array as da
 import numpy as np
-from pyproj import Proj
-from sqlalchemy.orm import Session
+import satpy.readers.yaml_reader
+import satpy.resample
+import yaml
+from pyresample.geometry import AreaDefinition, StackedAreaDefinition
+from satpy import DataQuery, Scene, available_readers
+from satpy.dataset import DatasetDict
+from satpy.writers import get_enhanced_image
+from xarray import DataArray
 
-from uwsift import config
-from uwsift.common import Platform, Info, Instrument, Kind, INSTRUMENT_MAP, PLATFORM_MAP
+from uwsift import USE_INVENTORY_DB, config
+from uwsift.common import INSTRUMENT_MAP, PLATFORM_MAP, Info, Instrument, Kind, Platform
+from uwsift.model.area_definitions_manager import AreaDefinitionsManager
+from uwsift.satpy_compat import DataID, get_id_items, get_id_value, id_from_attrs
 from uwsift.util import USER_CACHE_DIR
-from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
-from .metadatabase import Resource, Product, Content
+from uwsift.util.common import get_reader_kwargs_dict
+from uwsift.workspace.guidebook import ABI_AHI_Guidebook
 
-from satpy import Scene, available_readers, __version__ as satpy_version
-from uwsift.satpy_compat import DataID, get_id_value, get_id_items, id_from_attrs
+from .metadatabase import (
+    Content,
+    ContentImage,
+    ContentMultiChannelImage,
+    ContentUnstructuredPoints,
+    Product,
+    Resource,
+)
+from .utils import metadata_utils
 
 _SATPY_READERS = None  # cache: see `available_satpy_readers()` below
-SATPY_READER_CACHE_FILE = os.path.join(USER_CACHE_DIR,
-                                       'available_satpy_readers.yaml')
+SATPY_READER_CACHE_FILE = os.path.join(USER_CACHE_DIR, "available_satpy_readers.yaml")
 
 LOG = logging.getLogger(__name__)
 
-try:
-    from skimage.measure import find_contours
-except ImportError:
-    find_contours = None
+satpy_version = None
 
 DEFAULT_GTIFF_OBS_DURATION = timedelta(seconds=60)
 DEFAULT_GUIDEBOOK = ABI_AHI_Guidebook
@@ -56,14 +77,25 @@ GUIDEBOOKS = {
     Platform.HIMAWARI_9: ABI_AHI_Guidebook,
 }
 
-import_progress = namedtuple('import_progress',
-                             ['uuid', 'stages', 'current_stage', 'completion', 'stage_desc', 'dataset_info', 'data'])
+import_progress = namedtuple(
+    "import_progress",
+    ["uuid", "stages", "current_stage", "completion", "stage_desc", "dataset_info", "data", "content"],
+)
 """
 # stages:int, number of stages this import requires
 # current_stage:int, 0..stages-1 , which stage we're on
 # completion:float, 0..1 how far we are along on this stage
 # stage_desc:tuple(str), brief description of each of the stages we'll be doing
 """
+
+try:
+    import hdf5plugin  # noqa F401 # suppress "'hdf5plugin' imported but unused"
+except ImportError:
+    LOG.warning(
+        "Your installation/environment doesn't include the package hdf5plugin. If you want to visualise "
+        'compressed FCI L1c data, please add this package using "pip install hdf5plugin" or '
+        '"conda install -c conda-forge hdf5plugin "..'
+    )
 
 
 def _load_satpy_readers_cache(force_refresh=None):
@@ -75,34 +107,36 @@ def _load_satpy_readers_cache(force_refresh=None):
     try:
         if force_refresh:
             raise RuntimeError("Forcing refresh of available Satpy readers list")
-        with open(SATPY_READER_CACHE_FILE, 'r') as cfile:
+        if not satpy_version:
+            raise RuntimeError("Satpy version cannot be determined, regenerating available readers...")
+        with open(SATPY_READER_CACHE_FILE, "r") as cfile:
             LOG.info("Loading cached available Satpy readers from {}".format(SATPY_READER_CACHE_FILE))
             cache_contents = yaml.load(cfile, yaml.SafeLoader)
         if cache_contents is None:
             raise RuntimeError("Cached reader list is empty, regenerating...")
-        if cache_contents['satpy_version'] < satpy_version:
-            raise RuntimeError("Satpy has been updated, regenerating available readers...")
+        if cache_contents["satpy_version"] != satpy_version:
+            raise RuntimeError("Satpy has different version, regenerating available readers...")
     except (FileNotFoundError, RuntimeError, KeyError) as cause:
         LOG.info("Updating list of available Satpy readers...")
         cause.__suppress_context__ = True
         readers = available_readers(as_dict=True)
         # sort list of readers just in case we depend on this in the future
-        readers = sorted(readers, key=lambda x: x['name'])
+        readers = sorted(readers, key=lambda x: x["name"])
         readers = list(_sanitize_reader_info_for_yaml(readers))
         cache_contents = {
-            'satpy_version': satpy_version,
-            'readers': readers,
+            "satpy_version": satpy_version,
+            "readers": readers,
         }
         _save_satpy_readers_cache(cache_contents)
-    return cache_contents['readers']
+    return cache_contents["readers"]
 
 
 def _sanitize_reader_info_for_yaml(readers):
     # filter out known python objects to simplify YAML serialization
     for reader_info in readers:
-        reader_info.pop('reader')
-        reader_info.pop('data_identification_keys', None)
-        reader_info['config_files'] = list(reader_info['config_files'])
+        reader_info.pop("reader")
+        reader_info.pop("data_identification_keys", None)
+        reader_info["config_files"] = list(reader_info["config_files"])
         yield reader_info
 
 
@@ -110,7 +144,7 @@ def _save_satpy_readers_cache(cache_contents):
     """Write reader cache information to a file on disk."""
     cfile_dir = os.path.dirname(SATPY_READER_CACHE_FILE)
     os.makedirs(cfile_dir, exist_ok=True)
-    with open(SATPY_READER_CACHE_FILE, 'w') as cfile:
+    with open(SATPY_READER_CACHE_FILE, "w") as cfile:
         LOG.info("Caching available Satpy readers to {}".format(SATPY_READER_CACHE_FILE))
         yaml.dump(cache_contents, cfile)
 
@@ -122,7 +156,7 @@ def available_satpy_readers(as_dict=False, force_cache_refresh=None):
         _SATPY_READERS = _load_satpy_readers_cache(force_refresh=force_cache_refresh)
 
     if not as_dict:
-        return [r['name'] for r in _SATPY_READERS]
+        return [r["name"] for r in _SATPY_READERS]
     return _SATPY_READERS
 
 
@@ -130,118 +164,91 @@ def filter_dataset_ids(ids_to_filter: Iterable[DataID]) -> Generator[DataID, Non
     """Generate only non-filtered DataIDs based on EXCLUDE_DATASETS global filters."""
     # skip certain DataIDs
     for ds_id in ids_to_filter:
-        for filter_key, filtered_values in config.get('data_reading.exclude_datasets').items():
-            if get_id_value(ds_id, filter_key) in filtered_values:
+        for filter_key, filtered_values in config.get("open_file_wizard.exclude_datasets").items():
+            if filtered_values and get_id_value(ds_id, filter_key) in filtered_values:
                 break
         else:
             yield ds_id
 
 
-def get_guidebook_class(layer_info) -> Guidebook:
-    platform = layer_info.get(Info.PLATFORM)
+def get_guidebook_class(dataset_info) -> ABI_AHI_Guidebook:
+    platform = dataset_info.get(Info.PLATFORM)
     return GUIDEBOOKS.get(platform, DEFAULT_GUIDEBOOK)()
 
 
-def get_contour_increments(layer_info):
-    standard_name = layer_info[Info.STANDARD_NAME]
-    units = layer_info[Info.UNITS]
-    increments = {
-        'air_temperature': [10., 5., 2.5, 1., 0.5],
-        'brightness_temperature': [10., 5., 2.5, 1., 0.5],
-        'toa_brightness_temperature': [10., 5., 2.5, 1., 0.5],
-        'toa_bidirectional_reflectance': [.15, .10, .05, .02, .01],
-        'relative_humidity': [15., 10., 5., 2., 1.],
-        'eastward_wind': [15., 10., 5., 2., 1.],
-        'northward_wind': [15., 10., 5., 2., 1.],
-        'geopotential_height': [100., 50., 25., 10., 5.],
-    }
-
-    unit_increments = {
-        'kelvin': [10., 5., 2.5, 1., 0.5],
-        '1': [.15, .10, .05, .02, .01],
-        '%': [15., 10., 5., 2., 1.],
-        'kg m**-2': [20., 10., 5., 2., 1.],
-        'm s**-1': [15., 10., 5., 2., 1.],
-        'm**2 s**-1': [5000., 1000., 500., 200., 100.],
-        'gpm': [6000., 2000., 1000., 500., 200.],
-        'kg kg**-1': [16e-8, 8e-8, 4e-8, 2e-8, 1e-8],
-        'Pa s**-1': [6., 3., 2., 1., 0.5],
-        's**-1': [0.02, 0.01, 0.005, 0.002, 0.001],
-        'Pa': [5000., 1000., 500., 200., 100.],
-        'J kg**-1': [5000., 1000., 500., 200., 100.],
-        '(0 - 1)': [0.5, 0.2, 0.1, 0.05, 0.05],
-    }
-
-    contour_increments = increments.get(standard_name)
-    if contour_increments is None:
-        contour_increments = unit_increments.get(units)
-
-        # def _in_group(wg, grp):
-        #     return round(wg / grp) * grp >= grp
-        # contour_increments = [5., 2.5, 1., 0.5, 0.1]
-        # vmin, vmax = layer_info[Info.VALID_RANGE]
-        # width_guess = vmax - vmin
-        # if _in_group(width_guess, 10000.):
-        #     contour_increments = [x * 100. for x in contour_increments]
-        # elif _in_group(width_guess, 1000.):
-        #     contour_increments = [x * 50. for x in contour_increments]
-        # elif _in_group(width_guess, 100.):
-        #     contour_increments = [x * 10. for x in contour_increments]
-        # elif _in_group(width_guess, 10.):
-        #     contour_increments = [x * 1. for x in contour_increments]
-    if contour_increments is None:
-        LOG.warning("Unknown contour data type ({}, {}), guessing at contour "
-                    "levels...".format(standard_name, units))
-        return [5000., 1000., 500., 200., 100.]
-
-    LOG.debug("Contour increments for ({}, {}): {}".format(
-        standard_name, units, contour_increments))
-    return contour_increments
-
-
-def get_contour_levels(vmin, vmax, increments):
-    levels = []
-    mult = 1 / increments[-1]
-    for idx, inc in enumerate(increments):
-        vmin_round = np.ceil(vmin / inc) * inc
-        vmax_round = np.ceil(vmax / inc) * inc
-        inc_levels = np.arange(vmin_round, vmax_round, inc)
-        # round to the highest increment or modulo operations will be wrong
-        inc_levels = np.round(inc_levels / increments[-1]) * increments[-1]
-        if idx > 0:
-            # don't use coarse contours in the finer contour levels
-            # we multiple by 1 / increments[-1] to try to resolve precision
-            # errors which can be a big issue for very small increments.
-            mask = np.logical_or.reduce([np.isclose((inc_levels * mult) % (i * mult), 0) for i in increments[:idx]])
-            inc_levels = inc_levels[~mask]
-        levels.append(inc_levels)
-
-    return levels
-
-
-def generate_guidebook_metadata(layer_info) -> Mapping:
-    guidebook = get_guidebook_class(layer_info)
-    # also get info for this layer from the guidebook
-    gbinfo = guidebook.collect_info(layer_info)
-    layer_info.update(gbinfo)  # FUTURE: should guidebook be integrated into DocBasicLayer?
+def generate_guidebook_metadata(info) -> Mapping:
+    guidebook = get_guidebook_class(info)
+    # also get more values for this info from the guidebook
+    gbinfo = guidebook.collect_info(info)
+    info.update(gbinfo)  # FUTURE: should guidebook be integrated into suitable place?
 
     # add as visible to the front of the current set, and invisible to the rest of the available sets
-    layer_info[Info.COLORMAP] = guidebook.default_colormap(layer_info)
-    layer_info[Info.CLIM] = guidebook.climits(layer_info)
-    layer_info[Info.VALID_RANGE] = guidebook.valid_range(layer_info)
-    if Info.DISPLAY_TIME not in layer_info:
-        layer_info[Info.DISPLAY_TIME] = guidebook._default_display_time(layer_info)
-    if Info.DISPLAY_NAME not in layer_info:
-        layer_info[Info.DISPLAY_NAME] = guidebook._default_display_name(layer_info)
+    info[Info.COLORMAP] = metadata_utils.get_default_colormap(info, guidebook)
+    if info[Info.KIND] == Kind.POINTS:
+        info[Info.STYLE] = metadata_utils.get_default_point_style_name(info)
+    valid_range = guidebook.valid_range(info)
+    if valid_range is not None:
+        info[Info.VALID_RANGE] = valid_range
+    if Info.DISPLAY_TIME not in info:
+        info[Info.DISPLAY_TIME] = guidebook._default_display_time(info)
+    if Info.DISPLAY_NAME not in info:
+        info[Info.DISPLAY_NAME] = guidebook._default_display_name(info)
 
-    if 'level' in layer_info:
-        # calculate contour_levels and zoom levels
-        increments = get_contour_increments(layer_info)
-        vmin, vmax = layer_info[Info.VALID_RANGE]
-        contour_levels = get_contour_levels(vmin, vmax, increments)
-        layer_info['contour_levels'] = contour_levels
+    return info
 
-    return layer_info
+
+def _get_types_of_required_aux_files(scn: Scene) -> Set[str]:
+    """
+    Get the file types of required auxiliary files in the given Scene.
+
+    For example, the types 'HRIT_PRO', 'HRIT_EPI' for the prolog/epilog files of
+    SEVIRI in HRIT format.
+
+    :param scn: Scene object to analyse
+    :return: set of required file types
+    """
+    required_aux_file_types = set()
+    for reader in scn._readers.values():
+        for file_handlers in reader.file_handlers.values():
+            for file_handler in file_handlers:
+                required_aux_file_types |= set(file_handler.filetype_info.get("requires", ()))
+    return required_aux_file_types
+
+
+def _get_paths_of_required_aux_files(scn: Scene, required_aux_file_types) -> Set[str]:
+    """
+    Get set of paths of auxiliary files required to load data in Scene.
+    For example, prolog/epilog files for SEVIRI in HRIT format.
+
+    :param scn: Scene object to analyse
+    :param required_aux_file_types: the file types which are required
+    :return: set of required files
+    """
+    required_aux_paths = set()
+    if required_aux_file_types:
+        for reader in scn._readers.values():
+            for file_handlers in reader.file_handlers.values():
+                for file_handler in file_handlers:
+                    if file_handler.filetype_info["file_type"] in required_aux_file_types:
+                        required_aux_paths.add(file_handler.filename)
+    return required_aux_paths
+
+
+def _get_paths_in_scene_contributing_to_ds(scn: Scene, ds_name: str) -> List[str]:
+    """
+    Get list of paths in scene which actually contain data for the dataset given
+    by its name `ds_name`.
+    :param scn: scene object to analyse
+    :param ds_name: dataset name
+    :return: paths in scene which are required to load given dataset
+    """
+    contributing_paths = []
+    for reader in scn._readers.values():
+        for file_handlers in reader.file_handlers.values():
+            for file_handler in file_handlers:
+                if not ds_name or not hasattr(file_handler, "channel_name") or file_handler.channel_name == ds_name:
+                    contributing_paths.append(file_handler.filename)
+    return contributing_paths
 
 
 class aImporter(ABC):
@@ -249,15 +256,13 @@ class aImporter(ABC):
     Abstract Importer class creates or amends Resource, Product, Content entries in the metadatabase used by Workspace
     aImporter instances are backgrounded by the Workspace to bring Content into the workspace
     """
-    # dedicated sqlalchemy database session to use during this import instance;
-    # revert if necessary, commit as appropriate
-    _S: Session = None
-    # where content flat files should be imported to within the workspace, omit this from content path
-    _cwd: str = None
 
     def __init__(self, workspace_cwd, database_session, **kwargs):
         super(aImporter, self).__init__()
+        # dedicated sqlalchemy database session to use during this import instance;
+        # revert if necessary, commit as appropriate
         self._S = database_session
+        # where content flat files should be imported to within the workspace, omit this from content path
         self._cwd = workspace_cwd
 
     @classmethod
@@ -266,13 +271,105 @@ class aImporter(ABC):
         try:
             cls = prod.resource[0].format
         except IndexError:
-            LOG.error('no resources in {} {}'.format(repr(type(prod)), repr(prod)))
+            LOG.error("no resources in {} {}".format(repr(type(prod)), repr(prod)))
             raise
         paths = [r.path for r in prod.resource]
-        # HACK for Satpy importer
-        if 'reader' in prod.info:
-            kwargs.setdefault('reader', prod.info['reader'])
-        return cls(paths, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
+
+        # Get the Satpy Scene for this set of paths
+        scn = kwargs["scenes"].get(tuple(paths), None)
+
+        # Only Satpy readers / SatpyImporter still supported, thus:
+        # There must be such a Scene and the prod must be from Satpy, we can
+        assert scn and "_satpy_id" in prod.info  # nosec B101
+
+        merge_target = kwargs.get("merge_target")
+        if merge_target:
+            # For the merging process it is crucial that it only has
+            # to deal with files which belong to the given Product `prod`,
+            # extraneous files would interfere with the merging process.
+            # Thus: Filter the files in `paths` and keep only those
+            # that contribute to the Satpy dataset for `prod`.
+            if "prerequisites" in prod.info:
+                paths = cls._collect_prerequisites_paths(prod, scn)
+            else:
+                paths = _get_paths_in_scene_contributing_to_ds(scn, prod.info["_satpy_id"].get("name"))
+
+            # Now we can analyse, which files must be loaded
+            paths = cls._extract_paths_to_merge(merge_target, paths, scn)
+            if not paths:
+                return None
+
+        # In order to "load" converted datasets, we have to reuse the existing
+        # Scene 'scn' from the first instantiation of SatpyImporter instead of
+        # loading the data again, of course: we need to 'rescue across' the
+        # converted data from the first SatpyImporter instantiation to the
+        # second one (which will be created in the very last statement of this
+        # method).
+        # Since only products of the kinds POINTS, LINES and VECTORS need
+        # conversion (at this time), the mechanism is only applied for these.
+        # For an unknown reason reusing the scene breaks for FCI data,
+        #
+        # this Importer data reading magic is too confused.
+        if prod.info[Info.KIND] in (Kind.POINTS, Kind.LINES, Kind.VECTORS):
+            del kwargs["scenes"]
+            kwargs["scene"] = scn
+
+        # TODO: ignore mypy error for now because in the future aImporter should be merged with SatpyImporter
+        return cls(paths, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)  # type: ignore
+
+    @classmethod
+    def _extract_paths_to_merge(cls, merge_target, paths, scn):
+        """
+        Get a subset of 'paths', filtering out all files that are already loaded
+        into the target product.
+
+        I.e., collect only files from the given 'paths' list that are not yet
+        loaded and, if necessary, auxiliary files required to load these.
+        """
+        new_paths = []
+        existing_content = merge_target.content[0]
+        for path in paths:
+            if path not in existing_content.source_files:
+                new_paths.append(path)
+        if not new_paths:
+            return None
+        if new_paths != paths:
+            required_aux_file_types = _get_types_of_required_aux_files(scn)
+            required_aux_file_paths = _get_paths_of_required_aux_files(scn, required_aux_file_types)
+            if set(new_paths) == required_aux_file_paths:
+                return None
+            return new_paths + list(required_aux_file_paths)  # TODO
+        return new_paths
+
+    @classmethod
+    def _collect_prerequisites_paths(cls, prod, scn):
+        # If the dataset has prerequisites - this is the case for
+        # RGB composites provided by Satpy - the files that are
+        # required by these must be collected.
+        paths = []
+        for prerequisite in prod.info.get("prerequisites"):
+            ds_name = prerequisite.get("name") if isinstance(prerequisite, DataQuery) else prerequisite
+            if ds_name not in scn.available_dataset_names():
+                # This is a not supported case: Merging should be
+                # done for an RGB composite of which prequisite
+                # datasets are missing in the scene. This can
+                # happen, when the composite depends on other
+                # composites - their datasets have not been created
+                # in the Scene at this stage, thus the Scene can't
+                # be queried for the files required by these datasets.
+                # We have to interrupt this loading process (which
+                # runs in its own thread) by raising an exception.
+                raise RuntimeError(
+                    f"The Satpy RGB Composite type '{prod.info[Info.SHORT_NAME]}'"
+                    f" does not work when merging of new data chunks"
+                    f" into existing data is active."
+                    f" Consider switching it off by configuring"
+                    f" 'data_reading.merge_with_existing: False'"
+                )
+            paths += _get_paths_in_scene_contributing_to_ds(scn, ds_name)
+        # remove possible duplicates in paths
+        paths = list(dict.fromkeys(paths))
+        return paths
 
     @classmethod
     @abstractmethod
@@ -312,576 +409,7 @@ class aImporter(ABC):
             generator which yields status tuples as the content is imported
         """
         # FUTURE: this should be async def coroutine
-        return
-
-
-class aSingleFileWithSingleProductImporter(aImporter):
-    """
-    simplification of importer that handles a single-file with a single product
-    """
-    source_path: str = None
-    _resource: Resource = None
-
-    def __init__(self, source_path, workspace_cwd, database_session, **kwargs):
-        if isinstance(source_path, list) and len(source_path) == 1:
-            # backwards compatibility - we now expect a list
-            source_path = source_path[0]
-        super(aSingleFileWithSingleProductImporter, self).__init__(workspace_cwd, database_session)
-        self.source_path = source_path
-
-    @property
-    def num_products(self):
-        return 1
-
-    def merge_resources(self) -> Iterable[Resource]:
-        """
-        Returns:
-            sequence of Resources found at the source, typically one resource per file
-        """
-        now = datetime.utcnow()
-        if self._resource is not None:
-            res = self._resource
-        else:
-            self._resource = res = self._S.query(Resource).filter(Resource.path == self.source_path).first()
-        if res is None:
-            LOG.debug('creating new Resource entry for {}'.format(self.source_path))
-            self._resource = res = Resource(
-                format=type(self),
-                path=self.source_path,
-                mtime=now,
-                atime=now,
-            )
-            self._S.add(res)
-        return [self._resource]
-
-    @abstractmethod
-    def product_metadata(self):
-        """
-        Returns:
-            info dictionary for the single product available
-        """
-        return {}
-
-    def merge_products(self) -> Iterable[Product]:
-        """
-        products available in the resource, adding any metadata entries for Products within the resource
-        this may be run by the metadata collection agent, or by the workspace!
-        Returns:
-            sequence of Products that could be turned into Content in the workspace
-        """
-        now = datetime.utcnow()
-        if self._resource is not None:
-            res = self._resource
-        else:
-            self._resource = res = self._S.query(Resource).filter(Resource.path == self.source_path).first()
-        if res is None:
-            LOG.debug('no resources for {}'.format(self.source_path))
-            return []
-
-        if len(res.product):
-            zult = list(res.product)
-            # LOG.debug('pre-existing products {}'.format(repr(zult)))
-            return zult
-
-        # else probe the file and add product metadata, without importing content
-        from uuid import uuid1
-        uuid = uuid1()
-        meta = self.product_metadata()
-        meta[Info.UUID] = uuid
-
-        prod = Product(
-            uuid_str=str(uuid),
-            atime=now,
-        )
-        prod.resource.append(res)
-        assert (Info.OBS_TIME in meta)
-        assert (Info.OBS_DURATION in meta)
-        prod.update(meta)  # sets fields like obs_duration and obs_time transparently
-        assert (prod.info[Info.OBS_TIME] is not None and prod.obs_time is not None)
-        assert (prod.info[Info.VALID_RANGE] is not None)
-        LOG.debug('new product: {}'.format(repr(prod)))
-        self._S.add(prod)
-        self._S.commit()
-        return [prod]
-
-
-class GeoTiffImporter(aSingleFileWithSingleProductImporter):
-    """
-    GeoTIFF data importer
-    """
-
-    @classmethod
-    def is_relevant(self, source_path=None, source_uri=None):
-        source = source_path or source_uri
-        return True if (source.lower().endswith('.tif') or source.lower().endswith('.tiff')) else False
-
-    @staticmethod
-    def _metadata_for_path(pathname):
-        meta = {}
-        if not pathname:
-            return meta
-
-        # Old but still necesary, get some information from the filename instead of the content
-        m = re.match(r'HS_H(\d\d)_(\d{8})_(\d{4})_B(\d\d)_([A-Za-z0-9]+).*', os.path.split(pathname)[1])
-        if m is not None:
-            plat, yyyymmdd, hhmm, bb, scene = m.groups()
-            when = datetime.strptime(yyyymmdd + hhmm, '%Y%m%d%H%M')
-            plat = Platform('Himawari-{}'.format(int(plat)))
-            band = int(bb)
-            #
-            # # workaround to make old files work with new information
-            # from uwsift.model.guidebook import AHI_HSF_Guidebook
-            # if band in AHI_HSF_Guidebook.REFL_BANDS:
-            #     standard_name = "toa_bidirectional_reflectance"
-            # else:
-            #     standard_name = "toa_brightness_temperature"
-
-            meta.update({
-                Info.PLATFORM: plat,
-                Info.BAND: band,
-                Info.INSTRUMENT: Instrument.AHI,
-                Info.SCHED_TIME: when,
-                Info.OBS_TIME: when,
-                Info.OBS_DURATION: DEFAULT_GTIFF_OBS_DURATION,
-                Info.SCENE: scene,
-            })
-        return meta
-
-    @staticmethod
-    def _check_geotiff_metadata(gtiff):
-        gtiff_meta = gtiff.GetMetadata()
-        # Sanitize metadata from the file to use SIFT's Enums
-        if "name" in gtiff_meta:
-            gtiff_meta[Info.DATASET_NAME] = gtiff_meta.pop("name")
-        if "platform" in gtiff_meta:
-            plat = gtiff_meta.pop("platform")
-            try:
-                gtiff_meta[Info.PLATFORM] = Platform(plat)
-            except ValueError:
-                gtiff_meta[Info.PLATFORM] = Platform.UNKNOWN
-                LOG.warning("Unknown platform being loaded: {}".format(plat))
-        if "instrument" in gtiff_meta or "sensor" in gtiff_meta:
-            inst = gtiff_meta.pop("sensor", gtiff_meta.pop("instrument", None))
-            try:
-                gtiff_meta[Info.INSTRUMENT] = Instrument(inst)
-            except ValueError:
-                gtiff_meta[Info.INSTRUMENT] = Instrument.UNKNOWN
-                LOG.warning("Unknown instrument being loaded: {}".format(inst))
-        if "start_time" in gtiff_meta:
-            start_time = datetime.strptime(gtiff_meta["start_time"], "%Y-%m-%dT%H:%M:%SZ")
-            gtiff_meta[Info.SCHED_TIME] = start_time
-            gtiff_meta[Info.OBS_TIME] = start_time
-            if "end_time" in gtiff_meta:
-                end_time = datetime.strptime(gtiff_meta["end_time"], "%Y-%m-%dT%H:%M:%SZ")
-                gtiff_meta[Info.OBS_DURATION] = end_time - start_time
-        if "valid_min" in gtiff_meta:
-            gtiff_meta["valid_min"] = float(gtiff_meta["valid_min"])
-        if "valid_max" in gtiff_meta:
-            gtiff_meta["valid_max"] = float(gtiff_meta["valid_max"])
-        if "standard_name" in gtiff_meta:
-            gtiff_meta[Info.STANDARD_NAME] = gtiff_meta["standard_name"]
-        if "flag_values" in gtiff_meta:
-            gtiff_meta["flag_values"] = tuple(int(x) for x in gtiff_meta["flag_values"].split(','))
-        if "flag_masks" in gtiff_meta:
-            gtiff_meta["flag_masks"] = tuple(int(x) for x in gtiff_meta["flag_masks"].split(','))
-        if "flag_meanings" in gtiff_meta:
-            gtiff_meta["flag_meanings"] = gtiff_meta["flag_meanings"].split(' ')
-        if "units" in gtiff_meta:
-            gtiff_meta[Info.UNITS] = gtiff_meta.pop('units')
-        return gtiff_meta
-
-    @staticmethod
-    def get_metadata(source_path=None, source_uri=None, **kwargs):
-        import gdal
-        import osr
-        if source_uri is not None:
-            raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
-        d = GeoTiffImporter._metadata_for_path(source_path)
-        gtiff = gdal.Open(source_path)
-
-        ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
-        d[Info.KIND] = Kind.IMAGE
-
-        # FUTURE: this is Content metadata and not Product metadata:
-        d[Info.ORIGIN_X] = ox
-        d[Info.ORIGIN_Y] = oy
-        d[Info.CELL_WIDTH] = cw
-        d[Info.CELL_HEIGHT] = ch
-        # FUTURE: Should the Workspace normalize all input data or should the Image Layer handle any projection?
-        srs = osr.SpatialReference()
-        srs.ImportFromWkt(gtiff.GetProjection())
-        d[Info.PROJ] = srs.ExportToProj4().strip()  # remove extra whitespace
-
-        # Workaround for previously supported files
-        # give them some kind of name that means something
-        if Info.BAND in d:
-            d[Info.DATASET_NAME] = "B{:02d}".format(d[Info.BAND])
-        else:
-            # for new files, use this as a basic default
-            # FUTURE: Use Dataset name instead when we can read multi-dataset files
-            d[Info.DATASET_NAME] = os.path.split(source_path)[-1]
-
-        band = gtiff.GetRasterBand(1)
-        d[Info.SHAPE] = rows, cols = (band.YSize, band.XSize)
-
-        # Fix PROJ4 string if it needs an "+over" parameter
-        p = Proj(d[Info.PROJ])
-        lon_l, lat_u = p(ox, oy, inverse=True)
-        lon_r, lat_b = p(ox + cw * cols, oy + ch * rows, inverse=True)
-        if "+over" not in d[Info.PROJ] and lon_r < lon_l:
-            LOG.debug("Add '+over' to geotiff PROJ.4 because it seems to cross the anti-meridian")
-            d[Info.PROJ] += " +over"
-
-        bandtype = gdal.GetDataTypeName(band.DataType)
-        if bandtype.lower() != 'float32':
-            LOG.warning('attempting to read geotiff files with non-float32 content')
-
-        gtiff_meta = GeoTiffImporter._check_geotiff_metadata(gtiff)
-        d.update(gtiff_meta)
-        generate_guidebook_metadata(d)
-        LOG.debug("GeoTIFF metadata for {}: {}".format(source_path, repr(d)))
-        return d
-
-    def product_metadata(self):
-        return GeoTiffImporter.get_metadata(self.source_path)
-
-    # @asyncio.coroutine
-    def begin_import_products(self, *product_ids):  # FUTURE: allow product_ids to be uuids
-        import gdal
-        source_path = self.source_path
-        if product_ids:
-            products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
-        else:
-            products = list(self._S.query(Resource, Product).filter(
-                Resource.path == source_path).filter(
-                Product.resource_id == Resource.id).all())
-            assert (products)
-        if len(products) > 1:
-            LOG.warning('only first product currently handled in geotiff loader')
-        prod = products[0]
-
-        if prod.content:
-            LOG.info('content is already available, skipping import')
-            return
-
-        now = datetime.utcnow()
-
-        # re-collect the metadata, which should be separated between Product vs Content metadata in the FUTURE
-        # principally we're not allowed to store ORIGIN_ or CELL_ metadata in the Product
-        info = GeoTiffImporter.get_metadata(source_path)
-
-        # Additional metadata that we've learned by loading the data
-        gtiff = gdal.Open(source_path)
-
-        band = gtiff.GetRasterBand(1)  # FUTURE may be an assumption
-        shape = rows, cols = band.YSize, band.XSize
-        blockw, blockh = band.GetBlockSize()  # non-blocked files will report [band.XSize,1]
-
-        data_filename = '{}.image'.format(prod.uuid)
-        data_path = os.path.join(self._cwd, data_filename)
-
-        coverage_filename = '{}.coverage'.format(prod.uuid)
-        coverage_path = os.path.join(self._cwd, coverage_filename)
-        # no sparsity map
-
-        # shovel that data into the memmap incrementally
-        # http://geoinformaticstutorial.blogspot.com/2012/09/reading-raster-data-with-python-and-gdal.html
-        img_data = np.memmap(data_path, dtype=np.float32, shape=shape, mode='w+')
-
-        # load at an increment that matches the file's tile size if possible
-        IDEAL_INCREMENT = 512.0
-        increment = min(blockh * int(np.ceil(IDEAL_INCREMENT / blockh)), 2048)
-
-        # how many coverage states are we traversing during the load?
-        # for now let's go simple and have it be just image rows
-        # coverage_rows = int((rows + increment - 1) / increment) if we had an even increment but it's not guaranteed
-        cov_data = np.memmap(coverage_path, dtype=np.int8, shape=(rows,), mode='w+')
-        cov_data[:] = 0  # should not be needed except maybe in Windows?
-
-        # LOG.debug("keys in geotiff product: {}".format(repr(list(prod.info.keys()))))
-        LOG.debug(
-            "cell size in geotiff product: {} x {}".format(prod.info[Info.CELL_HEIGHT], prod.info[Info.CELL_WIDTH]))
-
-        # create and commit a Content entry pointing to where the content is in the workspace, even if coverage is empty
-        c = Content(
-            lod=0,
-            resolution=int(min(abs(info[Info.CELL_WIDTH]), abs(info[Info.CELL_HEIGHT]))),
-            atime=now,
-            mtime=now,
-
-            # info about the data array memmap
-            path=data_filename,
-            rows=rows,
-            cols=cols,
-            levels=0,
-            dtype='float32',
-
-            cell_width=info[Info.CELL_WIDTH],
-            cell_height=info[Info.CELL_HEIGHT],
-            origin_x=info[Info.ORIGIN_X],
-            origin_y=info[Info.ORIGIN_Y],
-            proj4=info[Info.PROJ],
-
-            # info about the coverage array memmap, which in our case just tells what rows are ready
-            coverage_rows=rows,
-            coverage_cols=1,
-            coverage_path=coverage_filename
-        )
-        # c.info.update(prod.info) would just make everything leak together so let's not do it
-        self._S.add(c)
-        prod.content.append(c)
-        self._S.commit()
-
-        # FIXME: yield initial status to announce content is available, even if it's empty
-
-        # now do the actual array filling from the geotiff file
-        # FUTURE: consider explicit block loads using band.ReadBlock(x,y) once
-        irow = 0
-        while irow < rows:
-            nrows = min(increment, rows - irow)
-            row_data = band.ReadAsArray(0, irow, cols, nrows)
-            img_data[irow:irow + nrows, :] = np.require(row_data, dtype=np.float32)
-            cov_data[irow:irow + nrows] = 1
-            irow += increment
-            status = import_progress(uuid=prod.uuid,
-                                     stages=1,
-                                     current_stage=0,
-                                     completion=float(irow) / float(rows),
-                                     stage_desc="importing geotiff",
-                                     dataset_info=None,
-                                     data=img_data)
-            yield status
-
-        # img_data = gtiff.GetRasterBand(1).ReadAsArray()
-        # img_data = np.require(img_data, dtype=np.float32, requirements=['C'])  # FIXME: is this necessary/correct?
-        # normally we would place a numpy.memmap in the workspace with the content of the geotiff raster band/s here
-
-        # single stage import with all the data for this simple case
-        zult = import_progress(uuid=prod.uuid,
-                               stages=1,
-                               current_stage=0,
-                               completion=1.0,
-                               stage_desc="done loading geotiff",
-                               dataset_info=None,
-                               data=img_data)
-
-        yield zult
-
-        # Finally, update content mtime and atime
-        c.atime = c.mtime = datetime.utcnow()
-        # self._S.commit()
-
-
-# map .platform_id in PUG format files to SIFT platform enum
-PLATFORM_ID_TO_PLATFORM = {
-    'G16': Platform.GOES_16,
-    'G17': Platform.GOES_17,
-    'G18': Platform.GOES_18,
-    'G19': Platform.GOES_19,
-    # hsd2nc export of AHI data as PUG format
-    'Himawari-8': Platform.HIMAWARI_8,
-    'Himawari-9': Platform.HIMAWARI_9,
-    # axi2cmi export as PUG, more consistent with other uses
-    'H8': Platform.HIMAWARI_8,
-    'H9': Platform.HIMAWARI_9
-}
-
-
-class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
-    """
-    Import from PUG format GOES-16 netCDF4 files
-    """
-
-    @staticmethod
-    def _basic_pug_metadata(pug):
-        return {
-            Info.PLATFORM: PLATFORM_ID_TO_PLATFORM[pug.platform_id],  # e.g. G16, H8
-            Info.BAND: pug.band,
-            Info.DATASET_NAME: 'B{:02d}'.format(pug.band),
-            Info.INSTRUMENT: Instrument.AHI if 'Himawari' in pug.instrument_type else Instrument.ABI,
-            Info.SCHED_TIME: pug.sched_time,
-            Info.OBS_TIME: pug.time_span[0],
-            Info.OBS_DURATION: pug.time_span[1] - pug.time_span[0],
-            Info.DISPLAY_TIME: pug.display_time,
-            Info.SCENE: pug.scene_id,
-            Info.DISPLAY_NAME: pug.display_name,
-        }
-
-    @classmethod
-    def is_relevant(cls, source_path=None, source_uri=None):
-        source = source_path or source_uri
-        return True if (source.lower().endswith('.nc') or source.lower().endswith('.nc4')) else False
-
-    @staticmethod
-    def pug_factory(source_path):
-        dn, fn = os.path.split(source_path)
-        is_netcdf = (fn.lower().endswith('.nc') or fn.lower().endswith('.nc4'))
-        if not is_netcdf:
-            raise ValueError("PUG loader requires files ending in .nc or .nc4: {}".format(repr(source_path)))
-        return PugFile.attach(source_path)  # noqa
-        # if 'L1b' in fn:
-        #     LOG.debug('attaching {} as PUG L1b'.format(source_path))
-        #     return PugL1bTools(source_path)
-        # else:
-        #     LOG.debug('attaching {} as PUG CMI'.format(source_path))
-        #     return PugCmiTools(source_path)
-
-    @staticmethod
-    def get_metadata(source_path=None, source_uri=None, pug=None, **kwargs):
-        # yield successive levels of detail as we load
-        if source_uri is not None:
-            raise NotImplementedError("GoesRPUGImporter cannot read from URIs yet")
-
-        #
-        # step 1: get any additional metadata and an overview tile
-        #
-
-        d = {}
-        # nc = nc4.Dataset(source_path)
-        pug = pug or GoesRPUGImporter.pug_factory(source_path)
-
-        d.update(GoesRPUGImporter._basic_pug_metadata(pug))
-        # d[Info.DATASET_NAME] = os.path.split(source_path)[-1]
-        d[Info.KIND] = Kind.IMAGE
-
-        # FUTURE: this is Content metadata and not Product metadata:
-        d[Info.PROJ] = pug.proj4_string
-        # get nadir-meter-ish projection coordinate vectors to be used by proj4
-        y, x = pug.proj_y, pug.proj_x
-        d[Info.ORIGIN_X] = x[0]
-        d[Info.ORIGIN_Y] = y[0]
-
-        # midyi, midxi = int(y.shape[0] / 2), int(x.shape[0] / 2)
-        # PUG states radiance at index [0,0] extends between coordinates [0,0] to [1,1] on a quadrille
-        # centers of pixels are therefore at +0.5, +0.5
-        # for a (e.g.) H x W image this means [H/2,W/2] coordinates are image center
-        # for now assume all scenes are even-dimensioned (e.g. 5424x5424)
-        # given that coordinates are evenly spaced in angular -> nadir-meters space,
-        # technically this should work with any two neighbor values
-        # d[Info.CELL_WIDTH] = x[midxi+1] - x[midxi]
-        # d[Info.CELL_HEIGHT] = y[midyi+1] - y[midyi]
-        cell_size = pug.cell_size
-        d[Info.CELL_HEIGHT], d[Info.CELL_WIDTH] = cell_size
-
-        shape = pug.shape
-        d[Info.SHAPE] = shape
-        generate_guidebook_metadata(d)
-
-        d[Info.FAMILY] = '{}:{}:{}:{:5.2f}µm'.format(Kind.IMAGE.name, 'geo', d[Info.STANDARD_NAME], d[
-            Info.CENTRAL_WAVELENGTH])  # kind:pointofreference:measurement:wavelength
-        d[Info.CATEGORY] = 'NOAA-PUG:{}:{}:{}'.format(d[Info.PLATFORM].name, d[Info.INSTRUMENT].name,
-                                                      d[Info.SCENE])  # system:platform:instrument:target
-        d[Info.SERIAL] = d[Info.SCHED_TIME].strftime("%Y%m%dT%H%M%S")
-        LOG.debug(repr(d))
-        return d
-
-    # def __init__(self, source_path, workspace_cwd, database_session, **kwargs):
-    #     super(GoesRPUGImporter, self).__init__(workspace_cwd, database_session)
-    #     self.source_path = source_path
-
-    def product_metadata(self):
-        return GoesRPUGImporter.get_metadata(self.source_path)
-
-    # @asyncio.coroutine
-    def begin_import_products(self, *product_ids):
-        source_path = self.source_path
-        if product_ids:
-            products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
-            assert (products)
-        else:
-            products = list(self._S.query(Resource, Product).filter(
-                Resource.path == source_path).filter(
-                Product.resource_id == Resource.id).all())
-            assert (products)
-        if len(products) > 1:
-            LOG.warning('only first product currently handled in pug loader')
-        prod = products[0]
-
-        if prod.content:
-            LOG.warning('content was already available, skipping import')
-            return
-
-        pug = GoesRPUGImporter.pug_factory(source_path)
-        rows, cols = shape = pug.shape
-        cell_height, cell_width = pug.cell_size
-        origin_y, origin_x = pug.origin
-        proj4 = pug.proj4_string
-
-        now = datetime.utcnow()
-
-        data_filename = '{}.image'.format(prod.uuid)
-        data_path = os.path.join(self._cwd, data_filename)
-
-        # coverage_filename = '{}.coverage'.format(prod.uuid)
-        # coverage_path = os.path.join(self._cwd, coverage_filename)
-        # no sparsity map
-
-        # shovel that data into the memmap incrementally
-        img_data = np.memmap(data_path, dtype=np.float32, shape=shape, mode='w+')
-
-        LOG.info('converting radiance to %s' % pug.bt_or_refl)
-        image = pug.bt if 'bt' == pug.bt_or_refl else pug.refl
-        # bt_or_refl, image, units = pug.convert_from_nc()  # FIXME expensive
-        # overview_image = fixme  # FIXME, we need a properly navigated overview image here
-
-        # we got some metadata, let's yield progress
-        # yield    import_progress(uuid=dest_uuid,
-        #                          stages=1,
-        #                          current_stage=0,
-        #                          completion=1.0/3.0,
-        #                          stage_desc="calculating imagery",
-        #                          dataset_info=d,
-        #                          data=image)
-
-        #
-        # step 2: read and convert the image data
-        #   - in chunks if it's a huge image so we can show progress and/or cancel
-        #   - push the data into a workspace memmap
-        #   - record the content information in the workspace metadatabase
-        #
-
-        # FUTURE as we're doing so, also update coverage array (showing what sections of data are loaded)
-        # FUTURE and for some cases the sparsity array, if the data is interleaved (N/A for NetCDF imagery)
-        img_data[:] = np.ma.fix_invalid(image, copy=False, fill_value=np.NAN)  # FIXME: expensive
-
-        # create and commit a Content entry pointing to where the content is in the workspace, even if coverage is empty
-        c = Content(
-            lod=0,
-            resolution=int(min(abs(cell_width), abs(cell_height))),
-            atime=now,
-            mtime=now,
-
-            # info about the data array memmap
-            path=data_filename,
-            rows=rows,
-            cols=cols,
-            proj4=proj4,
-            # levels = 0,
-            dtype='float32',
-
-            # info about the coverage array memmap, which in our case just tells what rows are ready
-            # coverage_rows = rows,
-            # coverage_cols = 1,
-            # coverage_path = coverage_filename
-
-            cell_width=cell_width,
-            cell_height=cell_height,
-            origin_x=origin_x,
-            origin_y=origin_y,
-        )
-        # c.info.update(prod.info) would just make everything leak together so let's not do it
-        self._S.add(c)
-        prod.content.append(c)
-        # prod.touch()
-        self._S.commit()
-
-        yield import_progress(uuid=prod.uuid,
-                              stages=1,
-                              current_stage=0,
-                              completion=1.0,
-                              stage_desc="GOES PUG data add to workspace",
-                              dataset_info=None,
-                              data=img_data)
+        pass
 
 
 class SatpyImporter(aImporter):
@@ -889,32 +417,40 @@ class SatpyImporter(aImporter):
 
     def __init__(self, source_paths, workspace_cwd, database_session, **kwargs):
         super(SatpyImporter, self).__init__(workspace_cwd, database_session)
-        reader = kwargs.pop('reader', None)
+        reader = kwargs.pop("reader", None)
         if reader is None:
             raise NotImplementedError("Can't automatically determine reader.")
         if not isinstance(source_paths, (list, tuple)):
             source_paths = [source_paths]
 
         if Scene is None:
-            raise ImportError("SatPy is not available and can't be used as "
-                              "an importer")
+            raise ImportError("SatPy is not available and can't be used as " "an importer")
         self.filenames = list(source_paths)
         self.reader = reader
-        self.scn = kwargs.get('scene')
+        self.resampling_info = kwargs.get("resampling_info")
+        self.scn = kwargs.get("scene")
+        self.merge_target = kwargs.get("merge_target")
         if self.scn is None:
-            self.scn = Scene(reader=self.reader, filenames=self.filenames)
+            reader_kwargs = get_reader_kwargs_dict([self.reader])
+            self.scn = Scene(filenames={self.reader: self.filenames}, reader_kwargs=reader_kwargs)
         self._resources = []
         # DataID filters
         self.product_filters = {}
-        for k in ['resolution', 'calibration', 'level']:
+        for k in ["resolution", "calibration", "level"]:
             if k in kwargs:
                 self.product_filters[k] = kwargs.pop(k)
         # NOTE: product_filters don't do anything if the dataset_ids aren't
         #       specified since we are using all available dataset ids
-        self.dataset_ids = kwargs.get('dataset_ids')
+        self.dataset_ids = kwargs.get("dataset_ids")
         if self.dataset_ids is None:
             self.dataset_ids = filter_dataset_ids(self.scn.available_dataset_ids())
         self.dataset_ids = sorted(self.dataset_ids)
+
+        self.use_inventory_db = USE_INVENTORY_DB
+        self.required_aux_file_types = _get_types_of_required_aux_files(self.scn)
+
+        # NOTE: needed for an issue with resampling of NetCDF data.
+        self.scn_original = None  # noqa - Do not simply remove
 
     @classmethod
     def from_product(cls, prod: Product, workspace_cwd, database_session, **kwargs):
@@ -926,12 +462,12 @@ class SatpyImporter(aImporter):
         try:
             cls = prod.resource[0].format
         except IndexError:
-            LOG.error('no resources in {} {}'.format(repr(type(prod)), repr(prod)))
+            LOG.error("no resources in {} {}".format(repr(type(prod)), repr(prod)))
             raise
-        kwargs.pop('reader', None)
-        kwargs.pop('scenes', None)
-        kwargs.pop('scene', None)
-        kwargs['dataset_ids'] = [prod.info['_satpy_id']]
+        kwargs.pop("reader", None)
+        kwargs.pop("scenes", None)
+        kwargs.pop("scene", None)
+        kwargs["dataset_ids"] = [prod.info["_satpy_id"]]
         filenames = [r.path for r in prod.resource]
         return cls(filenames, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
 
@@ -943,12 +479,11 @@ class SatpyImporter(aImporter):
     def merge_resources(self):
         if len(self._resources) == len(self.filenames):
             return self._resources
-
-        resources = self._S.query(Resource).filter(
-            Resource.path.in_(self.filenames)).all()
-        if len(resources) == len(self.filenames):
-            self._resources = resources
-            return self._resources
+        if self.use_inventory_db:
+            resources = self._S.query(Resource).filter(Resource.path.in_(self.filenames)).all()
+            if len(resources) == len(self.filenames):
+                self._resources = resources
+                return self._resources
 
         now = datetime.utcnow()
         res_dict = {r.path: r for r in self._resources}
@@ -962,7 +497,8 @@ class SatpyImporter(aImporter):
                 mtime=now,
                 atime=now,
             )
-            self._S.add(res)
+            if self.use_inventory_db:
+                self._S.add(res)
             res_dict[fn] = res
 
         self._resources = res_dict.values()
@@ -971,25 +507,28 @@ class SatpyImporter(aImporter):
     def merge_products(self) -> Iterable[Product]:
         resources = self.merge_resources()
         if resources is None:
-            LOG.debug('no resources for {}'.format(self.filenames))
+            LOG.debug("no resources for {}".format(self.filenames))
             return
 
         existing_ids = {}
-        resources = list(resources)
-        for res in resources:
-            products = list(res.product)
-            existing_ids.update({prod.info['_satpy_id']: prod for prod in products})
-        existing_prods = {x: existing_ids[x] for x in self.dataset_ids if x in existing_ids}
-        if products and len(existing_prods) == len(self.dataset_ids):
-            products = existing_prods.values()
-            LOG.debug('pre-existing products {}'.format(repr(products)))
-            yield from products
-            return
+        if self.use_inventory_db:
+            resources = list(resources)
+            for res in resources:
+                products = list(res.product)
+                existing_ids.update({prod.info["_satpy_id"]: prod for prod in products})
+            existing_prods = {x: existing_ids[x] for x in self.dataset_ids if x in existing_ids}
+            # FIXME: products may be unset in next line, its use is suspicious anyway
+            if products and len(existing_prods) == len(self.dataset_ids):
+                products = list(existing_prods.values())
+                LOG.debug("pre-existing products {}".format(repr(products)))
+                yield from products
+                return
 
         from uuid import uuid1
-        scn = self.load_all_datasets()
-        for ds_id in scn.keys():
-            ds = scn[ds_id]
+
+        self._load_all_datasets()
+        revised_datasets = self._revise_all_datasets()
+        for ds_id, ds in revised_datasets.items():
             # don't recreate a Product for one we already have
             if ds_id in existing_ids:
                 yield existing_ids[ds_id]
@@ -998,7 +537,7 @@ class SatpyImporter(aImporter):
             meta = ds.attrs
             uuid = uuid1()
             meta[Info.UUID] = uuid
-            meta['_satpy_id'] = ds_id
+            meta["_satpy_id"] = ds_id
             now = datetime.utcnow()
             prod = Product(
                 uuid_str=str(uuid),
@@ -1006,15 +545,58 @@ class SatpyImporter(aImporter):
             )
             prod.resource.extend(resources)
 
-            assert (Info.OBS_TIME in meta)
-            assert (Info.OBS_DURATION in meta)
+            assert Info.OBS_TIME in meta  # nosec B101
+            assert Info.OBS_DURATION in meta  # nosec B101
             prod.update(meta)  # sets fields like obs_duration and obs_time transparently
-            assert (prod.info[Info.OBS_TIME] is not None and prod.obs_time is not None)
-            assert (prod.info[Info.VALID_RANGE] is not None)
-            LOG.debug('new product: {}'.format(repr(prod)))
-            self._S.add(prod)
-            self._S.commit()
+            assert prod.info[Info.OBS_TIME] is not None and prod.obs_time is not None  # nosec B101
+            LOG.debug("new product: {}".format(repr(prod)))
+            if self.use_inventory_db:
+                self._S.add(prod)
+                self._S.commit()
             yield prod
+
+    def _extract_segment_number(self):
+        """
+        Load the segment numbers loaded by this scene.
+        :return: list of all the segment numbers of all segments loaded by the scene
+        """
+        segments = []
+        collected_segment_count = 0
+        for reader in self.scn._readers.values():
+            for file_handlers in reader.file_handlers.values():
+                collected_segment_count += 1
+                for file_handler in file_handlers:
+                    if file_handler.filetype_info["file_type"] in self.required_aux_file_types:
+                        collected_segment_count -= 1
+                        continue
+                    seg = file_handler.filename_info["segment"]
+                    segments.append(seg)
+
+        filtered_segments = []
+        for segment in set(segments):
+            if segments.count(segment) == collected_segment_count:
+                filtered_segments.append(segment)
+
+        return sorted(filtered_segments)
+
+    def _extract_expected_segments(self) -> Optional[int]:
+        """
+        Load the number of expected segments for the products loaded by the given scene.
+        :return: number of expected segments or None if not found or products in scene
+        have different numbers of expected segments
+        """
+        expected_segments = None
+        for reader in self.scn._readers.values():
+            for file_handlers in reader.file_handlers.values():
+                for file_handler in file_handlers:
+                    if file_handler.filetype_info["file_type"] in self.required_aux_file_types:
+                        continue
+                    es = file_handler.filetype_info["expected_segments"]
+                    if expected_segments is None:
+                        expected_segments = es
+                    if expected_segments != es:
+                        return None
+        return expected_segments
 
     @property
     def num_products(self) -> int:
@@ -1024,21 +606,20 @@ class SatpyImporter(aImporter):
 
     @staticmethod
     def _get_platform_instrument(attrs: dict):
-        """Convert SatPy platform_name/sensor to """
-        attrs[Info.INSTRUMENT] = attrs.get('sensor')
-        attrs[Info.PLATFORM] = attrs.get('platform_name') or attrs.get('platform_shortname')
+        """Convert SatPy platform_name/sensor to"""
+        attrs[Info.INSTRUMENT] = attrs.get("sensor")
+        attrs[Info.PLATFORM] = attrs.get("platform_name") or attrs.get("platform_shortname")
 
         # Special handling of GRIB forecast data
-        if 'centreDescription' in attrs and \
-                attrs[Info.INSTRUMENT] == 'unknown':
-            description = attrs['centreDescription']
+        if "centreDescription" in attrs and attrs[Info.INSTRUMENT] == "unknown":
+            description = attrs["centreDescription"]
             if attrs.get(Info.PLATFORM) is None:
-                attrs[Info.PLATFORM] = 'NWP'
-            if 'NCEP' in description:
-                attrs[Info.INSTRUMENT] = 'GFS'
-        if attrs[Info.INSTRUMENT] in ['GFS', 'unknown']:
+                attrs[Info.PLATFORM] = "NWP"
+            if "NCEP" in description:
+                attrs[Info.INSTRUMENT] = "GFS"
+        if attrs[Info.INSTRUMENT] in ["GFS", "unknown"]:
             attrs[Info.INSTRUMENT] = Instrument.GFS
-        if attrs[Info.PLATFORM] in ['NWP', 'unknown']:
+        if attrs[Info.PLATFORM] in ["NWP", "unknown"]:
             attrs[Info.PLATFORM] = Platform.NWP
 
         # FUTURE: Use standard string names for platform/instrument
@@ -1046,311 +627,760 @@ class SatpyImporter(aImporter):
         #         Enum lookup to match Enum values to Enum keys.
         # if we haven't figured out what these are then give up and say they are unknown
         if isinstance(attrs[Info.PLATFORM], str):
-            plat_str = attrs[Info.PLATFORM].lower().replace('-', '')
+            plat_str = attrs[Info.PLATFORM].lower().replace("-", "")
             attrs[Info.PLATFORM] = PLATFORM_MAP.get(plat_str, attrs[Info.PLATFORM])
         if not attrs[Info.PLATFORM] or isinstance(attrs[Info.PLATFORM], str):
             attrs[Info.PLATFORM] = Platform.UNKNOWN
 
         if isinstance(attrs[Info.INSTRUMENT], str):
-            inst_str = attrs[Info.INSTRUMENT].lower().replace('-', '')
+            inst_str = attrs[Info.INSTRUMENT].lower().replace("-", "")
             attrs[Info.INSTRUMENT] = INSTRUMENT_MAP.get(inst_str, attrs[Info.INSTRUMENT])
         if not attrs[Info.INSTRUMENT] or isinstance(attrs[Info.INSTRUMENT], str):
             attrs[Info.INSTRUMENT] = Instrument.UNKNOWN
 
-    def load_all_datasets(self) -> Scene:
-        self.scn.load(self.dataset_ids, **self.product_filters)
+    def _load_all_datasets(self) -> None:
+        self.scn.load(self.dataset_ids, pad_data=False, upper_right_corner="NE", **self.product_filters)
         # copy satpy metadata keys to SIFT keys
+
+        if self.scn.missing_datasets:
+            # deactivating reduce_data, see https://github.com/pytroll/satpy/issues/2476
+            self.scn = self.scn.resample(resampler="native", reduce_data=False)
+
         for ds in self.scn:
-            start_time = ds.attrs['start_time']
-            id_str = ":".join(str(v[1]) for v in get_id_items(id_from_attrs(ds.attrs)))
-            ds.attrs[Info.DATASET_NAME] = id_str
-            ds.attrs[Info.OBS_TIME] = start_time
-            ds.attrs[Info.SCHED_TIME] = start_time
-            duration = ds.attrs.get('end_time', start_time) - start_time
-            if duration.total_seconds() <= 0:
-                duration = timedelta(minutes=60)
-            ds.attrs[Info.OBS_DURATION] = duration
+            self._set_name_metadata(ds.attrs)
+            self._set_time_metadata(ds.attrs)
+            self._set_kind_metadata(ds.attrs)
+            self._set_wavelength_metadata(ds.attrs)
+            self._set_shape_metadata(ds.attrs, ds.shape)
+            self._set_scene_metadata(ds.attrs)
+            self._set_family_metadata(ds.attrs)
+            self._set_category_metadata(ds.attrs)
+            self._set_serial_metadata(ds.attrs)
+            ds.attrs.setdefault("reader", self.reader)
 
-            # Handle GRIB platform/instrument
-            ds.attrs[Info.KIND] = Kind.IMAGE if self.reader != 'grib' else \
-                Kind.CONTOUR
-            self._get_platform_instrument(ds.attrs)
-            ds.attrs.setdefault(Info.STANDARD_NAME, ds.attrs.get('standard_name'))
-            if 'wavelength' in ds.attrs:
-                ds.attrs.setdefault(Info.CENTRAL_WAVELENGTH,
-                                    ds.attrs['wavelength'][1])
+    @staticmethod
+    def _set_name_metadata(
+        attrs: dict, name: Optional[str] = None, short_name: Optional[str] = None, long_name: Optional[str] = None
+    ) -> None:
+        if not name:
+            name = attrs["name"] or attrs.get(Info.STANDARD_NAME)
 
-            # Resolve anything else needed by SIFT
-            model_time = ds.attrs.get('model_time')
-            if model_time is not None:
-                ds.attrs[Info.DATASET_NAME] += " " + model_time.isoformat()
-            ds.attrs[Info.SHORT_NAME] = ds.attrs['name']
-            if ds.attrs.get('level') is not None:
-                ds.attrs[Info.SHORT_NAME] = "{} @ {}hPa".format(
-                    ds.attrs['name'], ds.attrs['level'])
-            ds.attrs[Info.SHAPE] = ds.shape
-            ds.attrs[Info.UNITS] = ds.attrs.get('units')
-            if ds.attrs[Info.UNITS] == 'unknown':
-                LOG.warning("Layer units are unknown, using '1'")
-                ds.attrs[Info.UNITS] = 1
-            generate_guidebook_metadata(ds.attrs)
+        id_str = ":".join(str(v[1]) for v in get_id_items(id_from_attrs(attrs)))
+        attrs[Info.DATASET_NAME] = id_str
 
-            # Generate FAMILY and CATEGORY
-            if 'model_time' in ds.attrs:
-                model_time = ds.attrs['model_time'].isoformat()
-            else:
-                model_time = None
-            ds.attrs[Info.SCENE] = ds.attrs.get('scene_id')
-            if ds.attrs[Info.SCENE] is None:
-                # compute a "good enough" hash for this Scene
-                area = ds.attrs['area']
-                extents = area.area_extent
-                # round extents to nearest 100 meters
-                extents = tuple(int(np.round(x / 100.0) * 100.0) for x in extents)
-                proj_str = area.proj4_string
-                ds.attrs[Info.SCENE] = "{}-{}".format(str(extents), proj_str)
-            if ds.attrs.get(Info.CENTRAL_WAVELENGTH) is None:
-                cw = ""
-            else:
-                cw = ":{:5.2f}µm".format(ds.attrs[Info.CENTRAL_WAVELENGTH])
-            ds.attrs[Info.FAMILY] = '{}:{}:{}{}'.format(
-                ds.attrs[Info.KIND].name, ds.attrs[Info.STANDARD_NAME],
-                ds.attrs[Info.SHORT_NAME], cw)
-            ds.attrs[Info.CATEGORY] = 'SatPy:{}:{}:{}'.format(
-                ds.attrs[Info.PLATFORM].name, ds.attrs[Info.INSTRUMENT].name,
-                ds.attrs[Info.SCENE])  # system:platform:instrument:target
-            # TODO: Include level or something else in addition to time?
-            start_str = ds.attrs['start_time'].isoformat()
-            ds.attrs[Info.SERIAL] = start_str if model_time is None else model_time + ":" + start_str
-            ds.attrs.setdefault('reader', self.reader)
+        model_time = attrs.get("model_time")
+        if model_time is not None:
+            attrs[Info.DATASET_NAME] += " " + model_time.isoformat()
 
-        return self.scn
+        level = attrs.get("level")
+        if level is None:
+            attrs[Info.SHORT_NAME] = short_name or name
+        else:
+            attrs[Info.SHORT_NAME] = f"{short_name or name} @ {level}hPa"
 
-    def _area_to_sift_attrs(self, area):
-        """Area to uwsift keys"""
-        from pyresample.geometry import AreaDefinition
-        if not isinstance(area, AreaDefinition):
-            raise NotImplementedError("Only AreaDefinition datasets can "
-                                      "be loaded at this time.")
+        attrs[Info.LONG_NAME] = long_name or name
+        attrs[Info.STANDARD_NAME] = attrs.get("standard_name") or name
 
-        half_pixel_x = abs(area.pixel_size_x) / 2.
-        half_pixel_y = abs(area.pixel_size_y) / 2.
+    @staticmethod
+    def _determine_sched_time(attrs: dict):
+        if "time_parameters" in attrs:
+            return attrs["time_parameters"]["nominal_start_time"]
+        if "nominal_start_time" in attrs:
+            return attrs["nominal_start_time"]
+        return attrs["start_time"]
 
-        return {
-            Info.PROJ: area.proj4_string,
-            Info.ORIGIN_X: area.area_extent[0] + half_pixel_x,
-            Info.ORIGIN_Y: area.area_extent[3] - half_pixel_y,
-            Info.CELL_HEIGHT: -abs(area.pixel_size_y),
-            Info.CELL_WIDTH: area.pixel_size_x,
+    @staticmethod
+    def _set_time_metadata(attrs: dict) -> None:
+        # TODO Review Satpy start/end times ("[{nominal,observation]_}{start,end}_times") and adjust SIFT
+        #  terminology regarding start/end times and durations accordingly.
+        start_time = attrs["start_time"]
+        attrs[Info.OBS_TIME] = start_time
+        attrs[Info.SCHED_TIME] = SatpyImporter._determine_sched_time(attrs)
+        duration = attrs.get("end_time", start_time) - start_time
+        if duration.total_seconds() <= 0:
+            duration = timedelta(minutes=60)
+        attrs[Info.OBS_DURATION] = duration
+
+    def _set_kind_metadata(self, attrs: dict) -> None:
+        if "prerequisites" in attrs:
+            attrs[Info.KIND] = Kind.MC_IMAGE
+            return
+        reader_kind = config.get(f"data_reading.{self.reader}.kind", None)
+        if reader_kind:
+            try:
+                attrs[Info.KIND] = Kind[reader_kind]
+            except KeyError:
+                raise KeyError(f"Unknown data kind '{reader_kind}'" f" configured for reader {self.reader}.")
+        else:
+            LOG.info(f"No data kind configured for reader '{self.reader}'." f" Falling back to 'IMAGE'.")
+            attrs[Info.KIND] = Kind.IMAGE
+
+    def _set_wavelength_metadata(self, attrs: dict) -> None:
+        self._get_platform_instrument(attrs)
+        if "wavelength" in attrs and attrs.get("wavelength"):
+            attrs.setdefault(Info.CENTRAL_WAVELENGTH, attrs["wavelength"][1])
+
+    def _set_shape_metadata(self, attrs: dict, shape) -> None:
+        if len(shape) == 3 and "prerequisites" in attrs.keys():
+            shape = (shape[1], shape[2], shape[0])
+        attrs[Info.SHAPE] = shape if not self.resampling_info else self.resampling_info["shape"]
+        attrs[Info.UNITS] = attrs.get("units")
+        if attrs[Info.UNITS] == "unknown":
+            LOG.warning("Dataset units are unknown, using '1'")
+            attrs[Info.UNITS] = 1
+        generate_guidebook_metadata(attrs)
+
+    def _set_scene_metadata(self, attrs: dict) -> None:
+        attrs[Info.SCENE] = attrs.get("scene_id")
+        if attrs[Info.SCENE] is None:
+            self._compute_scene_hash(attrs)
+
+    @staticmethod
+    def _set_family_metadata(attrs: dict) -> None:
+        if attrs.get(Info.CENTRAL_WAVELENGTH) is None:
+            cw = ""
+        else:
+            cw = ":{:5.2f}µm".format(attrs[Info.CENTRAL_WAVELENGTH])
+        attrs[Info.FAMILY] = "{}:{}:{}{}".format(
+            attrs[Info.KIND].name, attrs[Info.STANDARD_NAME], attrs[Info.SHORT_NAME], cw
+        )
+
+    @staticmethod
+    def _set_category_metadata(attrs: dict) -> None:
+        # system:platform:instrument:target
+        attrs[Info.CATEGORY] = "SatPy:{}:{}:{}".format(
+            attrs[Info.PLATFORM].name, attrs[Info.INSTRUMENT].name, attrs[Info.SCENE]
+        )
+
+    @staticmethod
+    def _set_serial_metadata(attrs: dict) -> None:
+        # TODO: Include level or something else in addition to time?
+        start_str = attrs["start_time"].isoformat()
+        if "model_time" in attrs:
+            model_time = attrs["model_time"].isoformat()
+            attrs[Info.SERIAL] = f"{model_time}:{start_str}"
+        else:
+            attrs[Info.SERIAL] = start_str
+
+    @staticmethod
+    def _get_area_extent(area: Union[AreaDefinition, StackedAreaDefinition]) -> List:
+        """
+        Return the area extent of the AreaDefinition or of the nominal
+        AreaDefinition of the StackedAreaDefinition. The nominal AreaDefinition
+        is the one referenced via 'area_id' by all AreaDefinitions listed in the
+        StackedAreaDefinition. If there are different 'area_id's in the
+        StackedAreaDefinition this function fails throwing an exception.
+
+        Use case: Get the extent of the full-disk to which a non-contiguous set
+        of segments loaded from a segmented GEOS file format (e.g. HRIT) belongs.
+
+        :param area: AreaDefinition ar StackedAreaDefinition
+        :return: Extent of the nominal AreaDefinition.
+        :raises ValueError: when a StackedAreaDefinition with incompatible
+        AreaDefinitions is passed
+        """
+        if isinstance(area, StackedAreaDefinition):
+            any_area_def = area.defs[0]
+            for area_def in area.defs:
+                if area_def.area_id != any_area_def.area_id:
+                    raise ValueError(f"Different area_ids found in StackedAreaDefinition: {area}.")
+            area = satpy.resample.get_area_def(any_area_def.area_id)
+        return area.area_extent
+
+    def _compute_scene_hash(self, attrs: dict):
+        """Compute a "good enough" hash and store it as
+        SCENE information.
+
+        The SCENE information is used at other locations to identify data that
+        has roughly the same extent and projection. That is a  pre-requisite
+        to allow to derive algebraics and compositions from them.
+
+        Unstructured data has no clear extent and not an intrinsic projection
+        (data locations are in latitude / longitude), thus something like a
+        SCENE (in the sense of describing a view on a section of the earth's
+        surface) cannot clearly be determined for it.
+        """
+        try:
+            area = (
+                attrs["area"]
+                if not self.resampling_info
+                else AreaDefinitionsManager.area_def_by_id(self.resampling_info["area_id"])
+            )
+            # round extents to nearest 100 meters
+            extents = tuple(int(np.round(x / 100.0) * 100.0) for x in self._get_area_extent(area))
+            attrs[Info.SCENE] = "{}-{}".format(str(extents), area.proj_str)
+        except (KeyError, AttributeError):
+            # Scattered data, this is not suitable to define a scene
+            attrs[Info.SCENE] = None
+
+    def _stack_data_arrays(
+        self, datasets: List[DataArray], attrs: dict, name_prefix: str = "", axis: int = 1
+    ) -> DataArray:
+        """
+        Merge multiple DataArrays into a single ``DataArray``. Use the
+        ``attrs`` dict for the DataArray metadata. This method also copies
+        the Satpy metadata fields into SIFT fields. The ``attrs`` dict won't
+        be modified.
+
+        :param datasets: List of DataArrays
+        :param attrs: metadata for the resulting DataArray
+        :param name_prefix: if given, a prefix for the name of the new DataArray
+        :param axis: numpy axis index
+        :return: stacked Dask array
+        """
+        # Workaround for a Dask bug: Convert all DataArrays to float32
+        # before calling into dask, because an int16 DataArray will be
+        # converted into a Series instead of a dask Array with newer
+        # versions. This then causes a TypeError.
+        meta = np.stack([da.utils.meta_from_array(ds) for ds in datasets], axis=axis)
+        datasets = [ds.astype(meta.dtype) for ds in datasets]
+        combined_data = da.stack(datasets, axis=axis)
+
+        attrs = attrs.copy()
+        ds_id = attrs["_satpy_id"]
+        name = f"{name_prefix or ''}{attrs['name']}"
+        attrs["_satpy_id"] = DataID(ds_id.id_keys, name=name)
+        self._set_name_metadata(attrs, name)
+        self._set_time_metadata(attrs)
+        self._set_kind_metadata(attrs)
+        self._set_wavelength_metadata(attrs)
+        self._set_shape_metadata(attrs, combined_data.shape)
+
+        guidebook = get_guidebook_class(attrs)
+        attrs[Info.DISPLAY_NAME] = guidebook._default_display_name(attrs)
+
+        self._set_scene_metadata(attrs)
+        self._set_family_metadata(attrs)
+        self._set_category_metadata(attrs)
+
+        return DataArray(combined_data, attrs=attrs)
+
+    def _parse_style_attributes_config(self) -> Dict[str, Set[str]]:
+        """
+        Extract the ``style_attributes`` section from the reader config.
+        This function doesn't validate whether the style attributes or the
+        product names exist.
+
+        The returned dictionary lists for each product, which dependent styles
+        it is configured for.
+
+        Maintenance: this swaps the mapping direction since the new one is more
+        useful for querying which features (style attributes) should be styled depending
+        on a given product
+
+        :return: mapping of products to style attributes
+        """
+        style_attributes = config.get(f"data_reading.{self.reader}.style_attributes", None)
+        if not style_attributes:
+            return {}
+
+        style_attributes_by_product = {}
+        for style_attribute, product_names in style_attributes.items():
+            for product_name in product_names:
+                if product_name not in style_attributes_by_product:
+                    style_attributes_by_product[product_name] = {style_attribute}
+                else:
+                    style_attributes_by_product[product_name].add(style_attribute)
+
+        return style_attributes_by_product
+
+    def _combine_points(self, datasets: DatasetDict, converter) -> Dict[DataID, DataArray]:
+        # Currently only the "fill" can be colored by a mapping from product values to colors (using a colormap) but in
+        # the future other features could be colored as well, e.g.  like "stroke".
+        supported_color_by_style_attrs = {"fill"}
+        style_attributes_by_product = self._parse_style_attributes_config()
+
+        converted_datasets = {}
+        for ds_id, ds in datasets.items():
+            if ds.attrs[Info.KIND] != Kind.POINTS:
+                continue
+
+            ds_name = ds_id["name"]
+            do_color_by_values = ds_name in style_attributes_by_product and bool(
+                style_attributes_by_product[ds_name] & supported_color_by_style_attrs
+            )
+            try:
+                # Only if we want to use the values of the data to color
+                # markers we need the dataset's array itself, otherwise the
+                # coordinates alone are sufficient.
+                convertible_ds = (
+                    [ds.area.lons, ds.area.lats, ds] if do_color_by_values else [ds.area.lons, ds.area.lats]
+                )
+            except AttributeError:
+                # Some products (e.g. `latitude` and `longitude`) may not
+                # (for whatever reason) have an associated SwathDefinition.
+                # Without it, there is no geolocation information per data
+                # point, because it is taken from its fields 'lats', 'lons'.
+                # This cannot be healed, point data loading fails.
+                LOG.error(
+                    f"Dataset '{ds.attrs['name']}' of kind POINTS has no point"
+                    f" coordinates (lats, lons) (Missing SwathDefinition)."
+                )
+                continue
+            converted_datasets[ds_id] = converter(convertible_ds, ds.attrs)
+        return converted_datasets
+
+    def _parse_coords_end_config(self) -> List[str]:
+        """
+        Parse the ``coordinates_end`` section of the reader config.
+
+        :return: List of ``coords`` identifiers
+        """
+        coords_end = config.get(f"data_reading.{self.reader}.coordinates_end", None)
+        if not coords_end:
+            return []
+
+        if len(coords_end) < 2 or len(coords_end) > 2:
+            LOG.warning("expected 2 end coordinates for LINES")
+        return coords_end
+
+    def _combine_lines(self, datasets: DatasetDict, converter) -> Dict[DataID, DataArray]:
+        """
+        Find convertible LINES datasets in the ``DatasetDict``. The ``converter``
+        function is then used to generate new DataArrays.
+
+        The positions for the tip and base of the lines are extracted from the
+        dataset metadata. The dataset itself will be discarded.
+
+        :param datasets: all loaded datasets and previously converted datasets
+        :param converter: function to convert a list of DataArrays
+        :return: mapping of converted DataID to new DataArray
+        """
+        coords_end = self._parse_coords_end_config()
+
+        converted_datasets = {}
+        for ds_id, ds in datasets.items():
+            if ds.attrs[Info.KIND] != Kind.LINES:
+                continue
+
+            convertible_ds = []
+            try:
+                for coord in coords_end:
+                    convertible_ds.append(ds.coords[coord])  # base
+            except KeyError:
+                LOG.error(f"dataset has no coordinates: {ds.attrs['name']}")
+                continue
+            if len(convertible_ds) < 2:
+                LOG.error(f"LINES dataset needs 4 coordinates: {ds.attrs['name']}")
+                continue
+
+            convertible_ds.extend([ds.area.lons, ds.area.lats])  # tip
+            converted_datasets[ds_id] = converter(convertible_ds, ds.attrs)
+        return converted_datasets
+
+    def _revise_all_datasets(self) -> DatasetDict:
+        """
+        Revise all datasets and convert the data representation of the POINTS
+        and LINES records found to the data format VisPy needs to display them
+        as such.
+
+        The original datasets are not kept in the scene but replaced by the
+        converted datasets.
+
+        :return: ``DatasetDict`` with the loaded and converted datasets
+        """
+        loaded_datasets = DatasetDict()
+        for ds_id in self.scn.keys():
+            ds = self.scn[ds_id]
+            loaded_datasets[ds_id] = ds
+
+        # Note: If you do not want the converted data sets to overwrite the
+        # original data sets in a future development of this software,
+        # you can pass a suitable prefix to self._stack_data_arrays() (which
+        # will be used to create a new name for the converted data set) by
+        # defining the appropriate converters, for example, as follows:
+        #   self._combine_points: lambda *args: self._stack_data_arrays(*args, "POINTS-"),
+        converters = {
+            self._combine_points: lambda *args: self._stack_data_arrays(*args),
+            self._combine_lines: lambda *args: self._stack_data_arrays(*args),
         }
 
-    def begin_import_products(self, *product_ids) -> Generator[import_progress, None, None]:
-        import dask.array as da
+        for detector, converter in converters.items():
+            converted_datasets = detector(loaded_datasets, converter)
+            for old_ds_id, new_ds in converted_datasets.items():
+                del loaded_datasets[old_ds_id]
 
-        if product_ids:
-            products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
-            assert products
+                new_ds_id = DataID.from_dataarray(new_ds)
+                loaded_datasets[new_ds_id] = new_ds
+
+        for ds_id, ds in loaded_datasets.items():
+            self.scn[ds_id] = ds
+        return loaded_datasets
+
+    @staticmethod
+    def _area_to_sift_attrs(area):
+        """Area to uwsift keys"""
+        if not isinstance(area, AreaDefinition):
+            raise NotImplementedError("Only AreaDefinition datasets can " "be loaded at this time.")
+
+        return {
+            Info.PROJ: area.proj_str,
+            Info.ORIGIN_X: area.area_extent[0],  # == lower_(left_)x
+            Info.ORIGIN_Y: area.area_extent[3],  # == upper_(right_)y
+            Info.CELL_WIDTH: area.pixel_size_x,
+            Info.CELL_HEIGHT: -area.pixel_size_y,
+        }
+
+    def _get_grid_info(self):
+        grid_origin = config.get(f"data_reading.{self.reader}.grid.origin", "NW")
+        grid_first_index_x = config.get(f"data_reading.{self.reader}.grid.first_index_x", 0)
+        grid_first_index_y = config.get(f"data_reading.{self.reader}.grid.first_index_y", 0)
+
+        return {
+            Info.GRID_ORIGIN: grid_origin,
+            Info.GRID_FIRST_INDEX_X: grid_first_index_x,
+            Info.GRID_FIRST_INDEX_Y: grid_first_index_y,
+        }
+
+    def begin_import_products(self, *product_ids) -> Generator[import_progress, None, None]:  # noqa: C901
+        if self.use_inventory_db:
+            products = self._get_products_from_inventory_db(product_ids)
         else:
-            products = list(self._S.query(Resource, Product).filter(
-                Resource.path.in_(self.filenames)).filter(
-                Product.resource_id == Resource.id).all())
-            assert products
+            products = product_ids
+
+        merge_with_existing = self.merge_target is not None
 
         # FIXME: Don't recreate the importer every time we want to load data
-        dataset_ids = [prod.info['_satpy_id'] for prod in products]
-        self.scn.load(dataset_ids)
+        dataset_ids = [prod.info["_satpy_id"] for prod in products]
+        self.scn.load(dataset_ids, pad_data=not merge_with_existing, upper_right_corner="NE")
+
+        # If there are datasets missing, resampling is needed to create them:
+        if self.scn.missing_datasets:
+            # About the next strange line of code: keep a reference to the
+            # original scene to work around an issue in the resampling
+            # implementation for NetCDF data: otherwise the original data
+            # would be garbage collected too early.
+            self.scn_original = self.scn  # noqa - Do not simply remove
+
+            # deactivating reduce_data, see https://github.com/pytroll/satpy/issues/2476
+            self.scn = self.scn.resample(resampler="native", reduce_data=False)
+
+        if self.resampling_info:
+            self._preprocess_products_with_resampling()
+
         num_stages = len(products)
         for idx, (prod, ds_id) in enumerate(zip(products, dataset_ids)):
-            dataset = self.scn[ds_id]
-            shape = dataset.shape
-            num_contents = 1 if prod.info[Info.KIND] == Kind.IMAGE else 2
+
+            dataset = (
+                self.scn[ds_id] if prod.info[Info.KIND] != Kind.MC_IMAGE else get_enhanced_image(self.scn[ds_id]).data
+            )
+            if prod.info[Info.KIND] == Kind.MC_IMAGE:
+                # The dimension of the dataset is ('bands', 'y', 'x')
+                # but for later the dimension ('y', 'x', 'bands') is needed
+                dataset = dataset.transpose("y", "x", "bands")
+            # Since in the first SatpyImporter loading pass (see
+            # load_all_datasets()) no padding is applied (pad_data=False), the
+            # Info.SHAPE stored at that time may not be the same as it is now if
+            # we load with padding now. In that case we must update the
+            # prod.info[Info.SHAPE] with the actual shape, but let's do this in
+            # any case, it doesn't hurt.
+            prod.info[Info.SHAPE] = dataset.shape
+            kind = prod.info[Info.KIND]
 
             if prod.content:
-                LOG.warning('content was already available, skipping import')
+                LOG.warning("content was already available, skipping import")
                 continue
 
             now = datetime.utcnow()
-            area_info = self._area_to_sift_attrs(dataset.attrs['area'])
-            cell_width = area_info[Info.CELL_WIDTH]
-            cell_height = area_info[Info.CELL_HEIGHT]
-            proj4 = area_info[Info.PROJ]
-            origin_x = area_info[Info.ORIGIN_X]
-            origin_y = area_info[Info.ORIGIN_Y]
-            data = dataset.data
 
-            # Handle building contours for data from 0 to 360 longitude
-            # our map's antimeridian is 180
-            antimeridian = 179.999
-            # find out if there is data beyond 180 in this data
-            if '+proj=latlong' not in proj4:
-                # the x coordinate for the antimeridian in this projection
-                am = Proj(proj4)(antimeridian, 0)[0]
-                if am >= 1e30:
-                    am_index = -1
-                else:
-                    am_index = int(np.ceil((am - origin_x) / cell_width))
+            if kind in [Kind.LINES, Kind.POINTS]:
+                if len(dataset.shape) == 1:
+                    LOG.error(f"one dimensional dataset can't be loaded: {ds_id['name']}")
+                    continue
+
+                completion, content, data_memmap = self._create_unstructured_points_dataset_content(dataset, now, prod)
+                yield import_progress(
+                    uuid=prod.uuid,
+                    stages=num_stages,
+                    current_stage=idx,
+                    completion=completion,
+                    stage_desc=f"SatPy {kind.name} data add to workspace",
+                    dataset_info=None,
+                    data=data_memmap,
+                    content=content,
+                )
+                continue
+
+            uuid = prod.uuid
+
+            if merge_with_existing:
+                existing_product = self.merge_target
+                segments = self._extract_segment_number()
+                uuid = existing_product.uuid
+                c = existing_product.content[0]
+                img_data = c.img_data
+                self.merge_data_into_memmap(dataset.data, img_data, segments)
             else:
-                am_index = int(np.ceil((antimeridian - origin_x) / cell_width))
-            # if there is data beyond 180, let's copy it to the beginning of the
-            # array so it shows up in the primary -180/0 portion of the SIFT map
-            if prod.info[Info.KIND] == Kind.CONTOUR and 0 < am_index < shape[1]:
-                # Previous implementation:
-                # Prepend a copy of the last half of the data (180 to 360 -> -180 to 0)
-                # data = da.concatenate((data[:, am_index:], data), axis=1)
-                # adjust X origin to be -180
-                # origin_x -= (shape[1] - am_index) * cell_width
-                # The above no longer works with newer PROJ because +over is deprecated
-                #
-                # New implementation:
-                # Swap the 180 to 360 portion to be -180 to 0
-                # if we have data from 0 to 360 longitude, we want -180 to 360
-                data = da.concatenate((data[:, am_index:], data[:, :am_index]), axis=1)
-                # remove the custom 180 prime meridian in the projection
-                proj4 = proj4.replace("+pm=180 ", "")
-                area_info[Info.PROJ] = proj4
+                area_info = self._area_to_sift_attrs(dataset.attrs["area"])
+                grid_info = self._get_grid_info()
 
-            # shovel that data into the memmap incrementally
-            data_filename = '{}.image'.format(prod.uuid)
-            data_path = os.path.join(self._cwd, data_filename)
-            img_data = np.memmap(data_path, dtype=np.float32, shape=shape, mode='w+')
-            da.store(data, img_data)
+                if kind == Kind.MC_IMAGE:
+                    c, img_data = self._create_mc_image_dataset_content(dataset, now, prod, area_info, grid_info)
+                else:
+                    c, img_data = self._create_image_dataset_content(dataset, now, prod, area_info, grid_info)
 
-            c = Content(
-                lod=0,
-                resolution=int(min(abs(cell_width), abs(cell_height))),
-                atime=now,
-                mtime=now,
+                c.info[Info.KIND] = prod.info[Info.KIND]
+                c.img_data = img_data
+                c.source_files = set()  # TODO(AR): adds member to the ContentImage object 'c'
+                # c.info.update(prod.info) would just make everything leak together so let's not do it
+                prod.content.append(c)
+                self._add_content_to_cache(c)
 
-                # info about the data array memmap
-                path=data_filename,
-                rows=shape[0],
-                cols=shape[1],
-                proj4=proj4,
-                # levels = 0,
-                dtype='float32',
+            required_files = _get_paths_of_required_aux_files(self.scn, self.required_aux_file_types)
+            # Note loaded source files but not required files. This is necessary
+            # because the merger will try to not load already loaded files again
+            # but might need to reload required files.
+            c.source_files |= set(self.filenames) - required_files
 
-                # info about the coverage array memmap, which in our case just tells what rows are ready
-                # coverage_rows = rows,
-                # coverage_cols = 1,
-                # coverage_path = coverage_filename
-
-                cell_width=cell_width,
-                cell_height=cell_height,
-                origin_x=origin_x,
-                origin_y=origin_y,
+            yield import_progress(
+                uuid=uuid,
+                stages=num_stages,
+                current_stage=idx,
+                completion=1.0,
+                stage_desc=f"SatPy {kind.name} data add to workspace",
+                dataset_info=None,
+                data=img_data,
+                content=c,
             )
-            c.info[Info.KIND] = Kind.IMAGE
-            # c.info.update(prod.info) would just make everything leak together so let's not do it
-            self._S.add(c)
-            prod.content.append(c)
-            # prod.touch()
-            self._S.commit()
 
-            yield import_progress(uuid=prod.uuid,
-                                  stages=num_stages,
-                                  current_stage=idx,
-                                  completion=1. / num_contents,
-                                  stage_desc="SatPy image data add to workspace",
-                                  dataset_info=None,
-                                  data=img_data)
+    def _get_products_from_inventory_db(self, product_ids):
+        if product_ids:
+            products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
+            assert products  # nosec B101
+        else:
+            products = list(
+                self._S.query(Resource, Product)
+                .filter(Resource.path.in_(self.filenames))
+                .filter(Product.resource_id == Resource.id)
+                .all()
+            )
+            assert products  # nosec B101
+        return products
 
-            if num_contents == 1:
-                continue
+    def _create_mc_image_dataset_content(self, dataset, now, prod, area_info, grid_info):
+        data_filename, img_data = self._create_data_memmap_file(dataset.data, dataset.data.dtype, prod)
+        shape = prod.info[Info.SHAPE]
+        c = ContentMultiChannelImage(
+            lod=0,
+            resolution=int(min(abs(area_info[Info.CELL_WIDTH]), abs(area_info[Info.CELL_HEIGHT]))),
+            atime=now,
+            mtime=now,
+            # info about the data array memmap
+            path=data_filename,
+            rows=shape[0],
+            cols=shape[1],
+            bands=shape[2],
+            proj4=area_info[Info.PROJ],
+            dtype=str(dataset.dtype),
+            cell_width=area_info[Info.CELL_WIDTH],
+            cell_height=area_info[Info.CELL_HEIGHT],
+            origin_x=area_info[Info.ORIGIN_X],
+            origin_y=area_info[Info.ORIGIN_Y],
+            grid_origin=grid_info[Info.GRID_ORIGIN],
+            grid_first_index_x=grid_info[Info.GRID_FIRST_INDEX_X],
+            grid_first_index_y=grid_info[Info.GRID_FIRST_INDEX_Y],
+        )
+        return c, img_data
 
-            if find_contours is None:
-                raise RuntimeError("Can't create contours without 'skimage' "
-                                   "package installed.")
+    def _create_image_dataset_content(self, dataset, now, prod, area_info, grid_info):
+        # For kind IMAGE the dtype must be float32 seemingly, see class
+        # Column, comment for 'dtype' and the construction of c = Content
+        # just below.
+        # FIXME: It is dubious to enforce that type conversion to happen in
+        #  _create_data_memmap_file, but otherwise IMAGES of pixel counts
+        #  data (dtype = np.uint16) crash.
+        data_filename, img_data = self._create_data_memmap_file(dataset.data, np.float32, prod)
+        shape = prod.info[Info.SHAPE]
+        c = ContentImage(
+            lod=0,
+            resolution=int(min(abs(area_info[Info.CELL_WIDTH]), abs(area_info[Info.CELL_HEIGHT]))),
+            atime=now,
+            mtime=now,
+            # info about the data array memmap
+            path=data_filename,
+            rows=shape[0],
+            cols=shape[1],
+            proj4=area_info[Info.PROJ],
+            dtype="float32",
+            cell_width=area_info[Info.CELL_WIDTH],
+            cell_height=area_info[Info.CELL_HEIGHT],
+            origin_x=area_info[Info.ORIGIN_X],
+            origin_y=area_info[Info.ORIGIN_Y],
+            grid_origin=grid_info[Info.GRID_ORIGIN],
+            grid_first_index_x=grid_info[Info.GRID_FIRST_INDEX_X],
+            grid_first_index_y=grid_info[Info.GRID_FIRST_INDEX_Y],
+        )
+        return c, img_data
 
-            # XXX: Should/could 'lod' be used for different contour level data?
-            levels = [x for y in prod.info['contour_levels'] for x in y]
-            data_filename = '{}.contour'.format(prod.uuid)
-            data_path = os.path.join(self._cwd, data_filename)
+    def _create_unstructured_points_dataset_content(self, dataset, now, prod):
+        data_filename, data_memmap = self._create_data_memmap_file(dataset.data, dataset.dtype, prod)
+        shape = prod.info[Info.SHAPE]
+        content = ContentUnstructuredPoints(
+            atime=now,
+            mtime=now,
+            # info about the data array memmap
+            path=data_filename,
+            n_points=shape[0],
+            n_dimensions=shape[1],
+            dtype=dataset.dtype,
+        )
+        content.info[Info.KIND] = prod.info[Info.KIND]
+        prod.content.append(content)
+        self._add_content_to_cache(content)
+        completion = 2.0
+        return completion, content, data_memmap
+
+    def _preprocess_products_with_resampling(self):
+        resampler: str = self.resampling_info["resampler"]
+        max_area = self.scn.finest_area()
+        if isinstance(max_area, AreaDefinition) and max_area.area_id == self.resampling_info["area_id"]:
+            LOG.info(
+                f"Source and target area ID are identical:"
+                f" '{self.resampling_info['area_id']}'."
+                f" Skipping resampling."
+            )
+        else:
+            area_name = max_area.area_id if hasattr(max_area, "area_id") else max_area.name
+            LOG.info(
+                f"Resampling from area ID/name '{area_name}'"
+                f" to area ID '{self.resampling_info['area_id']}'"
+                f" with method '{resampler}'"
+            )
+            # Use as many processes for resampling as the number of CPUs
+            # the application can use.
+            # See https://pyresample.readthedocs.io/en/latest/multi.html
+            #  and https://docs.python.org/3/library/os.html#os.cpu_count
             try:
-                contour_data = self._compute_contours(
-                    img_data, prod.info[Info.VALID_RANGE][0],
-                    prod.info[Info.VALID_RANGE][1], levels)
-            except ValueError:
-                LOG.warning("Could not compute contour levels for '{}'".format(prod.uuid))
-                LOG.debug("Contour error: ", exc_info=True)
-                continue
+                nprocs = len(os.sched_getaffinity(0))
+            except AttributeError:
+                # Windows or even some Unix variants only provide:
+                nprocs = os.cpu_count()
 
-            contour_data[:, 0] *= cell_width
-            contour_data[:, 0] += origin_x
-            contour_data[:, 1] *= cell_height
-            contour_data[:, 1] += origin_y
-            contour_data.tofile(data_path)
-            c = Content(
-                lod=0,
-                resolution=int(min(abs(cell_width), abs(cell_height))),
-                atime=now,
-                mtime=now,
+            target_area_def = AreaDefinitionsManager.area_def_by_id(self.resampling_info["area_id"])
 
-                # info about the data array memmap
-                path=data_filename,
-                rows=contour_data.shape[0],  # number of vertices
-                cols=contour_data.shape[1],  # col (x), row (y), "connect", num_points_for_level
-                proj4=proj4,
-                # levels = 0,
-                dtype='float32',
+            # About the next strange line of code: keep a reference to the
+            # original scene to work around an issue in the resampling
+            # implementation for NetCDF data: otherwise the original data
+            # would be garbage collected too early.
+            if not self.scn_original:
+                self.scn_original = self.scn  # noqa - Do not simply remove
 
-                cell_width=cell_width,
-                cell_height=cell_height,
-                origin_x=origin_x,
-                origin_y=origin_y,
+            # deactivating reduce_data, see https://github.com/pytroll/satpy/issues/2476
+            reduce_data = False if resampler == "native" else True
+
+            self.scn = self.scn.resample(
+                target_area_def,
+                resampler=resampler,
+                nprocs=nprocs,
+                radius_of_influence=self.resampling_info["radius_of_influence"],
+                reduce_data=reduce_data,
             )
-            c.info[Info.KIND] = Kind.CONTOUR
-            # c.info["level_index"] = level_indexes
+
+    def _get_fci_segment_height(self, segment_number: int, segment_width: int) -> int:
+        try:
+            seg_heights = self.scn._readers[self.reader].segment_heights
+            # we can assume that we're reading only from one filetype (either FDHSI or HRFI)
+            file_type = list(self.scn._readers[self.reader].file_handlers.keys())[0]
+            return seg_heights(file_type, segment_width)[segment_number - 1]
+        except AttributeError:
+            LOG.exception(
+                "You're probably using an old version of Satpy. Please update Satpy to be >=0.39.0 "
+                "to use merge_with_existing=True with the FCI reader."
+            )
+            raise
+
+        return -1
+
+    def _calc_segment_heights(self, segments_data, segments_indices):
+        def get_segment_height_calculator() -> Callable:
+            if self.reader in ["fci_l1c_nc", "fci_l1c_fdhsi"]:
+                return self._get_fci_segment_height
+            else:
+                return lambda x, y: segments_data.shape[0] // len(segments_indices)
+
+        calc_segment_height = get_segment_height_calculator()
+        expected_num_segments = self._extract_expected_segments()
+        segment_heights = np.zeros((expected_num_segments,))
+        for i in range(1, expected_num_segments + 1):
+            segment_heights[i - 1] = calc_segment_height(i, segments_data.shape[1])
+        return segment_heights.astype(int)
+
+    def _determine_segments_to_image_mapping(self, segments_data, segments_indices) -> Tuple[List, List]:
+
+        segment_heights = self._calc_segment_heights(segments_data, segments_indices)
+
+        segment_starts_stops = []
+        image_starts_stops = []
+        visited_segments: List[int] = []
+        for segment_num in segments_indices:
+            curr_segment_height_idx = segment_num - 1
+            curr_segment_height = segment_heights[curr_segment_height_idx]
+
+            image_stop_pos = segment_heights[curr_segment_height_idx:].sum()
+            image_start_pos = image_stop_pos - curr_segment_height
+
+            curr_segment_stop = segments_data.shape[0]
+            if visited_segments:
+                curr_segment_stop -= segment_heights[visited_segments].sum()
+            curr_segment_start = curr_segment_stop - curr_segment_height
+
+            visited_segments.append(curr_segment_height_idx)
+            segment_starts_stops.append((curr_segment_start, curr_segment_stop))
+            image_starts_stops.append((image_start_pos, image_stop_pos))
+        return segment_starts_stops, image_starts_stops
+
+    def merge_data_into_memmap(self, segments_data, image_data, segments_indices):
+        """
+        Merge new segments from data into img_data. The data is expected to
+        contain the data for all segments with the last segment (that has the
+        largest segment number) as first in the data array.
+        The segments list defines which chunk of data belongs to which segment.
+        The list must be sorted ascending.
+        Those requirements match the current Satpy behavior which loads segments
+        in ascending order and produce a data array with the last segments data
+        first.
+        :param segments_data: the segments data as provided by Satpy importer
+        :param image_data: the dataset data where the segments are merged into
+        :param segments_indices: list of segments whose data is to be merged
+        Note: this is not the highest segment number in the current segments
+        list but the highest segment number which can appear for the product.
+        """
+
+        segment_starts_stops, image_starts_stops = self._determine_segments_to_image_mapping(
+            segments_data, segments_indices
+        )
+
+        for i in range(len(segment_starts_stops)):
+            segment_start = segment_starts_stops[i][0]
+            segment_stop = segment_starts_stops[i][1]
+            image_start = image_starts_stops[i][0]
+            image_stop = image_starts_stops[i][1]
+            image_data[image_start:image_stop, :] = segments_data[segment_start:segment_stop, :]
+
+    def _add_content_to_cache(self, c: Content) -> None:
+        if self.use_inventory_db:
             self._S.add(c)
-            prod.content.append(c)
             self._S.commit()
 
-            completion = 2. / num_contents
-            yield import_progress(uuid=prod.uuid,
-                                  stages=num_stages,
-                                  current_stage=idx,
-                                  completion=completion,
-                                  stage_desc="SatPy contour data add to workspace",
-                                  dataset_info=None,
-                                  data=img_data)
-
-    def _get_verts_and_connect(self, paths):
-        """ retrieve vertices and connects from given paths-list
+    def _create_data_memmap_file(self, data: da.array, dtype, prod: Product) -> Tuple[str, Optional[np.memmap]]:
         """
-        # THIS METHOD WAS COPIED FROM VISPY
-        verts = np.vstack(paths)
-        gaps = np.add.accumulate(np.array([len(x) for x in paths])) - 1
-        connect = np.ones(gaps[-1], dtype=bool)
-        connect[gaps[:-1]] = False
-        return verts, connect
+        Create *binary* file in the current working directory to cache `data`
+        as numpy memmap. The filename extension of the file is derived from the
+        kind of the given `prod`.
 
-    def _compute_contours(self, img_data: np.ndarray, vmin: float, vmax: float, levels: list) -> np.ndarray:
-        all_levels = []
-        empty_level = np.array([[0, 0, 0, 0]], dtype=np.float32)
-        for level in levels:
-            if level < vmin or level > vmax:
-                all_levels.append(empty_level)
-                continue
+        'dtype' must be given explicitly because it is not necessarily
+        ``dtype == data.dtype`` (caller decides).
+        """
+        # shovel that data into the memmap incrementally
 
-            contours = find_contours(img_data, level, positive_orientation='high')
-            if not contours:
-                LOG.debug("No contours found for level: {}".format(level))
-                all_levels.append(empty_level)
-                continue
-            v, c = self._get_verts_and_connect(contours)
-            # swap row, column to column, row (x, y)
-            v[:, [0, 1]] = v[:, [1, 0]]
-            v += np.array([0.5, 0.5])
-            v[:, 0] = np.where(np.isnan(v[:, 0]), 0, v[:, 0])
+        kind = prod.info[Info.KIND]
+        data_filename = "{}.{}".format(prod.uuid, kind.name.lower())
+        data_path = os.path.join(self._cwd, data_filename)
+        if data is None or data.size == 0:
+            # For empty data memmap is not possible
+            return data_filename, None
 
-            # HACK: Store float vertices, boolean, and index arrays together in one float array
-            this_level = np.empty((v.shape[0],), np.float32)
-            this_level[:] = np.nan
-            this_level[-1] = v.shape[0]
-            c = np.concatenate((c, [False])).astype(np.float32)
-            # level_data = np.concatenate((v, c[:, None]), axis=1)
-            level_data = np.concatenate((v, c[:, None], this_level[:, None]), axis=1)
-            all_levels.append(level_data)
+        data_memmap = np.memmap(data_path, dtype=dtype, shape=data.shape, mode="w+")
+        da.store(data, data_memmap)
 
-        if not all_levels:
-            raise ValueError("No valid contour levels")
-        return np.concatenate(all_levels).astype(np.float32)
+        return data_filename, data_memmap

@@ -1,0 +1,98 @@
+{% set data = load_setup_py_data() %}
+
+package:
+  name: uwsift
+  version: {{ data.get('version') }}
+
+source:
+  path: ../../
+
+build:
+  # If this is a new build for the same version, increment the build
+  # number. If you do not include this key, it defaults to 0.
+  number: 0
+  script: python -m pip install --no-deps --ignore-installed .
+
+requirements:
+  host:
+    - python {{PY_VER}}*
+    - setuptools
+    - pip
+
+outputs:
+
+  - name: uwsift-deps
+    requirements:
+      run:
+        - python {{PY_VER}}*
+
+        - appdirs
+        - defusedxml
+        - donfig
+        - ffmpeg
+        - h5py
+        - imageio
+        - imageio-ffmpeg
+        - matplotlib
+        - netcdf4
+        - numba
+        - numpy
+        - pillow
+        - pygrib
+        - pyproj
+        - pyqt >=5.15
+        - pyqtgraph
+        - pyqtwebengine
+        - pyshp
+        - pyyaml
+        - rasterio
+        - satpy
+        - scikit-image
+        - shapely
+        - sqlalchemy
+        - vispy >=0.10
+    test:
+      commands:
+        - python -c "from rasterio import Affine"
+        - python -c "from PyQt5 import QtGui, QtCore, QtWidgets"
+        - python -c "from netCDF4 import Dataset"
+        - python -c "import h5py"
+
+  - name: uwsift
+    files:
+      - "**/uwsift/**/*"
+    requirements:
+      run:
+        - uwsift-deps
+
+  - name: uwsift-devel-deps
+    requirements:
+      run:
+        - uwsift-deps
+
+        - cmake
+        - conda-build
+        - git
+        - git-bash # [win]
+        - make # Alternative: ninja
+        - pip
+        - pyinstaller
+        - pytest-mock
+        - pytest-qt
+        - setuptools
+
+test:
+  commands:
+    - python -m uwsift -h
+
+about:
+  home: https://github.com/ssec/sift
+  license: "GNU Lesser General Public License v3 or later (LGPLv3+)"
+  summary: "Visualization tool for satellite imagery data"
+
+extra:
+  maintainers: SIFT Developers
+
+# See
+# https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
+# more information about meta.yaml

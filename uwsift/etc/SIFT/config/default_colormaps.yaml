@@ -1,0 +1,14 @@
+default_colormaps:
+  toa_bidirectional_reflectance:
+    colormap: Square Root (Vis Default)
+#    range: [-1.2, 120]
+  toa_brightness_temperature:
+    colormap: Rainbow (IR Default)
+  brightness_temperature:
+    colormap: Rainbow (IR Default)
+  height_at_cloud_top:
+    colormap: Cloud Top Height
+  air_temperature:
+    colormap: Rainbow (IR Default)
+  relative_humidity:
+    colormap: Rainbow (IR Default)

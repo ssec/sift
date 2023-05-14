@@ -1,0 +1,8 @@
+# Map physical quantities to units.
+# Note that unit names must conform to the following spellings:
+# 'kelvin', 'degrees_Celsius'
+units:
+  temperature:
+    all: kelvin
+    toa_brightness_temperature: kelvin
+    brightness_temperature: kelvin

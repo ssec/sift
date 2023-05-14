@@ -4,38 +4,53 @@ uwsift.control package
 Submodules
 ----------
 
-uwsift.control.doc\_ws\_as\_timeline\_scene module
---------------------------------------------------
+uwsift.control.auto\_update module
+----------------------------------
 
-.. automodule:: uwsift.control.doc_ws_as_timeline_scene
+.. automodule:: uwsift.control.auto_update
    :members:
    :undoc-members:
    :show-inheritance:
 
-uwsift.control.file\_behaviors module
--------------------------------------
+uwsift.control.qml\_utils module
+--------------------------------
 
-.. automodule:: uwsift.control.file_behaviors
+.. automodule:: uwsift.control.qml_utils
    :members:
    :undoc-members:
    :show-inheritance:
 
-uwsift.control.layer\_tree module
----------------------------------
+uwsift.control.time\_matcher module
+-----------------------------------
 
-.. automodule:: uwsift.control.layer_tree
+.. automodule:: uwsift.control.time_matcher
    :members:
    :undoc-members:
    :show-inheritance:
 
-uwsift.control.rgb\_behaviors module
-------------------------------------
+uwsift.control.time\_matcher\_policies module
+---------------------------------------------
 
-.. automodule:: uwsift.control.rgb_behaviors
+.. automodule:: uwsift.control.time_matcher_policies
    :members:
    :undoc-members:
    :show-inheritance:
 
+uwsift.control.time\_transformer module
+---------------------------------------
+
+.. automodule:: uwsift.control.time_transformer
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+uwsift.control.time\_transformer\_policies module
+-------------------------------------------------
+
+.. automodule:: uwsift.control.time_transformer_policies
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 Module contents
 ---------------

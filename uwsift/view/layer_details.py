@@ -13,234 +13,411 @@ REQUIRES
 :copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-__author__ = 'evas'
-__docformat__ = 'reStructuredText'
+__author__ = "evas"
+__docformat__ = "reStructuredText"
 
 import logging
-import enum
-import typing as typ
-from collections import defaultdict
-from uuid import UUID
+from functools import partial
+from typing import Optional, Tuple
 
-import numpy as np
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QGridLayout, QLabel, QTextEdit, QSizePolicy, QWidget, QVBoxLayout
+from PyQt5 import QtWidgets
 
-from uwsift.model.layer import DocBasicLayer
-from uwsift.common import Info, Kind, Presentation
-from uwsift.ui.custom_widgets import QNoScrollWebView
+from uwsift.common import FALLBACK_RANGE, INVALID_COLOR_LIMITS, Info, Kind
+from uwsift.model.layer_item import LayerItem
+from uwsift.model.layer_model import LayerModel
+from uwsift.model.product_dataset import ProductDataset
+from uwsift.ui.layer_details_widget_ui import Ui_LayerDetailsPane
+from uwsift.util.common import (
+    format_clims,
+    format_resolution,
+    get_initial_gamma,
+    range_hull,
+    range_hull_no_fail,
+)
 from uwsift.view.colormap import COLORMAP_MANAGER
 
 LOG = logging.getLogger(__name__)
 
 
-class SingleLayerInfoPane(QWidget):
-    """Shows details about one layer that is current selected."""
+class SingleLayerInfoPane(QtWidgets.QWidget):
+    """Shows details about one layer that is currently selected."""
 
-    document = None
-    name_text = None
-    time_text = None
-    instrument_text = None
-    colormap_text = None
-    clims_text = None
+    _slider_steps = 100
 
-    def __init__(self, document, parent=None):
-        """Create subwidgets and layout."""
-        super(SingleLayerInfoPane, self).__init__(parent)
-        self.document = document  # FUTURE: make this a weakref?
-        min_width = 3 * 100
+    def __init__(self, *args, **kwargs):
+        """Initialise subwidgets and layout.
 
-        # build our layer detail info display controls
-        self.name_text = QLabel("")
-        self.name_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.time_text = QLabel("")
-        self.time_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.instrument_text = QLabel("")
-        self.instrument_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.wavelength_text = QLabel("")
-        self.wavelength_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.colormap_text = QLabel("")
-        self.colormap_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.clims_text = QLabel("")
-        self.clims_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.cmap_vis = QNoScrollWebView()
-        self.cmap_vis.setFixedSize(min_width, 30)
-        self.cmap_vis.page().runJavaScript('document.body.style.overflow = "hidden";')
-        self.composite_details = QLabel("Composite Details")
-        self.composite_details.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        f = QFont()
-        f.setUnderline(True)
-        self.composite_details.setFont(f)
-        self.composite_codeblock = QTextEdit()
-        self.composite_codeblock.setReadOnly(True)
-        self.composite_codeblock.setMinimumSize(min_width, 100)
-        self.composite_codeblock.setDisabled(True)
-        self.composite_codeblock.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        Hide the subwidgets at the beginning because no layer is selected."""
+        super(SingleLayerInfoPane, self).__init__(*args, **kwargs)
 
-        # set the layout for this widget
-        # Note: add in a grid is (widget, row#, col#) or (widget, row#, col#, row_span, col_span)
-        layout = QGridLayout()
-        layout.setAlignment(Qt.AlignLeft)
-        layout.addWidget(self.name_text, 0, 0)
-        layout.addWidget(self.time_text, 1, 0)
-        layout.addWidget(self.instrument_text, 2, 0)
-        layout.addWidget(self.wavelength_text, 3, 0)
-        layout.addWidget(self.colormap_text, 4, 0)
-        layout.addWidget(self.clims_text, 5, 0)
-        layout.addWidget(self.cmap_vis, 6, 0)
-        layout.addWidget(self.composite_details, 7, 0)
-        layout.addWidget(self.composite_codeblock, 8, 0)
+        self._valid_min, self._valid_max = FALLBACK_RANGE
+
+        layout = QtWidgets.QVBoxLayout(self)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
+        self._details_pane_ui = Ui_LayerDetailsPane()
+        self._details_pane_widget = QtWidgets.QWidget(self)
+        self._details_pane_ui.setupUi(self._details_pane_widget)
+
+        layout.addWidget(self._details_pane_widget)
         self.setLayout(layout)
 
-        # add this widget to the scrollable parent widget
-        layout = QVBoxLayout()
-        layout.addWidget(self)
-        self.parent().setLayout(layout)
+        self._clear_details_pane()
 
-        # clear out the display
-        self.update_display()
+        self._current_selected_layer: Optional[LayerItem] = None
 
-    def _display_shared_info(self, shared_info: defaultdict):
-        self.name_text.setText("Name: " + shared_info[Info.DISPLAY_NAME])
-        self.time_text.setText("Time: " + shared_info[Info.DISPLAY_TIME])
-        self.instrument_text.setText("Instrument: " + shared_info[Info.INSTRUMENT])
-        self.wavelength_text.setText("Wavelength: " + shared_info[Info.CENTRAL_WAVELENGTH])
-        self.colormap_text.setText("Colormap: " + (shared_info["colormap"] or ""))
-        self.clims_text.setText("Color Limits: " + shared_info["climits"])
-        self.composite_codeblock.setText(shared_info['codeblock'])
+        self._init_cmap_combo()
 
-        # format colormap
-        if not shared_info["colormap"]:
-            self.cmap_vis.setHtml("")
-        else:
-            cmap_html = COLORMAP_MANAGER[shared_info["colormap"]]._repr_html_()
-            cmap_html = cmap_html.replace("height", "border-collapse: collapse;\nheight")
-            self.cmap_vis.setHtml(
-                """<html><head></head><body style="margin: 0px"><div>%s</div></body></html>""" % (cmap_html,))
+        self._details_pane_ui.cmap_combobox.currentIndexChanged.connect(self._cmap_changed)
+        self._details_pane_ui.vmin_slider.valueChanged.connect(partial(self._slider_changed, is_max=False))
+        self._details_pane_ui.vmax_slider.valueChanged.connect(partial(self._slider_changed, is_max=True))
+        self._details_pane_ui.vmin_spinbox.valueChanged.connect(partial(self._spin_box_changed, is_max=False))
+        self._details_pane_ui.vmax_spinbox.valueChanged.connect(partial(self._spin_box_changed, is_max=True))
 
-    def _update_if_different(self, shared_info: defaultdict, layer_info: typ.Union[DocBasicLayer, Presentation],
-                             key: typ.Hashable = None, attr: str = None, default=""):
-        """Get information from the provided layer or presentation.
+        self._details_pane_ui.gammaSpinBox.valueChanged.connect(self._gamma_changed)
 
-        Compares current layer information with existing info in ``shared_info``. If they are the same then keep the
-        value. Otherwise reset the value to ``default`` (empty string by default).
-        """
-        if key is not None:
-            new_name = layer_info[key] if key in layer_info else default
-        elif attr is not None:
-            new_name = getattr(layer_info, attr, default)
-            key = attr
-        else:
-            raise ValueError("Either 'key' or 'attr' must be provided.")
+        self._details_pane_ui.climitsCurrentTime.clicked.connect(self._fit_clims_to_current_time)
+        self._details_pane_ui.climitsAllTimes.clicked.connect(self._fit_clims_to_all_times)
 
-        if isinstance(new_name, enum.Enum):
-            new_name = new_name.value
-        if key not in shared_info:
-            shared_info[key] = new_name
-        else:
-            shared_info[key] = default if shared_info[key] != new_name else new_name
+        self._details_pane_ui.colormap_reset_button.clicked.connect(self._reset_to_initial_state)
 
-    def _get_shared_color_limits(self, shared_info: defaultdict, layer_info: DocBasicLayer, this_prez: Presentation):
-        new_clims = ""
-        if this_prez is not None:
-            new_clims = np.array(this_prez.climits)
-            unit_info = self.document[this_prez.uuid][Info.UNIT_CONVERSION]
-            new_clims = unit_info[1](new_clims, inverse=False)
-            try:
-                if layer_info[Info.KIND] in [Kind.IMAGE, Kind.COMPOSITE, Kind.CONTOUR]:
-                    min_str = layer_info[Info.UNIT_CONVERSION][2](new_clims[0], include_units=False)
-                    max_str = layer_info[Info.UNIT_CONVERSION][2](new_clims[1])
-                    new_clims = '{} ~ {}'.format(min_str, max_str)
-                elif layer_info[Info.KIND] in [Kind.RGB]:
-                    # FUTURE: Other layer types
-                    deps = (layer_info.r, layer_info.g, layer_info.b)
+    # Slot functions
 
-                    tmp_clims = []
-                    for i, dep in enumerate(deps):
-                        if dep is None:
-                            tmp_clims.append('N/A')
-                            continue
-
-                        min_str = dep[Info.UNIT_CONVERSION][2](new_clims[i][0], include_units=False)
-                        max_str = dep[Info.UNIT_CONVERSION][2](new_clims[i][1])
-                        tmp_clims.append('{} ~ {}'.format(min_str, max_str))
-                    new_clims = ", ".join(tmp_clims)
-                else:
-                    new_clims = "N/A"
-            except TypeError:
-                LOG.warning("unable to format color limit: %r" % (new_clims,), exc_info=True)
-                new_clims = "N/A"
-        if "climits" not in shared_info:
-            shared_info["climits"] = new_clims
-        else:
-            shared_info["climits"] = "" if shared_info["climits"] != new_clims else new_clims
-
-    def _get_code_block(self, shared_info: defaultdict, layer_uuid: UUID):
-        ns, codeblock = self.document.get_algebraic_namespace(layer_uuid)
-        if codeblock:
-            short_names = []
-            for name, uuid in ns.items():
-                try:
-                    dep_info = self.document[uuid]
-                    short_name = dep_info.get(Info.SHORT_NAME, '<N/A>')
-                except KeyError:
-                    LOG.debug("Layer '{}' not found in document".format(uuid))
-                    short_name = '<Unknown>'
-                short_names.append("# {} = {}".format(name, short_name))
-            ns_str = "\n".join(short_names)
-            codeblock_str = ns_str + '\n\n' + codeblock
-        else:
-            codeblock_str = ''
-        if 'codeblock' not in shared_info:
-            shared_info['codeblock'] = codeblock_str
-        else:
-            shared_info['codeblock'] = '' if shared_info['codeblock'] != codeblock_str else codeblock_str
-
-    def update_display(self, selected_uuid_list: list = None):
-        """update the information being displayed to match the given UUID(s)
-
-        If the uuid list parameter is None, clear out the information instead
-        """
-        shared_info = defaultdict(str)
-
-        # clear the list if we got None
-        if selected_uuid_list is None or len(selected_uuid_list) <= 0:
-            self._display_shared_info(shared_info)
+    def initiate_update(self):
+        """Start the update process if a layer is currently selected."""
+        self._clear_details_pane()
+        if not self._current_selected_layer:
             return
 
-        # otherwise display information on the selected layer(s)
-        # figure out the info shared between all the layers currently selected
-        presentation_info = self.document.current_layer_set
-        for layer_uuid in selected_uuid_list:
-            layer_info = self.document.get_info(uuid=layer_uuid)
+        clims = self._current_selected_layer.presentation.climits
+        valid_range = self._current_selected_layer.valid_range
+        if valid_range:
+            self._valid_min, self._valid_max = range_hull(clims, valid_range)
+        elif (
+            clims and clims != INVALID_COLOR_LIMITS and isinstance(clims, tuple)
+        ):  # Internal RGB Composites have a list of color limit (clims) tuples
+            self._valid_min, self._valid_max = clims
+        else:
+            self._valid_min, self._valid_max = FALLBACK_RANGE
 
-            this_prez = None
-            for prez_tuple in presentation_info:
-                if prez_tuple.uuid == layer_uuid:
-                    this_prez = prez_tuple
-                    break
+        self._update_displayed_info()
 
-            # compare our various values
-            self._update_if_different(shared_info, layer_info, Info.DISPLAY_NAME)
-            self._update_if_different(shared_info, layer_info, Info.DISPLAY_TIME)
-            self._update_if_different(shared_info, layer_info, Info.INSTRUMENT)
-            self._update_if_different(shared_info, this_prez, attr='colormap')
-            self._get_shared_color_limits(shared_info, layer_info, this_prez)
-            self._get_code_block(shared_info, layer_uuid)
+    def selection_did_change(self, layers: Tuple[LayerItem]):
+        """Update the displayed values only when one layer is selected.
 
-            # wavelength
-            wl = layer_info.get(Info.CENTRAL_WAVELENGTH)
-            fmt = "{:0.2f} µm"
-            if isinstance(wl, (tuple, list)):
-                wl = [fmt.format(x) if x is not None else '---' for x in wl]
-                wl = "(" + ", ".join(wl) + ")"
+        Also reset the display to its initial state at the beginning.
+
+        :param layers: Layers which are currently selected
+        """
+        if layers is not None and len(layers) == 1:
+            self._current_selected_layer = layers[0]
+            self.initiate_update()
+        else:
+            self._clear_details_pane()
+
+    def update_displayed_clims(self):
+        """Update the corresponding viewed values for the color limits of the layer
+
+        Exclude the listed layer types for displaying color limit values even if they have some."""
+        if self._current_selected_layer:
+            if self._current_selected_layer.presentation.climits and self._current_selected_layer.info.get(
+                Info.KIND
+            ) not in [Kind.MC_IMAGE]:
+                self._determine_display_value_for_clims()
+
+    def update_displayed_colormap(self):
+        """Update the currently viewed colormap values of the layer"""
+        if self._current_selected_layer:
+            if self._current_selected_layer.presentation.colormap:
+                self._details_pane_ui.layerColormapValue.setText(self._current_selected_layer.presentation.colormap)
+
+                idx = self._details_pane_ui.cmap_combobox.findData(self._current_selected_layer.presentation.colormap)
+                self._details_pane_ui.cmap_combobox.setCurrentIndex(idx)
+
+                cmap = COLORMAP_MANAGER.get(self._current_selected_layer.presentation.colormap)
+                if cmap:
+                    cmap_html = cmap._repr_html_()
+                    cmap_html = cmap_html.replace("height", "border-collapse: collapse;\nheight")
+                    self._details_pane_ui.layerColormapVisual.setHtml(
+                        f"""<html><head></head><body style="margin: 0px"><div>{cmap_html}</div></body></html>"""
+                    )
+
+    # Utility functions
+
+    def _clear_details_pane(self):
+        self._details_pane_ui.layerNameValue.setText("<no single layer selected>")
+        self._details_pane_ui.layerVisibleSchedTimeValue.setText("N/A")
+        self._details_pane_ui.layerInstrumentValue.setText("N/A")
+        self._details_pane_ui.layerWavelengthValue.setText("N/A")
+        self._details_pane_ui.layerResolutionValue.setText("N/A")
+        self._details_pane_ui.layerColormapValue.setText("N/A")
+        self._details_pane_ui.layerColorLimitsValue.setText("N/A")
+        self._details_pane_ui.layerColormapVisual.setHtml("")
+        self._details_pane_ui.kindDetailsStackedWidget.setCurrentWidget(self._details_pane_ui.page_others)
+
+    def _cmap_changed(self, index):
+        model = self._current_selected_layer.model
+        cmap_str = self._details_pane_ui.cmap_combobox.itemData(index)
+        self._current_cmap = str(cmap_str)
+        model.change_colormap_for_layer(self._current_selected_layer.uuid, self._current_cmap)
+
+    def _create_slider_value(self, channel_val):
+        return int((channel_val - self._valid_min) / (self._valid_max - self._valid_min) * self._slider_steps)
+
+    def _determine_display_value_for_clims(self):
+        try:
+            clims = self._current_selected_layer.presentation.climits
+            if self._current_selected_layer.kind == Kind.RGB:
+                model: LayerModel = self._current_selected_layer.model
+                input_layers_info = model.get_input_layers_info(self._current_selected_layer)
+                clims_str = self._get_multichannel_clims_str(clims, input_layers_info)
             else:
-                wl = fmt.format(wl) if wl is not None else '---'
-            if Info.CENTRAL_WAVELENGTH not in shared_info:
-                shared_info[Info.CENTRAL_WAVELENGTH] = wl
-            else:
-                shared_info[Info.CENTRAL_WAVELENGTH] = "---" if shared_info[Info.CENTRAL_WAVELENGTH] != wl else wl
+                unit_conv = self._current_selected_layer.info[Info.UNIT_CONVERSION]
+                clims_str = format_clims(clims, unit_conv)
 
-        # set the various text displays
-        self._display_shared_info(shared_info)
+            self._details_pane_ui.layerColorLimitsValue.setText(clims_str)
+        except TypeError:
+            LOG.warning(
+                f"Unable to set the value for color limits."
+                f" Instead for {self._current_selected_layer.uuid} will the value 'N/A' be shown."
+            )
+        except KeyError:
+            LOG.warning(
+                f"Unable to convert color limits of layer {self._current_selected_layer}."
+                f" Because there is no unit conversion in layer info: '{self._current_selected_layer.info}'."
+                f" Instead for {self._current_selected_layer.uuid} will the value 'N/A' be shown."
+            )
+
+    def _fit_clims_to_all_times(self):
+        model = self._current_selected_layer.model
+        actual_range = self._current_selected_layer.get_actual_range_from_layer()
+        model.change_color_limits_for_layer(self._current_selected_layer.uuid, actual_range)
+        valid_range = self._current_selected_layer.valid_range
+
+        assert actual_range != (None, None)  # nosec B101
+        self._valid_min, self._valid_max = range_hull_no_fail(actual_range, valid_range, actual_range)
+
+        self._update_vmin()
+        self._update_vmax()
+
+    def _fit_clims_to_current_time(self):
+        first_active_dataset = self._current_selected_layer.get_first_active_product_dataset()
+        if first_active_dataset:
+            model = self._current_selected_layer.model
+            actual_range = self._current_selected_layer.get_actual_range_from_first_active_dataset()
+            model.change_color_limits_for_layer(self._current_selected_layer.uuid, actual_range)
+
+            valid_range = self._current_selected_layer.valid_range
+
+            assert actual_range != (None, None)  # nosec B101
+            self._valid_min, self._valid_max = range_hull_no_fail(actual_range, valid_range, actual_range)
+
+            self._update_vmin()
+            self._update_vmax()
+
+    def _gamma_changed(self, val):
+        model = self._current_selected_layer.model
+        model.change_gamma_for_layer(self._current_selected_layer.uuid, val)
+
+    def _get_multichannel_clims_str(self, clims, input_layers_info):
+        assert len(input_layers_info) == len(clims)  # nosec B101
+        multichannel_clims_strs = []
+        for idx in range(len(clims)):
+            curr_clims = clims[idx]
+            curr_layer_info = input_layers_info[idx]
+            if curr_layer_info:
+                curr_unit_conv = curr_layer_info.get(Info.UNIT_CONVERSION)
+                multichannel_clims_strs.append(format_clims(curr_clims, curr_unit_conv))
+            else:
+                multichannel_clims_strs.append("N/A")
+
+        return ", ".join(multichannel_clims_strs)
+
+    def _get_multichannel_instrument_str(self):
+        used_instruments = set()
+        instruments = []
+        for instrument in self._current_selected_layer.info.get(Info.INSTRUMENT):
+            if not instrument:
+                instruments.append("N/A")
+                continue
+
+            instruments.append(instrument.value)
+            used_instruments.add(instrument.value)
+        if len(used_instruments) == 1:
+            instrument_str = list(used_instruments)[0]
+        else:
+            instrument_str = ", ".join(instruments)
+        return instrument_str
+
+    @staticmethod
+    def _get_multichannel_wavelength_str(wavelength):
+        wavelength_tmp = []
+        for wv in wavelength:
+            if not wv:
+                wavelength_tmp.append("N/A")
+                continue
+
+            wavelength_tmp.append(f"{wv.central} {wv.unit}")
+        wavelength_str = ", ".join(wavelength_tmp)
+        return wavelength_str
+
+    def _get_slider_value(self, slider_val):
+        return (slider_val / self._slider_steps) * (self._valid_max - self._valid_min) + self._valid_min
+
+    def _init_cmap_combo(self):
+        # FIXME: We should do this by colormap category
+        for colormap in COLORMAP_MANAGER.keys():
+            self._details_pane_ui.cmap_combobox.addItem(colormap, colormap)
+
+    def _reset_to_initial_state(self):
+        model = self._current_selected_layer.model
+        # rejecting (Cancel button) means reset previous settings
+        model.change_colormap_for_layer(
+            self._current_selected_layer.uuid, self._current_selected_layer.info[Info.COLORMAP]
+        )
+
+        clims = self._current_selected_layer.determine_initial_clims()
+        model.change_color_limits_for_layer(self._current_selected_layer.uuid, clims)
+        model.change_gamma_for_layer(
+            self._current_selected_layer.uuid, get_initial_gamma(self._current_selected_layer.info)
+        )
+        actual_range = self._current_selected_layer.get_actual_range_from_first_active_dataset()
+        valid_range = self._current_selected_layer.valid_range
+
+        self._valid_min, self._valid_max = valid_range if valid_range else actual_range
+        self._update_vmin()
+        self._update_vmax()
+        self._update_gamma()
+
+    def _set_new_clims(self, val, is_max):
+        if is_max:
+            new_clims = (self._current_selected_layer.presentation.climits[0], val)
+        else:
+            new_clims = (val, self._current_selected_layer.presentation.climits[1])
+        model = self._current_selected_layer.model
+        model.change_color_limits_for_layer(self._current_selected_layer.uuid, new_clims)
+
+    def _slider_changed(self, value=None, is_max=True):
+        spin_box = self._details_pane_ui.vmax_spinbox if is_max else self._details_pane_ui.vmin_spinbox
+        if value is None:
+            slider = self._details_pane_ui.vmax_slider if is_max else self._details_pane_ui.vmin_slider
+            value = slider.value()
+        value = self._get_slider_value(value)
+        LOG.debug("slider %s %s => %f" % (self._current_selected_layer.uuid, "max" if is_max else "min", value))
+        display_val = self._current_selected_layer.info[Info.UNIT_CONVERSION][1](value)
+        spin_box.blockSignals(True)
+        spin_box.setValue(display_val)
+        spin_box.blockSignals(False)
+        return self._set_new_clims(value, is_max)
+
+    def _spin_box_changed(self, is_max=True):
+        slider = self._details_pane_ui.vmax_slider if is_max else self._details_pane_ui.vmin_slider
+        spin_box = self._details_pane_ui.vmax_spinbox if is_max else self._details_pane_ui.vmin_spinbox
+        dis_val = spin_box.value()
+        val = self._current_selected_layer.info[Info.UNIT_CONVERSION][1](dis_val, inverse=True)
+        LOG.debug(
+            "spin box %s %s => %f => %f" % (self._current_selected_layer.uuid, "max" if is_max else "min", dis_val, val)
+        )
+        sv = self._create_slider_value(val)
+        slider.blockSignals(True)
+        slider.setValue(sv)
+        slider.blockSignals(False)
+        return self._set_new_clims(val, is_max)
+
+    def _update_displayed_info(self):
+        self._update_displayed_layer_name()
+        self._update_displayed_time()
+        self._update_displayed_instrument()
+        self._update_displayed_wavelength()
+        self._update_displayed_resolution()
+        self.update_displayed_clims()
+
+        self._update_displayed_kind_details()
+
+    def _update_displayed_instrument(self):
+        if self._current_selected_layer.info.get(Info.INSTRUMENT):
+
+            if self._current_selected_layer.info.get(Info.KIND) == Kind.RGB:
+                instrument_str = self._get_multichannel_instrument_str()
+            else:
+                instrument_str = self._current_selected_layer.info[Info.INSTRUMENT].value
+
+            self._details_pane_ui.layerInstrumentValue.setText(instrument_str)
+
+    def _update_displayed_kind_details(self):
+        if (
+            self._current_selected_layer.kind == Kind.IMAGE
+            and self._current_selected_layer.get_first_active_product_dataset()
+        ):
+            self._details_pane_ui.kindDetailsStackedWidget.setCurrentWidget(self._details_pane_ui.page_IMAGE)
+
+            self.update_displayed_colormap()
+
+            self._update_gamma()
+            self._update_vmin()
+            self._update_vmax()
+
+    def _update_displayed_layer_name(self):
+        layer_descriptor = self._current_selected_layer.descriptor
+        if layer_descriptor:
+            self._details_pane_ui.layerNameValue.setText(self._current_selected_layer.descriptor)
+
+    def _update_displayed_resolution(self):
+        resolution_str = "N/A"
+        if self._current_selected_layer.info.get("resolution"):
+            resolution_str = format_resolution(self._current_selected_layer.info["resolution"])
+        elif self._current_selected_layer.info.get("resolution-x") or self._current_selected_layer.info.get(
+            "resolution-y"
+        ):
+            resolution_x = self._current_selected_layer.info.get("resolution-x")
+            resolution_y = self._current_selected_layer.info.get("resolution-y")
+
+            resolution_str = format_resolution(resolution_x) if resolution_x else "N/A"
+            resolution_str += " / "
+            resolution_str += format_resolution(resolution_y) if resolution_y else "N/A"
+
+        self._details_pane_ui.layerResolutionValue.setText(resolution_str)
+
+    def _update_displayed_time(self):
+        active_product_dataset: Optional[
+            ProductDataset
+        ] = self._current_selected_layer.get_first_active_product_dataset()
+        if active_product_dataset:
+            self._details_pane_ui.layerVisibleSchedTimeValue.setText(
+                self._current_selected_layer.get_first_active_product_dataset().info.get(Info.DISPLAY_TIME)
+            )
+
+    def _update_displayed_wavelength(self):
+        if self._current_selected_layer.info.get("wavelength"):
+            wavelength = self._current_selected_layer.info.get("wavelength")
+            if self._current_selected_layer.kind == Kind.RGB:
+                wavelength_str = self._get_multichannel_wavelength_str(wavelength)
+            else:
+                wavelength_str = f"{wavelength.central} {wavelength.unit}"
+            self._details_pane_ui.layerWavelengthValue.setText(wavelength_str)
+        else:
+            wavelength_str = "N/A" if self._current_selected_layer.kind != Kind.RGB else "N/A, N/A, N/A"
+            self._details_pane_ui.layerWavelengthValue.setText(wavelength_str)
+
+    def _update_gamma(self):
+        self._details_pane_ui.gammaSpinBox.setValue(self._current_selected_layer.presentation.gamma)
+
+    def _update_vmin(self):
+        current_vmin = self._current_selected_layer.presentation.climits[0]
+        self._details_pane_ui.vmin_slider.setRange(0, self._slider_steps)
+        slider_val = self._create_slider_value(current_vmin)
+        self._details_pane_ui.vmin_slider.setSliderPosition(max(slider_val, 0))
+
+        conv = self._current_selected_layer.info[Info.UNIT_CONVERSION]
+        self._details_pane_ui.vmin_spinbox.setRange(conv[1](self._valid_min), conv[1](self._valid_max))
+        self._details_pane_ui.vmin_spinbox.setValue(conv[1](current_vmin))
+
+    def _update_vmax(self):
+        current_vmax = self._current_selected_layer.presentation.climits[1]
+        self._details_pane_ui.vmax_slider.setMaximum(32767)
+        self._details_pane_ui.vmax_slider.setRange(0, self._slider_steps)
+        slider_val = self._create_slider_value(current_vmax)
+        self._details_pane_ui.vmax_slider.setSliderPosition(min(slider_val, 32767))
+
+        conv = self._current_selected_layer.info[Info.UNIT_CONVERSION]
+        self._details_pane_ui.vmax_spinbox.setRange(conv[1](self._valid_min), conv[1](self._valid_max))
+        self._details_pane_ui.vmax_spinbox.setValue(conv[1](current_vmax))

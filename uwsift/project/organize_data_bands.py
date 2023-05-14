@@ -24,8 +24,8 @@ REQUIRES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-__docformat__ = 'reStructuredText'
-__author__ = 'davidh'
+__docformat__ = "reStructuredText"
+__author__ = "davidh"
 
 import logging
 import os
@@ -35,22 +35,28 @@ from glob import glob
 
 LOG = logging.getLogger(__name__)
 
-FILENAME_RE = r'HS_H08_(?P<date>\d{8})_(?P<time>\d{4})_(?P<band>B\d{2})_FLDK_(?P<res>R\d+)\.(?P<ext>.+)'
+FILENAME_RE = r"HS_H08_(?P<date>\d{8})_(?P<time>\d{4})_(?P<band>B\d{2})_FLDK_(?P<res>R\d+)\.(?P<ext>.+)"
 fn_re = re.compile(FILENAME_RE)
 
 
 def main():
     import argparse
+
     parser = argparse.ArgumentParser(description="Regenerate or generate mirrored AHI data structure")
-    parser.add_argument("base_ahi_dir", default="/odyssey/isis/tmp/davidh/sift_data/ahi",
-                        help="Base AHI directory for the geotiff data files "
-                             "(next child directory is the full dated directory)")
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count",
-                        default=int(os.environ.get("VERBOSITY", 2)),
-                        help='each occurrence increases verbosity 1 level through '
-                             'ERROR-WARNING-Info-DEBUG (default Info)')
-    parser.add_argument("--overwrite", action="store_true",
-                        help="Overwrite existing hardlinks")
+    parser.add_argument(
+        "base_ahi_dir",
+        default="/odyssey/isis/tmp/davidh/sift_data/ahi",
+        help="Base AHI directory for the geotiff data files " "(next child directory is the full dated directory)",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbosity",
+        action="count",
+        default=int(os.environ.get("VERBOSITY", 2)),
+        help="each occurrence increases verbosity 1 level through " "ERROR-WARNING-Info-DEBUG (default Info)",
+    )
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite existing hardlinks")
     args = parser.parse_args()
 
     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
@@ -75,9 +81,9 @@ def main():
             continue
         link_dir = os.path.dirname(link_path)
         if not os.path.isdir(link_dir):
-            LOG.info("Creating directory for link: %s", link_dir)
+            LOG.debug("Creating directory for link: %s", link_dir)
             os.makedirs(link_dir)
-        LOG.info("Creating hardlink '%s' -> '%s'", link_path, tif_file)
+        LOG.debug("Creating hardlink '%s' -> '%s'", link_path, tif_file)
         os.link(tif_file, link_path)
     LOG.info("Done mirroring files")
 

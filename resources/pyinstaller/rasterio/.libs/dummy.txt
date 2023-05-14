@@ -1,0 +1,4 @@
+Dummy file to ensure the directory is not skipped by PyInstaller.
+
+Note: the rasterio/.libs directory is not anymore needed if
+https://github.com/rasterio/rasterio/pull/2626 is fixed.

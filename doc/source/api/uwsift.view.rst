@@ -1,15 +1,16 @@
 uwsift.view package
 ===================
 
-Subpackages
------------
-
-.. toctree::
-
-   uwsift.view.timeline
-
 Submodules
 ----------
+
+uwsift.view.algebraic\_config module
+------------------------------------
+
+.. automodule:: uwsift.view.algebraic_config
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 uwsift.view.cameras module
 --------------------------
@@ -27,14 +28,6 @@ uwsift.view.colormap module
    :undoc-members:
    :show-inheritance:
 
-uwsift.view.colormap\_dialogs module
-------------------------------------
-
-.. automodule:: uwsift.view.colormap_dialogs
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 uwsift.view.colormap\_editor module
 -----------------------------------
 
@@ -43,10 +36,10 @@ uwsift.view.colormap\_editor module
    :undoc-members:
    :show-inheritance:
 
-uwsift.view.create\_algebraic module
-------------------------------------
+uwsift.view.dataset\_statistics\_pane module
+--------------------------------------------
 
-.. automodule:: uwsift.view.create_algebraic
+.. automodule:: uwsift.view.dataset_statistics_pane
    :members:
    :undoc-members:
    :show-inheritance:
@@ -63,6 +56,14 @@ uwsift.view.layer\_details module
 ---------------------------------
 
 .. automodule:: uwsift.view.layer_details
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+uwsift.view.layer\_tree\_view module
+------------------------------------
+
+.. automodule:: uwsift.view.layer_tree_view
    :members:
    :undoc-members:
    :show-inheritance:
@@ -99,6 +100,14 @@ uwsift.view.scene\_graph module
    :undoc-members:
    :show-inheritance:
 
+uwsift.view.test\_visuals module
+--------------------------------
+
+.. automodule:: uwsift.view.test_visuals
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 uwsift.view.texture\_atlas module
 ---------------------------------
 
@@ -130,7 +139,6 @@ uwsift.view.visuals module
    :members:
    :undoc-members:
    :show-inheritance:
-
 
 Module contents
 ---------------

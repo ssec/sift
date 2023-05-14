@@ -1,0 +1,15 @@
+# Config file for translating Satpy's standard_name to a shorter name better
+# suited for GUI display
+
+standard_names:
+  # L1 data
+  'toa_outgoing_radiance_per_unit_wavelength': RAD
+  'toa_outgoing_radiance_per_unt_wavenumber': RAD
+  'toa_bidirectional_reflectance': REFL
+  'toa_brightness_temperature': BT
+
+  #L2 data
+  'cloud_mask_classification': cloud mask
+  'air_pressure_at_cloud_top': CTP
+  'reflectance_mean_all': REFL (mean, all)
+  'reflectance_mean_cld': REFL (mean, cloudy)

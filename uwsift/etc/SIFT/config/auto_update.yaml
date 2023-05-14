@@ -1,0 +1,9 @@
+# Activate auto update and set interval (in seconds) in which
+# the search path specified in catalogue settings is queried.
+
+auto_update:
+  active: False
+  interval: 20
+
+data_reading:
+  merge_with_existing: False # shall be activated only with active auto_update

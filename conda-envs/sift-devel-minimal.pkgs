@@ -1,0 +1,66 @@
+# This file may be used to create an environment using:
+# e.g. ENV=devel
+# $ conda create --name $ENV --channel conda-forge --strict-channel-priority python=3.10
+# $ conda activate $ENV
+# $ conda config --env --add channels conda-forge
+# $ conda config --env --set channel_priority strict
+# $ conda install --file <this file>
+#
+# Only the minimal set of packages to install is listed (that is the intention
+# at least), all further dependencies should be resolved by Conda.
+#
+defusedxml=0.7.1
+donfig=0.7.0
+imageio-ffmpeg=0.4.7
+# imageio-ffmpeg -> ffmpeg
+# imageio-ffmpeg -> imageio
+matplotlib=3.5.2
+numba=0.55.2
+proj=9.1.0
+pyproj=3.4.1
+pygrib=2.1.4
+pyqtgraph=0.12.4
+pyqtwebengine=5.15.7
+# pyqtwebengine # -> pyqt
+pyshp=2.3.1
+rasterio=1.3.4
+satpy=0.39.0
+# satpy -> appdirs
+# satpy -> h5py
+# satpy -> netcdf4
+# satpy -> numpy
+# satpy -> pillow
+# satpy -> pyproj
+# satpy -> pyyaml
+scikit-image=0.19.3
+shapely=2.0.0
+sqlalchemy=1.4.39
+vispy=0.12.1
+
+# Explicit Satpy dependencies to make more readers work
+bottleneck=1.3.5
+h5netcdf=1.1.0
+hdf5plugin=4.0.1
+# pygac: not available in conda-forge, you may have a look here: https://anaconda.org/bucricket/pygac
+pyhdf=0.10.5
+python-eccodes=1.4.2  # This and its dependency 'eecodes' seem to be broken on Windows
+rioxarray=0.13.3
+
+# This is only for development
+cmake=3.24.0
+conda-build=3.21.9
+git=2.39.1
+make=4.3
+pre-commit=2.21.0
+pyinstaller-hooks-contrib=2022.8
+pyinstaller=5.1
+pytest-mock=3.8.2
+pytest-qt=4.1.0
+pytest=7.1.2
+sphinx=5.1.1
+# sphinx -> sphinxcontrib-applehelp=1.0.2
+# sphinx -> sphinxcontrib-devhelp=1.0.2
+# sphinx -> sphinxcontrib-htmlhelp=2.0.0
+# sphinx -> sphinxcontrib-jsmath=1.0.1
+# sphinx -> sphinxcontrib-qthelp=1.0.3
+# sphinx -> sphinxcontrib-serializinghtml=1.1.5

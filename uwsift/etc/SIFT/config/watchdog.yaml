@@ -1,0 +1,26 @@
+watchdog:
+  heartbeat_file: "$$CACHE_DIR$$/heartbeat.txt"
+  notification_cmd: /path/to/raiseEvent.sh
+  # Unit of the following settings: seconds
+  heartbeat_check_interval: 60
+  max_tolerable_dataset_age: 600
+  max_tolerable_idle_time: 600
+
+  # Restart the application after the interval expires
+  # Set this option to 0 in order to disable the Auto Restart
+  # Note: Auto Restart requires the heartbeat_file option
+  auto_restart_interval: 86400
+  # Ask again if the restart request was cancelled by the user
+  # Set this option to 0 in order to only ask the user once
+  auto_restart_ask_again_interval: 600
+  # The user has to cancel the restart request within this time
+  # to cancel the restart
+  # Set this option to 0 in order to disable the deadline
+  auto_restart_popup_deadline: 30
+
+  # If the memory consumption of SIFT exceeds this value,
+  # then the watchdog will issue a restart request.
+  # Possible units: M -> Mebibyte, G -> Gibibyte (with base 1024 to be
+  # consistent with systemd).
+  # Leave this option empty in order to disable it
+  max_memory_consumption: 5G

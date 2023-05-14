@@ -3,6 +3,7 @@ channels:
   - conda-forge
 dependencies:
   - appdirs
+  - defusedxml
   - Cython
   - imageio
   - imageio-ffmpeg
@@ -13,6 +14,7 @@ dependencies:
   - pyshp
   - pyqt
   - pyqtgraph
+  - pyqtwebengine
   - satpy
   - scikit-image
   - shapely
@@ -27,6 +29,7 @@ dependencies:
   - fsspec
   - h5netcdf
   - h5py
+  - hdf5plugin
   - netcdf4
   - pillow
   - pooch
@@ -55,3 +58,6 @@ dependencies:
     - trollimage
     - pyspectral
     - pyorbital
+    - ecmwflibs
+    - eccodes
+    - cfgrib

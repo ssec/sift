@@ -1,43 +1,44 @@
+import io
 import logging
 import os
-import io
-from PyQt5 import QtCore, QtGui, QtWidgets
 
 import imageio
-import numpy
 import matplotlib as mpl
+import numpy
 from matplotlib import pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 from uwsift.common import Info
+from uwsift.model.layer_model import LayerModel
 from uwsift.ui import export_image_dialog_ui
+from uwsift.util import USER_DESKTOP_DIRECTORY, get_package_data_dir
 from uwsift.view.colormap import COLORMAP_MANAGER
-from uwsift.util import get_package_data_dir, USER_DESKTOP_DIRECTORY
 
 LOG = logging.getLogger(__name__)
 DATA_DIR = get_package_data_dir()
 
 NUM_TICKS = 8
 TICK_SIZE = 14
-FONT = 'arial'
+FONT = "arial"
 
 
 def is_gif_filename(fn):
-    return os.path.splitext(fn)[-1] in ['.gif']
+    return os.path.splitext(fn)[-1] in [".gif"]
 
 
 def is_video_filename(fn):
-    return os.path.splitext(fn)[-1] in ['.mp4', '.m4v', '.gif']
+    return os.path.splitext(fn)[-1] in [".mp4", ".m4v", ".gif"]
 
 
 def get_imageio_format(fn):
     """Ask imageio if it knows what to do with this filename."""
-    request = imageio.core.Request(fn, 'w?')
+    request = imageio.core.Request(fn, "w?")
     return imageio.formats.search_write_format(request)
 
 
 class ExportImageDialog(QtWidgets.QDialog):
-    default_filename = 'sift_screenshot.png'
+    default_filename = "sift_screenshot.png"
 
     def __init__(self, parent):
         super(ExportImageDialog, self).__init__(parent)
@@ -65,20 +66,19 @@ class ExportImageDialog(QtWidgets.QDialog):
         self.ui.includeFooterCheckbox.clicked.connect(self._footer_changed)
         self._footer_changed()
 
-        self.ui.frameAllRadio.clicked.connect(self.change_frame_range)
-        self.ui.frameCurrentRadio.clicked.connect(self.change_frame_range)
-        self.ui.frameRangeRadio.clicked.connect(self.change_frame_range)
-        self.change_frame_range()  # set default
+        self.ui.frameAllRadio.clicked.connect(self._change_frame_range)
+        self.ui.frameCurrentRadio.clicked.connect(self._change_frame_range)
+        self.ui.frameRangeRadio.clicked.connect(self._change_frame_range)
+        self._change_frame_range()  # set default
 
     def set_total_frames(self, n):
         self.ui.frameRangeFrom.validator().setBottom(1)
         self.ui.frameRangeTo.validator().setBottom(2)
         self.ui.frameRangeFrom.validator().setTop(n - 1)
         self.ui.frameRangeTo.validator().setTop(n)
-        if (self.ui.frameRangeFrom.text() == '' or
-                int(self.ui.frameRangeFrom.text()) > n - 1):
-            self.ui.frameRangeFrom.setText('1')
-        if self.ui.frameRangeTo.text() in ['', '1']:
+        if self.ui.frameRangeFrom.text() == "" or int(self.ui.frameRangeFrom.text()) > n - 1:
+            self.ui.frameRangeFrom.setText("1")
+        if self.ui.frameRangeTo.text() in ["", "1"]:
             self.ui.frameRangeTo.setText(str(n))
 
     def _delay_clicked(self):
@@ -95,10 +95,12 @@ class ExportImageDialog(QtWidgets.QDialog):
 
     def _show_file_dialog(self):
         fn = QtWidgets.QFileDialog.getSaveFileName(
-            self, caption=self.tr('Screenshot Filename'),
+            self,
+            caption=self.tr("Screenshot Filename"),
             directory=os.path.join(self._last_dir, self.default_filename),
-            filter=self.tr('Image Files (*.png *.jpg *.gif *.mp4 *.m4v)'),
-            options=QtWidgets.QFileDialog.DontConfirmOverwrite)[0]
+            filter=self.tr("Image Files (*.png *.jpg *.gif *.mp4 *.m4v)"),
+            options=QtWidgets.QFileDialog.DontConfirmOverwrite,
+        )[0]
         if fn:
             self.ui.saveAsLineEdit.setText(fn)
         # bring this dialog back in focus
@@ -108,7 +110,7 @@ class ExportImageDialog(QtWidgets.QDialog):
     def _validate_filename(self):
         t = self.ui.saveAsLineEdit.text()
         bt = self.ui.buttonBox.button(QtWidgets.QDialogButtonBox.Save)
-        if not t or os.path.splitext(t)[-1] not in ['.png', '.jpg', '.gif', '.mp4', '.m4v']:
+        if not t or os.path.splitext(t)[-1] not in [".png", ".jpg", ".gif", ".mp4", ".m4v"]:
             bt.setDisabled(True)
         else:
             self._last_dir = os.path.dirname(t)
@@ -141,7 +143,7 @@ class ExportImageDialog(QtWidgets.QDialog):
         self.ui.animationGroupBox.setDisabled(disable or not is_gif)
         self.ui.frameDelayGroup.setDisabled(disable or not (is_gif or is_video))
 
-    def change_frame_range(self):
+    def _change_frame_range(self):
         if self.ui.frameRangeRadio.isChecked():
             self.ui.frameRangeFrom.setDisabled(False)
             self.ui.frameRangeTo.setDisabled(False)
@@ -151,16 +153,13 @@ class ExportImageDialog(QtWidgets.QDialog):
 
         self._check_animation_controls()
 
-    def get_frame_range(self):
+    def _get_frame_range(self):
         if self.ui.frameCurrentRadio.isChecked():
             frame = None
         elif self.ui.frameAllRadio.isChecked():
             frame = [None, None]
         elif self.ui.frameRangeRadio.isChecked():
-            frame = [
-                int(self.ui.frameRangeFrom.text()),
-                int(self.ui.frameRangeTo.text())
-            ]
+            frame = [int(self.ui.frameRangeFrom.text()), int(self.ui.frameRangeTo.text())]
         else:
             LOG.error("Unknown frame range selection")
             return
@@ -177,14 +176,14 @@ class ExportImageDialog(QtWidgets.QDialog):
 
         # loop is actually an integer of number of times to loop (0 infinite)
         info = {
-            'frame_range': self.get_frame_range(),
-            'include_footer': self.ui.includeFooterCheckbox.isChecked(),
+            "frame_range": self._get_frame_range(),
+            "include_footer": self.ui.includeFooterCheckbox.isChecked(),
             # 'transparency': self.ui.transparentCheckbox.isChecked(),
-            'loop': self.ui.loopRadio.isChecked(),
-            'filename': self.ui.saveAsLineEdit.text(),
-            'fps': fps,
-            'font_size': self.ui.footerFontSizeSpinBox.value(),
-            'colorbar': self._get_append_direction(),
+            "loop": self.ui.loopRadio.isChecked(),
+            "filename": self.ui.saveAsLineEdit.text(),
+            "fps": fps,
+            "font_size": self.ui.footerFontSizeSpinBox.value(),
+            "colorbar": self._get_append_direction(),
         }
         return info
 
@@ -195,9 +194,10 @@ class ExportImageDialog(QtWidgets.QDialog):
 
 class ExportImageHelper(QtCore.QObject):
     """Handle all the logic for creating screenshot images"""
-    default_font = os.path.join(DATA_DIR, 'fonts', 'Andale Mono.ttf')
 
-    def __init__(self, parent, doc, sgm):
+    default_font = os.path.join(DATA_DIR, "fonts", "Andale Mono.ttf")
+
+    def __init__(self, parent, sgm, model: LayerModel):
         """Initialize helper with defaults and other object handles.
 
         Args:
@@ -205,15 +205,16 @@ class ExportImageHelper(QtCore.QObject):
             sgm: ``SceneGraphManager`` object to get image data
         """
         super(ExportImageHelper, self).__init__(parent)
-        self.doc = doc
         self.sgm = sgm
+        self.model = model
         self._screenshot_dialog = None
 
     def take_screenshot(self):
         if not self._screenshot_dialog:
             self._screenshot_dialog = ExportImageDialog(self.parent())
             self._screenshot_dialog.accepted.connect(self._save_screenshot)
-        self._screenshot_dialog.set_total_frames(max(self.sgm.layer_set.max_frame, 1))
+        frame_count = self.sgm.animation_controller.get_frame_count()
+        self._screenshot_dialog.set_total_frames(max(frame_count, 1))
         self._screenshot_dialog.show()
 
     def _add_screenshot_footer(self, im, banner_text, font_size=11):
@@ -232,43 +233,55 @@ class ExportImageHelper(QtCore.QObject):
         return new_im
 
     def _create_colorbar(self, mode, u, size):
-        mpl.rcParams['font.sans-serif'] = FONT
-        mpl.rcParams.update({'font.size': TICK_SIZE})
+        mpl.rcParams["font.sans-serif"] = FONT
+        mpl.rcParams.update({"font.size": TICK_SIZE})
 
-        colors = COLORMAP_MANAGER[self.doc.colormap_for_uuid(u)]
-        if self.doc.prez_for_uuid(u).colormap == 'Square Root (Vis Default)':
+        colormap = self.model.get_dataset_presentation_by_uuid(u).colormap
+        colors = COLORMAP_MANAGER[colormap]
+
+        if colormap == "Square Root (Vis Default)":
             colors = colors.map(numpy.linspace((0, 0, 0, 1), (1, 1, 1, 1), 256))
         else:
             colors = colors.colors.rgba
 
         dpi = self.sgm.main_canvas.dpi
-        if mode == 'vertical':
-            fig = plt.figure(figsize=(size[0] / dpi * .1, size[1] / dpi * 1.2), dpi=dpi)
+        if mode == "vertical":
+            fig = plt.figure(figsize=(size[0] / dpi * 0.1, size[1] / dpi * 1.2), dpi=dpi)
             ax = fig.add_axes([0.3, 0.05, 0.2, 0.9])
         else:
-            fig = plt.figure(figsize=(size[0] / dpi * 1.2, size[1] / dpi * .1), dpi=dpi)
+            fig = plt.figure(figsize=(size[0] / dpi * 1.2, size[1] / dpi * 0.1), dpi=dpi)
             ax = fig.add_axes([0.05, 0.4, 0.9, 0.2])
 
         cmap = mpl.colors.ListedColormap(colors)
-        vmin, vmax = self.doc.prez_for_uuid(u).climits
+        vmin, vmax = self.model.get_dataset_presentation_by_uuid(u).climits
         norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
         cbar = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation=mode)
 
-        ticks = [str(self.doc[u][Info.UNIT_CONVERSION][2](self.doc[u][Info.UNIT_CONVERSION][1](t)))
-                 for t in numpy.linspace(vmin, vmax, NUM_TICKS)]
+        ticks = [
+            str(
+                self.model.get_dataset_by_uuid(u).info.get(Info.UNIT_CONVERSION)[2](
+                    self.model.get_dataset_by_uuid(u).info.get(Info.UNIT_CONVERSION)[1](t)
+                )
+            )
+            for t in numpy.linspace(vmin, vmax, NUM_TICKS)
+        ]
         cbar.set_ticks(numpy.linspace(vmin, vmax, NUM_TICKS))
         cbar.set_ticklabels(ticks)
 
         return fig
 
     def _append_colorbar(self, mode, im, u):
-        if mode is None or COLORMAP_MANAGER.get(self.doc.colormap_for_uuid(u)) is None:
+        if (
+            mode is None
+            or not self.model.get_dataset_presentation_by_uuid(u)
+            or COLORMAP_MANAGER.get(self.model.get_dataset_presentation_by_uuid(u).colormap) is None
+        ):
             return im
 
         fig = self._create_colorbar(mode, u, im.size)
 
         buf = io.BytesIO()
-        fig.savefig(buf, format='png', bbox_inches='tight', dpi=self.sgm.main_canvas.dpi)
+        fig.savefig(buf, format="png", bbox_inches="tight", dpi=self.sgm.main_canvas.dpi)
         buf.seek(0)
         fig_im = Image.open(buf)
 
@@ -277,7 +290,7 @@ class ExportImageHelper(QtCore.QObject):
         fig_w, fig_h = fig_im.size
 
         offset = 0
-        if mode == 'vertical':
+        if mode == "vertical":
             new_im = Image.new(im.mode, (orig_w + fig_w, orig_h))
             for i in [im, fig_im]:
                 new_im.paste(i, (offset, 0))
@@ -297,9 +310,9 @@ class ExportImageHelper(QtCore.QObject):
         # only use the first uuid to fill in filename information
         file_uuids = uuids[:1] if is_video_filename(base_filename) else uuids
         for u in file_uuids:
-            layer_info = self.doc[u]
+            dataset_info = self.model.get_dataset_by_uuid(u).info
             fn = base_filename.format(
-                start_time=layer_info[Info.SCHED_TIME],
+                start_time=dataset_info[Info.SCHED_TIME],
                 scene=Info.SCENE,
                 instrument=Info.INSTRUMENT,
             )
@@ -330,25 +343,25 @@ class ExportImageHelper(QtCore.QObject):
 
     def _get_animation_parameters(self, info, images):
         params = {}
-        if info['fps'] is None:
-            t = [self.doc[u][Info.SCHED_TIME] for u, im in images]
+        if info["fps"] is None:
+            t = [self.model.get_dataset_by_uuid(u).info.get(Info.SCHED_TIME) for u, im in images]
             t_diff = [max(1, (t[i] - t[i - 1]).total_seconds()) for i in range(1, len(t))]
             min_diff = float(min(t_diff))
             # imageio seems to be using duration in seconds
             # so use 1/10th of a second
-            duration = [.1 * (this_diff / min_diff) for this_diff in t_diff]
+            duration = [0.1 * (this_diff / min_diff) for this_diff in t_diff]
             duration = [duration[0]] + duration
-            if not info['loop']:
+            if not info["loop"]:
                 duration = duration + duration[-2:0:-1]
-            params['duration'] = duration
+            params["duration"] = duration
         else:
-            params['fps'] = info['fps']
+            params["fps"] = info["fps"]
 
-        if is_gif_filename(info['filename']):
-            params['loop'] = 0  # infinite number of loops
-        elif 'duration' in params:
+        if is_gif_filename(info["filename"]):
+            params["loop"] = 0  # infinite number of loops
+        elif "duration" in params:
             # not gif but were given "Time Lapse", can only have one FPS
-            params['fps'] = int(1. / params.pop('duration')[0])
+            params["fps"] = int(1.0 / params.pop("duration")[0])
 
         return params
 
@@ -361,52 +374,61 @@ class ExportImageHelper(QtCore.QObject):
         if s is None:
             s = 1
         if e is None:
-            e = max(self.sgm.layer_set.max_frame, 1)
+            e = max(self.sgm.animation_controller.get_frame_count(), 1)
         return s - 1, e - 1
 
     def _save_screenshot(self):
         info = self._screenshot_dialog.get_info()
         LOG.info("Exporting image with options: {}".format(info))
-        info['frame_range'] = self._convert_frame_range(info['frame_range'])
-        if info['frame_range']:
-            s, e = info['frame_range']
-            uuids = self.sgm.layer_set.frame_order[s: e + 1]
+        info["frame_range"] = self._convert_frame_range(info["frame_range"])
+        if info["frame_range"]:
+            s, e = info["frame_range"]
         else:
-            uuids = [self.sgm.layer_set.top_layer_uuid()]
-        uuids, filenames = self._create_filenames(uuids, info['filename'])
+            s = e = self.sgm.animation_controller.get_current_frame_index()
+
+        uuids = self.sgm.animation_controller.get_frame_uuids()[s : e + 1]
+
+        uuids, filenames = self._create_filenames(uuids, info["filename"])
 
         # check for existing filenames
-        if (any(os.path.isfile(fn) for fn in filenames) and
-                not self._overwrite_dialog()):
+        if any(os.path.isfile(fn) for fn in filenames) and not self._overwrite_dialog():
             return
 
         # get canvas screenshot arrays (numpy arrays of canvas pixels)
-        img_arrays = self.sgm.get_screenshot_array(info['frame_range'])
+        img_arrays = self.sgm.get_screenshot_array(info["frame_range"])
         if not img_arrays or len(uuids) != len(img_arrays):
-            LOG.error("Number of frames does not equal number of UUIDs")
+            LOG.error(
+                f"Number of frames: {0 if not img_arrays else len(img_arrays)}"
+                f" does not equal "
+                f"number of UUIDs: {len(uuids)}"
+            )
             return
 
         images = [(u, Image.fromarray(x)) for u, x in img_arrays]
 
-        if info['colorbar'] is not None:
-            images = [(u, self._append_colorbar(info['colorbar'], im, u)) for (u, im) in images]
+        if info["colorbar"] is not None:
+            images = [(u, self._append_colorbar(info["colorbar"], im, u)) for (u, im) in images]
 
-        if info['include_footer']:
-            banner_text = [self.doc[u][Info.DISPLAY_NAME] if u else "" for u, im in images]
-            images = [(u, self._add_screenshot_footer(im, bt, font_size=info['font_size'])) for (u, im), bt in
-                      zip(images, banner_text)]
+        if info["include_footer"]:
+            banner_text = [
+                self.model.get_dataset_by_uuid(u).info.get(Info.DISPLAY_NAME) if u else "" for u, im in images
+            ]
+            images = [
+                (u, self._add_screenshot_footer(im, bt, font_size=info["font_size"]))
+                for (u, im), bt in zip(images, banner_text)
+            ]
 
         imageio_format = get_imageio_format(filenames[0])
         if imageio_format:
             format_name = imageio_format.name
-        elif filenames[0].upper().endswith('.M4V'):
-            format_name = 'MP4'
+        elif filenames[0].upper().endswith(".M4V"):
+            format_name = "MP4"
         else:
             raise ValueError("Not sure how to handle file with format: {}".format(filenames[0]))
 
         if is_video_filename(filenames[0]) and len(images) > 1:
             params = self._get_animation_parameters(info, images)
-            if not info['loop'] and is_gif_filename(filenames[0]):
+            if not info["loop"] and is_gif_filename(filenames[0]):
                 # rocking animation
                 # we want frames 0, 1, 2, 3, 2, 1
                 # NOTE: this must be done *after* we get animation properties
@@ -417,9 +439,11 @@ class ExportImageHelper(QtCore.QObject):
             params = {}
             filenames = list(zip(filenames, [[x] for x in images]))
 
+        self._write_images(filenames, format_name, params)
+
+    def _write_images(self, filenames, format_name, params):
         for filename, file_images in filenames:
             writer = imageio.get_writer(filename, format_name, **params)
             for _, x in file_images:
                 writer.append_data(numpy.array(x))
-
         writer.close()

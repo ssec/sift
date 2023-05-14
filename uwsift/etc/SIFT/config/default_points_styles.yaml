@@ -1,0 +1,44 @@
+point_styles:
+  # Allowed values: disc, arrow, ring, clobber, square, diamond, vbar, hbar,
+  # cross, tailed_arrow, x, triangle_up, triangle_down, star
+
+  # note: scaled markers (using % size here) are affected by https://github.com/vispy/vispy/issues/2453
+  red_x:
+    symbol: 'x'
+    size: '9px'
+    fill: '#FF0000'
+    stroke: '#000000'
+    stroke-width: '2px'
+
+  red_empty_square:
+    symbol: 'square'
+    size: '20px'
+    stroke: '#FF0000'
+    stroke-width: '1px'
+
+  yellow_disc:
+    symbol: 'disc'
+    size: '14px'
+    fill: '#FFFF00'
+    stroke: '#FFFF00'
+    stroke-width: '0.5px'
+
+default_point_styles:
+  observed_lmk_locations_ir_105: 'red_x'
+  observed_lmk_locations_ir_123: 'red_x'
+  observed_lmk_locations_ir_133: 'red_x'
+  observed_lmk_locations_ir_38: 'red_x'
+  observed_lmk_locations_ir_87: 'red_x'
+  observed_lmk_locations_ir_97: 'red_x'
+  observed_lmk_locations_nir_13: 'red_x'
+  observed_lmk_locations_nir_16: 'red_x'
+  observed_lmk_locations_nir_22: 'red_x'
+  observed_lmk_locations_vis_04: 'red_x'
+  observed_lmk_locations_vis_05: 'red_x'
+  observed_lmk_locations_vis_06: 'red_x'
+  observed_lmk_locations_vis_08: 'red_x'
+  observed_lmk_locations_vis_09: 'red_x'
+  observed_lmk_locations_wv_63: 'red_x'
+  observed_lmk_locations_wv_73: 'red_x'
+  catalogue_landmark_locations: 'red_empty_square'
+  peak_current: 'yellow_disc'

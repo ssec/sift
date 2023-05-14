@@ -5,6 +5,7 @@
 ![CI](https://github.com/ssec/sift/actions/workflows/ci.yaml/badge.svg)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.2587907.svg)](https://doi.org/10.5281/zenodo.2587907)
 [![Gitter chat](https://badges.gitter.im/gitterHQ/gitter.png)](https://gitter.im/gitterHQ/gitter)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/ssec/sift/master.svg)](https://results.pre-commit.ci/latest/github/ssec/sift/master)
 
 
 Satellite Information Familiarization Tool (SIFT) was designed by the Space
@@ -27,6 +28,21 @@ The project wiki with some in-depth usage and installation instructions can
 also be found on GitHub: https://github.com/ssec/sift/wiki
 
 Developer documentation can be found on https://sift.readthedocs.io/en/latest/.
+
+## History
+
+SIFT was originally created and designed at [SSEC/CIMSS at the University of
+Wisconsin - Madison](https://cimss.ssec.wisc.edu/) as a training tool for US
+NWS forecasters. Later, [EUMETSAT, European Organization for the Exploitation
+of Meteorological Satellites](https://www.eumetsat.int/),
+joined the project contributing many new features and refactoring various
+portions of the project to support instrument calibration/validation workflows
+as well as additional scientific analysis. CIMSS and EUMETSAT now work on the
+project together as well as accepting contributions from users outside these
+groups.
+
+EUMETSAT contributions, leading up to SIFT 2.0, were carried out by
+[ask – Innovative Visualisierungslösungen GmbH](https://askvisual.de/).
 
 ## Data Access and Reading
 

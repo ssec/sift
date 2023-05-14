@@ -19,13 +19,13 @@ REQUIRES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-__author__ = 'rayg'
-__docformat__ = 'reStructuredText'
+__author__ = "rayg"
+__docformat__ = "reStructuredText"
 
 import logging
 from collections import OrderedDict
 
-from PyQt5.QtCore import QObject, pyqtSignal, QThread
+from PyQt5.QtCore import QObject, QThread, pyqtSignal
 
 LOG = logging.getLogger(__name__)
 
@@ -41,8 +41,6 @@ class Worker(QThread):
     """
     Worker thread use by TaskQueue
     """
-    queue = None
-    depth = 0
 
     # worker id, sequence of dictionaries listing update information to be propagated to view
     workerDidMakeProgress = pyqtSignal(int, list)
@@ -51,7 +49,7 @@ class Worker(QThread):
 
     def __init__(self, myid: int):
         super(Worker, self).__init__()
-        self.queue = OrderedDict()
+        self.queue: OrderedDict = OrderedDict()
         self.depth = 0
         self.id = myid
 
@@ -95,11 +93,6 @@ class TaskQueue(QObject):
     Eventually will include thread pools and multiprocess pools.
     Two threads for interactive tasks (high priority), one thread for background tasks (low priority): 0, 1, 2
     """
-    process_pool = None  # process pool for background activity
-    workers = None  # thread pool for background activity
-    _interactive_round_robin = 0  # swaps between 0 and 1 for interactive tasks
-    _last_status = None  # list of last status reports for different workers
-    _completion_futures = None  # dictionary of id(task) : completion(bool)
 
     didMakeProgress = pyqtSignal(list)  # sequence of dictionaries listing update information to be propagated to view
 
@@ -107,13 +100,13 @@ class TaskQueue(QObject):
     # finished : inherited
     # terminated : inherited
 
-    def __init__(self, process_pool=None, worker_count=3):
+    def __init__(self, process_pool=None):
         super(TaskQueue, self).__init__()
-        self._interactive_round_robin = 0
-        self.process_pool = process_pool
-        self._completion_futures = {}
-        self._last_status = []
-        self.workers = []
+        self._interactive_round_robin = 0  # swaps between 0 and 1 for interactive tasks
+        self.process_pool = process_pool  # thread pool for background activity
+        self._completion_futures = {}  # dictionary of id(task) : completion(bool)
+        self._last_status = []  # list of last status reports for different workers
+        self.workers = []  # thread pool for background activity
         for id in range(3):
             worker = Worker(id)
             worker.workerDidMakeProgress.connect(self._did_progress)
@@ -122,7 +115,7 @@ class TaskQueue(QObject):
             self._last_status.append(None)
 
         global TheQueue
-        assert (TheQueue is None)
+        assert TheQueue is None  # nosec B101
         TheQueue = self
 
     @property
@@ -133,8 +126,16 @@ class TaskQueue(QObject):
     def remaining(self):
         return sum([len(x.queue) for x in self.workers])
 
-    def add(self, key, task_iterable, description, interactive=False, and_then=None, use_process_pool=False,
-            use_thread_pool=False):
+    def add(
+        self,
+        key,
+        task_iterable,
+        description,
+        interactive=False,
+        and_then=None,
+        use_process_pool=False,
+        use_thread_pool=False,
+    ):
         """Add an iterable task which will yield progress information dictionaries.
 
         Expect behavior like this::
@@ -153,7 +154,7 @@ class TaskQueue(QObject):
         if interactive:
             wdex = self._interactive_round_robin
             self._interactive_round_robin += 1
-            self._interactive_round_robin %= 2
+            self._interactive_round_robin %= 2  # TODO(nk) worker count is hardcoded: worker_count-1
         else:
             wdex = 2
         if callable(and_then):
@@ -179,7 +180,7 @@ class TaskQueue(QObject):
                 return
 
         # otherwise this is a notification that we're finally at full idle
-        self.didMakeProgress.emit([{TASK_DOING: '', TASK_PROGRESS: 0.0}])
+        self.didMakeProgress.emit([{TASK_DOING: "", TASK_PROGRESS: 0.0}])
         # FUTURE: consider one progress bar per worker
 
     def _did_complete_task(self, task_key: str, succeeded: bool):
@@ -201,10 +202,3 @@ class TaskQueue(QObject):
         else:
             depth, remaining = self.depth, self.remaining
             return float(depth - remaining) / depth
-
-
-def test_task():
-    for dex in range(10):
-        yield {TASK_DOING: 'test task', TASK_PROGRESS: float(dex) / 10.0}
-        TheQueue.sleep(1)
-    yield {TASK_DOING: 'test task', TASK_PROGRESS: 1.0}

@@ -1,0 +1,8 @@
+data_reading:
+  avhrr_l1b_eps:
+    geometry_definition: SwathDefinition
+    filter_patterns:
+      [
+        'AVHR_xxx_1B_{platform_short_name}_{start_time:%Y%m%d%H%M%SZ}_{end_time:%Y%m%d%H%M%SZ}_{processing_mode}_{disposition_mode}_{creation_time:%Y%m%d%H%M%SZ}',
+        'AVHR_xxx_1B_{platform_short_name}_{start_time:%Y%m%d%H%M%SZ}_{end_time:%Y%m%d%H%M%SZ}_{processing_mode}_{disposition_mode}_{creation_time:%Y%m%d%H%M%SZ}.nat',
+      ]

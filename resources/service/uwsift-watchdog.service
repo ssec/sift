@@ -1,0 +1,15 @@
+# copy this file to ~/.local/share/systemd/user/uwsift-watchdog.service
+# then activate auto-start: systemctl --user enable uwsift-watchdog.service
+
+[Unit]
+Description=Watchdog for SIFT
+After=uwsift.service
+
+[Service]
+Type=exec
+WorkingDirectory=/home/username/Dokumente/eumSIFT
+ExecStart=/var/local/miniconda3/envs/devel-default/bin/python -m uwsift.util.watchdog
+Restart=always
+
+[Install]
+WantedBy=default.target

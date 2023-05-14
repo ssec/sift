@@ -22,4 +22,6 @@ REQUIRES
 :license: GPLv3, see LICENSE for more details
 """
 
-from .workspace import Workspace  # noqa
+from .caching_workspace import CachingWorkspace  # noqa: F401
+from .simple_workspace import SimpleWorkspace  # noqa: F401
+from .workspace import BaseWorkspace  # noqa: F401

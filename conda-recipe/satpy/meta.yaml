@@ -9,7 +9,7 @@ package:
   version: '{{ version }}'
 
 source:
-  git_url: https://github.com/pytroll/satpy.git 
+  git_url: https://github.com/pytroll/satpy.git
   git_rev: eb26f12435952d2bab94e761a7f284f1fcb30d33
 
 build:
