@@ -74,7 +74,7 @@ class Recipe:
     input_layer_ids: list = dataclasses.field(default_factory=list)
     read_only: bool = False
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.__id: uuid.UUID = uuidgen()
 
     @property

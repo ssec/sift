@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import List, Optional
+from typing import Callable, List, Optional
 from uuid import UUID
 
 from PyQt5.QtCore import QDateTime, QObject, pyqtSignal
@@ -33,7 +33,7 @@ class TimeManager(QObject):
 
     didMatchTimes = pyqtSignal(dict)
 
-    def __init__(self, animation_speed, matching_policy=find_nearest_past):
+    def __init__(self, animation_speed: float, matching_policy: Callable = find_nearest_past) -> None:
         super().__init__()
         self._animation_speed = animation_speed
         self._time_matcher = TimeMatcher(matching_policy)
@@ -51,6 +51,8 @@ class TimeManager(QObject):
 
     @property
     def qml_backend(self) -> QmlBackend:
+        if self._qml_backend is None:
+            raise RuntimeError("Trying to access time manager QML backend before it is initialized")
         return self._qml_backend
 
     @qml_backend.setter
@@ -59,6 +61,7 @@ class TimeManager(QObject):
 
     def connect_to_model(self, layer_model: LayerModel):
         self._layer_model = layer_model
+        # FIXME: Access to private member
         self.qml_layer_manager._layer_model = layer_model
 
         policy = WrappingDrivingPolicy(self._layer_model.layers)
@@ -174,6 +177,8 @@ class TimeManager(QObject):
                     that ingests a policy and handles UI based on that?
         """
         assert self._time_transformer is not None  # nosec B101 # suppress mypy [union-attr]
+        if self.qml_engine is None:
+            raise RuntimeError("Can't update timeline until QML Engine has been assigned.")
         self.qml_engine.clearComponentCache()
         if not layer or not layer.dynamic:
             self.qml_timestamps_model.clear()
@@ -183,9 +188,9 @@ class TimeManager(QObject):
             new_timestamp_qdts = list(map(lambda dt: QDateTime(dt), layer.timeline.keys()))
 
             if not self._time_transformer.t_sim:
-                self.qml_timestamps_model.currentTimestamp = list(layer.timeline.keys())[0]
+                self.qml_timestamps_model.currentTimestamp = list(layer.timeline.keys())[0]  # type: ignore
             else:
-                self.qml_timestamps_model.currentTimestamp = self._time_transformer.t_sim
+                self.qml_timestamps_model.currentTimestamp = self._time_transformer.t_sim  # type: ignore
             self.qml_timestamps_model.timestamps = new_timestamp_qdts
         self.qml_backend.refresh_timeline()
 

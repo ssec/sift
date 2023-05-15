@@ -8,9 +8,9 @@ Manage area definitions from Satpy/Pyresample.
 
 :author: A.Rettig <alexander.rettig@askvisual.de>
 """
+from __future__ import annotations
 
 import logging
-import typing as typ
 
 from pyresample.area_config import AreaNotFound, load_area_from_string
 from pyresample.geometry import AreaDefinition
@@ -53,14 +53,14 @@ class AreaDefinitionsManager:
     AreaDefinition object.
     """
 
-    _available_area_defs_by_id = None
-    _available_area_defs_id_by_name = None
+    _available_area_defs_by_id: None | dict[str, AreaDefinition] = None
+    _available_area_defs_id_by_name: None | dict[str, str] = None
 
     @classmethod
-    def init_available_area_defs(cls):
+    def init_available_area_defs(cls) -> None:
 
-        cls._available_area_defs_by_id: typ.Dict[str, AreaDefinition] = {}
-        cls._available_area_defs_id_by_name: typ.Dict[str, str] = {}
+        cls._available_area_defs_by_id = {}
+        cls._available_area_defs_id_by_name = {}
 
         desired_area_defs = config.get("area_definitions", {})
 
@@ -111,4 +111,5 @@ class AreaDefinitionsManager:
         return next(iter(cls._available_area_defs_id_by_name))
 
 
+# TODO: Why does this need to be a class being updated instead of an instance of a class?
 AreaDefinitionsManager.init_available_area_defs()

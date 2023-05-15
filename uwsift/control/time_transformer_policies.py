@@ -10,6 +10,9 @@ from uwsift.model.layer_item import LayerItem
 LOG = logging.getLogger(__name__)
 
 
+# TODO: Add Policy protocol class to help with type checking and to define an interface
+
+
 class WrappingDrivingPolicy(QObject):
     """
     Time translation policy that when called returns a simulated data time
