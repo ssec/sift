@@ -63,7 +63,7 @@ SIFT_FTP_PATH: (default 'pub/sift/dist') Where on the SSEC FTP server should
 import logging
 import os
 import shutil
-import subprocess
+import subprocess  # nosec: B404
 import sys
 from glob import glob
 

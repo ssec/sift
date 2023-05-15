@@ -1063,6 +1063,7 @@ class _GLGradientLineVisual(_GLLineVisual):
             # self._pos_vbo.set_data(pos)
             self._program.vert["position"] = self._pos_vbo
             self._program.vert["to_vec4"] = self._ensure_vec4_func(pos.shape[-1])
+            self._parent._changed["pos"] = False
 
         if self._parent._changed["color"]:
             color, cmap = self._parent._interpret_color()
@@ -1078,33 +1079,21 @@ class _GLGradientLineVisual(_GLLineVisual):
                 else:
                     self._color_vbo.set_data(color)
                     self._program.vert["color"] = self._color_vbo
+            self._parent._changed["color"] = False
 
-            self.shared_program["texture2D_LUT"] = cmap.texture_lut() if (hasattr(cmap, "texture_lut")) else None
+            self.shared_program["texture2D_LUT"] = cmap and cmap.texture_lut()
 
         # Do we want to use OpenGL, and can we?
-        GL = None
-        from vispy.app._default_app import default_app
-
-        if default_app is not None and default_app.backend_name != "ipynb_webgl":
-            try:
-                import OpenGL.GL as GL
-            except Exception:  # can be other than ImportError sometimes
-                pass
-
-        # Turn on line smooth and/or line width
-        if GL:
-            if self._parent._antialias:
-                GL.glEnable(GL.GL_LINE_SMOOTH)
-            else:
-                GL.glDisable(GL.GL_LINE_SMOOTH)
-            px_scale = self.transforms.pixel_scale
-            width = px_scale * self._parent._width
-            GL.glLineWidth(max(width, 1.0))
+        self.update_gl_state(line_smooth=bool(self._parent._antialias))
+        px_scale = self.transforms.pixel_scale
+        width = px_scale * self._parent._width
+        self.update_gl_state(line_width=max(width, 1.0))
 
         if self._parent._changed["connect"]:
             self._connect = self._parent._interpret_connect()
             if isinstance(self._connect, np.ndarray):
                 self._connect_ibo.set_data(self._connect)
+            self._parent._changed["connect"] = False
         if self._connect is None:
             return False
 

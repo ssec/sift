@@ -2,7 +2,7 @@
 
 import logging
 import os
-import pickle
+import pickle  # nosec: B403
 import re
 import sys
 import tracemalloc
@@ -91,7 +91,7 @@ class HeapAnalyzer:
 
     def load_combined_snapshots(self, path: str):
         with open(path, "rb") as file:
-            self._allocations = pickle.load(file)
+            self._allocations = pickle.load(file)  # nosec: B301
 
         for _, allocs in self._allocations.items():
             if self._combined_snapshot_count == 0:
