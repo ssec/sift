@@ -55,9 +55,14 @@ from sqlalchemy import (
     create_engine,
 )
 from sqlalchemy.ext.associationproxy import association_proxy
-from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.orm import Session, backref, relationship, scoped_session, sessionmaker
 from sqlalchemy.orm.collections import attribute_mapped_collection
+
+try:
+    from sqlalchemy.orm import declarative_base, declared_attr
+except ImportError:
+    # sqlalchemy <2.0
+    from sqlalchemy.ext import declarative_base, declared_attr
 
 from uwsift.common import FCS_SEP, Info
 
