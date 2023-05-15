@@ -18,7 +18,7 @@ Example::
 import os
 import re
 import shutil
-import subprocess
+import subprocess  # nosec: B404
 import sys
 
 
@@ -82,8 +82,10 @@ def main():
         with open(os.path.join(sys.prefix, "Library", "bin", "qt.conf"), "wt") as qtconf:
             qtconf.write(new_text)
 
-    subprocess.check_call(["conda-pack", "--arcroot", args.arcroot, "--output", args.output] + unknown_args)
-    os.chmod(args.output, 0o755)
+    subprocess.check_call(  # nosec: B603
+        ["conda-pack", "--arcroot", args.arcroot, "--output", args.output] + unknown_args
+    )
+    os.chmod(args.output, 0o755)  # nosec: B103
 
     # TODO: Do additional risky cleanup to reduce output file size
 
