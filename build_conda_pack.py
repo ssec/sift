@@ -77,6 +77,8 @@ def main():
         (old_prefix,) = tuple(re.findall(r"^Prefix\s*=\s*(.*?).Library\s*$", old_text, re.MULTILINE))
         new_prefix = old_prefix.replace("/", "\\")
         new_text = old_text.replace(old_prefix, new_prefix)
+        with open(os.path.join(sys.prefix, "qt.conf"), "wt") as qtconf:
+            qtconf.write(new_text)
         with open(os.path.join(sys.prefix, "Library", "bin", "qt.conf"), "wt") as qtconf:
             qtconf.write(new_text)
 
