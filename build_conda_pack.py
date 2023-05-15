@@ -72,12 +72,12 @@ def main():
 
     # HACK: https://github.com/conda/conda-pack/issues/141
     if sys.platform.startswith("win"):
-        with open(os.path.join(sys.prefix, "qt.conf"), "rt") as qtconf:
+        with open(os.path.join(sys.prefix, "bin", "qt.conf"), "rt") as qtconf:
             old_text = qtconf.read()
         (old_prefix,) = tuple(re.findall(r"^Prefix\s*=\s*(.*?).Library\s*$", old_text, re.MULTILINE))
         new_prefix = old_prefix.replace("/", "\\")
         new_text = old_text.replace(old_prefix, new_prefix)
-        with open(os.path.join(sys.prefix, "qt.conf"), "wt") as qtconf:
+        with open(os.path.join(sys.prefix, "bin", "qt.conf"), "wt") as qtconf:
             qtconf.write(new_text)
         with open(os.path.join(sys.prefix, "Library", "bin", "qt.conf"), "wt") as qtconf:
             qtconf.write(new_text)

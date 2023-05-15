@@ -6,6 +6,7 @@ concurrency:
   cancel-in-progress: true
 
 on:
+  pull_request:
   push:
     branches:
       - master
@@ -83,6 +84,8 @@ jobs:
       # that would require uploading the bundles as artifacts which would
       # quickly hit our temporary storage limits
       - name: Upload bundle
+        # only upload on push (currently only master)
+        if: github.event_name == 'push'
         run: |
           continuous_integration/upload_conda_pack.sh
 
