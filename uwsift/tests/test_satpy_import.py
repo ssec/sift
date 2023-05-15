@@ -50,11 +50,13 @@ def test_config_satpy_import_path(tmp_path):
             "import sys, uwsift, satpy, satpy.readers\n"
             "print({'base_config_dir': uwsift.USER_CONFIG_PATHS[0], "
             "'overwritten_satpy_import_path': uwsift.config.get('satpy_import_path', None), "
-            "'satpy_init_path': satpy.__file__}, file=sys.stderr)",
+            "'satpy_init_path': satpy.__file__})",
         ]
         working_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
-        process = subprocess.run(command, stderr=subprocess.PIPE, env=modified_env, cwd=working_dir, check=True)
-        results = literal_eval(process.stderr.decode("utf-8"))
+        process = subprocess.run(
+            command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=modified_env, cwd=working_dir, check=True
+        )
+        results = literal_eval(process.stdout.decode("utf-8"))
 
         # Can we configure the config file path with the environment variable `XDG_CONFIG_HOME`?
         assert results["base_config_dir"] == base_config_dir

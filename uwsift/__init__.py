@@ -2,6 +2,7 @@
 
 import os
 import sys
+import warnings
 from importlib.machinery import PathFinder
 from importlib.util import spec_from_file_location
 
@@ -33,17 +34,18 @@ CONFIG_PATHS = SYSTEM_CONFIG_PATHS + USER_CONFIG_PATHS
 
 
 def init_user_config_dirs(user_config_dirs: list):
-    print(f"Creating user configuration directories:{user_config_dirs}")
+    print(f"Creating user configuration directories:\n\t{user_config_dirs}", file=sys.stderr)
     for user_config_dir in user_config_dirs:
         try:
             os.makedirs(user_config_dir, mode=0o777, exist_ok=True)
         except (PermissionError, FileExistsError) as e:
-            print(f"Failed to create '{user_config_dir}': {e}")
+            print(f"Failed to create '{user_config_dir}': {e}", file=sys.stderr)
 
 
+# FIXME: Move this to GUI initialization (argument parsing)
 init_user_config_dirs(USER_CONFIG_PATHS)
 
-print(f"Reading configuration from:\n{CONFIG_PATHS}")
+print(f"Reading configuration from:\n\t{CONFIG_PATHS}", file=sys.stderr)
 config = Config("uwsift", paths=CONFIG_PATHS)
 
 
@@ -72,7 +74,7 @@ def overwrite_import(package_name: str, custom_import_path: str, *, verbose=True
 
                 if verbose:
                     # setup for the logger happens in __main__, thus use print
-                    print(f"Custom import path for package `{fullname}`: {package_import_path}")
+                    print(f"Custom import path for package `{fullname}`: {package_import_path}", file=sys.stderr)
                 return spec
             return None
 
@@ -97,12 +99,18 @@ def _map_str_to_image_display_mode(image_display_mode_str: str) -> ImageDisplayM
         if image_display_mode_str.lower() == idm:
             return idm
     if image_display_mode_str:  # empty is OK, but typos should not go unnoticed.
-        print(f"Unknown image display mode '{image_display_mode_str}', falling back to the default.")
+        warnings.warn(
+            f"Unknown image display mode '{image_display_mode_str}', falling back to the default.",
+            UserWarning,
+            stacklevel=2,
+        )
     return ImageDisplayMode.SIMPLE_GEOLOCATED  # this is the default
 
 
+# FIXME: These defeat the purpose of a dynamic config object and prevents command-line overrides.
+#    These can be converted to functions or direct `config.get(X)` usage.
 IMAGE_DISPLAY_MODE = _map_str_to_image_display_mode(config.get("display.image_mode", ""))
-print(f"Image Display Mode: {IMAGE_DISPLAY_MODE}")
+print(f"Image Display Mode: {IMAGE_DISPLAY_MODE}", file=sys.stderr)
 
 USE_INVENTORY_DB = config.get("storage.use_inventory_db")
 CLEANUP_FILE_CACHE = config.get("storage.cleanup_file_cache")

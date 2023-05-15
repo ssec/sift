@@ -45,6 +45,7 @@ from uwsift.common import (
     DEFAULT_TILE_WIDTH,
     TESS_LEVEL,
     Box,
+    IndexBox,
     Point,
     Resolution,
     ViewBox,
@@ -240,7 +241,7 @@ class SIFTTiledGeolocatedMixin:
             data = data.astype(np.float32)
         return data
 
-    def _build_texture_tiles(self, data, stride, tile_box: Box):
+    def _build_texture_tiles(self, data, stride, tile_box: IndexBox):
         """Prepare and organize strided data in to individual tiles with associated information."""
         data = self._normalize_data(data)
 
@@ -281,7 +282,7 @@ class SIFTTiledGeolocatedMixin:
             stride, tiy, tix, tex_tile_idx, data = tile_info
             self._texture.set_tile_data(tex_tile_idx, data)
 
-    def _build_vertex_tiles(self, preferred_stride, tile_box: Box):
+    def _build_vertex_tiles(self, preferred_stride, tile_box: IndexBox):
         """Rebuild the vertex buffers used for rendering the image when using
         the subdivide method.
 

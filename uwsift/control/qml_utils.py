@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import sys
 from datetime import datetime
-from typing import Callable, Dict, List, Optional
+from typing import Callable, List, Optional
 
 import numpy as np
 from dateutil.relativedelta import relativedelta
@@ -27,15 +29,17 @@ class QmlLayerManager(QObject):
     dateToDisplayChanged = pyqtSignal(str)
     testChanged = pyqtSignal(int)
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._layer_to_display = ""
         self._date_to_display = None
 
-        self._layer_model = None
+        self._layer_model: None | LayerModel = None
 
-        self._convenience_functions: Dict[str, Callable] = None
-        self._set_convenience_functions({"Most Frequent": self.get_most_frequent_data_layer_index})
+        self._convenience_functions: dict[str, Callable] = {
+            "Most Frequent": self.get_most_frequent_data_layer_index,
+        }
+        self.convFuncModel = LayerModel(layer_strings=list(self._convenience_functions.keys()))  # type: ignore
 
         # TODO(mk): make this configurable if the user wants to display dates differently?
         self._format_str = DEFAULT_TIME_FORMAT
@@ -46,6 +50,8 @@ class QmlLayerManager(QObject):
         Get index of the data layer with the least mean difference between timestamps.
         :return: -1 if no data layers exist, index of most frequent data layer otherwise.
         """
+        if self._layer_model is None:
+            raise RuntimeError("Layer model has not been connected to layer manager yet")
         dynamic_layers = self._layer_model.get_dynamic_layers()
         num_data_layers = len(dynamic_layers)
         if num_data_layers == 0:
@@ -75,10 +81,6 @@ class QmlLayerManager(QObject):
     def get_convenience_function(self, function_name: str) -> Optional[Callable]:
         conv_fun = self._convenience_functions.get(function_name, None)
         return conv_fun
-
-    def _set_convenience_functions(self, conv_funcs):
-        self._convenience_functions = conv_funcs
-        self.convFuncModel = LayerModel(layer_strings=list(conv_funcs.keys()))
 
     @pyqtProperty(QObject, notify=layerModelChanged)
     def layerModel(self):
@@ -197,7 +199,7 @@ class TimebaseModel(QAbstractListModel):
     currentTimestampChanged = pyqtSignal(str)
     returnToInitialState = pyqtSignal()
 
-    def __init__(self, *args, timestamps: List[QDateTime], **kwargs):
+    def __init__(self, *args, timestamps: None | List[QDateTime], **kwargs):
         super().__init__(*args, **kwargs)
         self._format_str = DEFAULT_TIME_FORMAT
         self.timestamps = timestamps  # sets self._timestamps
@@ -284,9 +286,9 @@ class QmlBackend(QObject):
     # to change.
     didChangeTimebase = pyqtSignal(int)
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self.qml_layer_manager: QmlLayerManager = None
+        self.qml_layer_manager: QmlLayerManager | None = None
 
     def clear_timeline(self):
         self.doClearTimeline.emit()
@@ -325,7 +327,7 @@ class QmlBackend(QObject):
         resulting data_layer_index is then emitted via the didChangeTimebase signal.
         :param conv_func_name: Name of the clicked convenience function as a string
         """
-        if self.qml_layer_manager:
+        if self.qml_layer_manager is not None:
             data_layer_index = self.qml_layer_manager.get_convenience_function(conv_func_name)()
             if data_layer_index >= 0:
                 self.didChangeTimebase.emit(data_layer_index)

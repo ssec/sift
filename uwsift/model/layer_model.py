@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import struct
 from datetime import datetime
@@ -715,7 +717,9 @@ class LayerModel(QAbstractItemModel):
 
         self.didUpdateLayers.emit()
 
-    def _check_recipe_layer_sched_times_to_update(self, existing_sched_times, input_layers, recipe_layer):
+    def _check_recipe_layer_sched_times_to_update(
+        self, existing_sched_times: list[datetime], input_layers: list, recipe_layer: LayerItem
+    ) -> list[datetime]:
         if isinstance(recipe_layer.recipe, AlgebraicRecipe):
             if recipe_layer.recipe.modified:
                 return existing_sched_times

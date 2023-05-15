@@ -1230,7 +1230,7 @@ class SatpyImporter(aImporter):
         completion = 2.0
         return completion, content, data_memmap
 
-    def _preprocess_products_with_resampling(self):
+    def _preprocess_products_with_resampling(self) -> None:
         resampler: str = self.resampling_info["resampler"]
         max_area = self.scn.finest_area()
         if isinstance(max_area, AreaDefinition) and max_area.area_id == self.resampling_info["area_id"]:
@@ -1246,16 +1246,6 @@ class SatpyImporter(aImporter):
                 f" to area ID '{self.resampling_info['area_id']}'"
                 f" with method '{resampler}'"
             )
-            # Use as many processes for resampling as the number of CPUs
-            # the application can use.
-            # See https://pyresample.readthedocs.io/en/latest/multi.html
-            #  and https://docs.python.org/3/library/os.html#os.cpu_count
-            try:
-                nprocs = len(os.sched_getaffinity(0))
-            except AttributeError:
-                # Windows or even some Unix variants only provide:
-                nprocs = os.cpu_count()
-
             target_area_def = AreaDefinitionsManager.area_def_by_id(self.resampling_info["area_id"])
 
             # About the next strange line of code: keep a reference to the
@@ -1271,7 +1261,6 @@ class SatpyImporter(aImporter):
             self.scn = self.scn.resample(
                 target_area_def,
                 resampler=resampler,
-                nprocs=nprocs,
                 radius_of_influence=self.resampling_info["radius_of_influence"],
                 reduce_data=reduce_data,
             )

@@ -18,6 +18,7 @@ from uwsift.common import (
     IMAGE_MESH_SIZE,
     PREFERRED_SCREEN_TO_TEXTURE_RATIO,
     Box,
+    IndexBox,
     Point,
     Resolution,
 )
@@ -151,7 +152,7 @@ def max_tiles_available(image_shape_y, image_shape_x, tile_shape_y, tile_shape_x
 
 
 @jit(
-    nb_types.NamedUniTuple(int64, 4, Box)(
+    nb_types.NamedUniTuple(int64, 4, IndexBox)(
         float64,
         float64,
         float64,
@@ -258,7 +259,7 @@ def visible_tiles(
     if tiy0 + nth > hh + 0.5:
         nth = hh + 0.5 - tiy0
 
-    tilebox = Box(
+    tilebox = IndexBox(
         bottom=np.int64(np.ceil(tiy0 + nth)),
         left=np.int64(np.floor(tix0)),
         top=np.int64(np.floor(tiy0)),
@@ -542,13 +543,14 @@ class TileCalculator(object):
         # maximum stride that we shouldn't lower resolution beyond
         self.overview_stride = self._calc_overview_stride()
 
-    def visible_tiles(self, visible_geom, stride=None, extra_tiles_box=None) -> Box:
-        """
-        given a visible world geometry and sampling, return (sampling-state, [Box-of-tiles-to-draw])
-        sampling state is WELLSAMPLED/OVERSAMPLED/UNDERSAMPLED
-        returned Box should be iterated per standard start:stop style
-        tiles are specified as (iy,ix) integer pairs
-        extra_box value says how many extra tiles to include around each edge
+    def visible_tiles(self, visible_geom, stride=None, extra_tiles_box=None) -> IndexBox:
+        """Get box of tile indexes for visible tiles that should be drawn.
+
+        Box indexes should be iterated with typical Python start:stop style
+        (inclusive start index, exclusive stop index). Tiles are expected to
+        be indexed (iy, ix) integer pairs. The ``extra_tiles_box`` value
+        specifies how many extra tiles to include around each edge.
+
         """
         if stride is None:
             stride = Point(1, 1)

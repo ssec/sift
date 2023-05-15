@@ -1,9 +1,15 @@
+from __future__ import annotations
+
 import logging
 import time
+from typing import TYPE_CHECKING
 
 from uwsift.common import DEFAULT_TIME_FORMAT
 
 LOG = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from uwsift.control.time_transformer_policies import WrappingDrivingPolicy
 
 
 class TimeTransformer:
@@ -15,7 +21,7 @@ class TimeTransformer:
         - sends t_sim to DisplayManager
     """
 
-    def __init__(self, translation_policy):
+    def __init__(self, translation_policy: WrappingDrivingPolicy):
 
         self._translation_policy = translation_policy
 
