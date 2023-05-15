@@ -129,6 +129,20 @@ class Box(NamedTuple):
     right: float
 
 
+class IndexBox(NamedTuple):
+    """Box using integer index values as coordinates.
+
+    This has a very similar purpose to :class:`Box`, but restricts coordinates
+    to integer values.
+
+    """
+
+    bottom: int
+    left: int
+    top: int
+    right: int
+
+
 class Resolution(NamedTuple):
     """Pixel resolution (km per pixel)."""
 
