@@ -80,8 +80,7 @@ class AreaDefinitionsManager:
         # Check for existence of at least one 'latlong' projection
         # (https://proj.org/operations/conversions/latlon.html)
         for area_def in cls._available_area_defs_by_id.values():
-            proj: str = area_def.proj_dict["proj"]
-            if proj in ("latlon", "latlong", "lonlat", "longlat"):
+            if area_def.crs.is_geographic:
                 return
 
         # Add default area definition(s)?
