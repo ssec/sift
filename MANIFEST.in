@@ -7,4 +7,6 @@ recursive-include uwsift/data/colormaps *.cmap
 recursive-include uwsift/data/grib_definitions *.def
 recursive-include uwsift/etc *
 include uwsift/ui/*.ui
+include uwsift/ui/*.qml
+include uwsift/ui/*.sh
 include LICENSE.txt
