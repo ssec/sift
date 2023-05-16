@@ -72,15 +72,7 @@ def main():
 
     # HACK: https://github.com/conda/conda-pack/issues/141
     if sys.platform.startswith("win"):
-        with open(os.path.join(sys.prefix, "Library", "bin", "qt.conf"), "rt") as qtconf:
-            old_text = qtconf.read()
-        (old_prefix,) = tuple(re.findall(r"^Prefix\s*=\s*(.*?).Library\s*$", old_text, re.MULTILINE))
-        new_prefix = old_prefix.replace("/", "\\")
-        new_text = old_text.replace(old_prefix, new_prefix)
-        with open(os.path.join(sys.prefix, "qt.conf"), "wt") as qtconf:
-            qtconf.write(new_text)
-        with open(os.path.join(sys.prefix, "Library", "bin", "qt.conf"), "wt") as qtconf:
-            qtconf.write(new_text)
+        _hack_conda_packed_qtconf_on_windows()
 
     subprocess.check_call(  # nosec: B603
         ["conda-pack", "--arcroot", args.arcroot, "--output", args.output] + unknown_args
@@ -88,6 +80,21 @@ def main():
     os.chmod(args.output, 0o755)  # nosec: B103
 
     # TODO: Do additional risky cleanup to reduce output file size
+
+
+def _hack_conda_packed_qtconf_on_windows():
+    qt_conf_path = os.path.join(sys.prefix, "Library", "bin", "qt.conf")
+    if not os.path.exists(qt_conf_path):
+        return
+    with open(qt_conf_path, "rt") as qtconf:
+        old_text = qtconf.read()
+    (old_prefix,) = tuple(re.findall(r"^Prefix\s*=\s*(.*?).Library\s*$", old_text, re.MULTILINE))
+    new_prefix = old_prefix.replace("/", "\\")
+    new_text = old_text.replace(old_prefix, new_prefix)
+    with open(os.path.join(sys.prefix, "qt.conf"), "wt") as qtconf:
+        qtconf.write(new_text)
+    with open(os.path.join(sys.prefix, "Library", "bin", "qt.conf"), "wt") as qtconf:
+        qtconf.write(new_text)
 
 
 if __name__ == "__main__":
