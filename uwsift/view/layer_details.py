@@ -335,7 +335,6 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
     def _update_displayed_instrument(self):
         if self._current_selected_layer.info.get(Info.INSTRUMENT):
-
             if self._current_selected_layer.info.get(Info.KIND) == Kind.RGB:
                 instrument_str = self._get_multichannel_instrument_str()
             else:

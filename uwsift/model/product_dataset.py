@@ -42,7 +42,6 @@ class ProductDataset:
         scheduled_time,
         input_datasets_infos: List[Optional[frozendict]],
     ) -> Optional["ProductDataset"]:
-
         if not any(input_datasets_uuids):
             LOG.debug("Could not create a multichannel ProductDataset, when no input ProductDatasets exist.")
             return None

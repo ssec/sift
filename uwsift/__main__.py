@@ -787,7 +787,6 @@ class Main(QtWidgets.QMainWindow):
         self.ui.regionSelectButton.setMenu(menu)
 
     def _init_layer_model(self):
-
         self.layer_model = LayerModel(self.document)
 
         self.document.didAddDataset.connect(self.layer_model.add_dataset)
@@ -1091,7 +1090,6 @@ class Main(QtWidgets.QMainWindow):
         self._open_cache_dialog.activate(ordered_uuid_to_name)
 
     def _open_wizard(self, *args, **kwargs):
-
         if not self._wizard_dialog:
             self._wizard_dialog = OpenFileWizard(
                 base_dir=self._last_open_dir, base_reader=self._last_reader, parent=self
@@ -1458,7 +1456,6 @@ def main() -> int:
     window.raise_()
 
     if AUTO_UPDATE_MODE__ACTIVE:
-
         # FIXME: let the AutoUpdateManager be in control...
         from uwsift import config
         from uwsift.control.auto_update import AutoUpdateManager

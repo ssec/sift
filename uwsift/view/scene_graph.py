@@ -158,7 +158,6 @@ class AnimationController(object):
     """Basic bookkeeping object for each layer set (A, B, C, D) from the UI."""
 
     def __init__(self):
-
         self._animation_speed = DEFAULT_ANIMATION_DELAY  # milliseconds
         self._animating = False
 
@@ -1382,7 +1381,6 @@ LATLON_GRID_RESOLUTION_MAX: float = 10.0
 
 
 def get_configured_latlon_grid_resolution() -> float:
-
     resolution: float = config.get("latlon_grid.resolution", LATLON_GRID_RESOLUTION_DEFAULT)
 
     if not isinstance(resolution, Number):

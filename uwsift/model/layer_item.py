@@ -62,7 +62,6 @@ class LayerItem:
 
     @staticmethod
     def extract_layer_info(info: frozendict) -> frozendict:
-
         layer_info: dict = {}
         unit_conversion = units_conversion(info)
         layer_info[Info.UNIT_CONVERSION] = unit_conversion

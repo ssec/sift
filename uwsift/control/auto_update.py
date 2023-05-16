@@ -54,7 +54,6 @@ class StartTimeGranuleUpdatePolicy:
 
 class AutoUpdateManager:
     def __init__(self, window, minimum_interval, search_path=None):
-
         # "Static"
         self.search_path = search_path
         self.reader = None

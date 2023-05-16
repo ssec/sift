@@ -58,7 +58,6 @@ class AreaDefinitionsManager:
 
     @classmethod
     def init_available_area_defs(cls) -> None:
-
         cls._available_area_defs_by_id = {}
         cls._available_area_defs_id_by_name = {}
 

@@ -1060,7 +1060,6 @@ class SatpyImporter(aImporter):
 
         num_stages = len(products)
         for idx, (prod, ds_id) in enumerate(zip(products, dataset_ids)):
-
             dataset = (
                 self.scn[ds_id] if prod.info[Info.KIND] != Kind.MC_IMAGE else get_enhanced_image(self.scn[ds_id]).data
             )
@@ -1295,7 +1294,6 @@ class SatpyImporter(aImporter):
         return segment_heights.astype(int)
 
     def _determine_segments_to_image_mapping(self, segments_data, segments_indices) -> Tuple[List, List]:
-
         segment_heights = self._calc_segment_heights(segments_data, segments_indices)
 
         segment_starts_stops = []

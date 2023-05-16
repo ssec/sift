@@ -629,7 +629,6 @@ class ProbeGraphDisplay(object):
     def _rebuild_plot_task(  # noqa: C901
         self, x_layer_uuid, y_layer_uuid, polygon, point_xy, plot_versus=False, plot_full_data=True
     ):
-
         data_source_description = "full data" if plot_full_data else "polygon data"
 
         x_layer = self.layer_model.get_layer_by_uuid(x_layer_uuid)
@@ -833,7 +832,6 @@ class ProbeGraphDisplay(object):
         self.figure.clf()
 
     def _draw_xy_line(self, axes):
-
         # get the bounds for our calculations and so we can reset the viewing window later
         x_bounds = axes.get_xbound()
         y_bounds = axes.get_ybound()
