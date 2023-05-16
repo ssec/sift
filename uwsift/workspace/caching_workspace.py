@@ -702,7 +702,6 @@ class CachingWorkspace(BaseWorkspace):
         # TODO: this causes a locking exception when run in a secondary thread.
         #  Keeping background operations lightweight makes sense however, so just review this
         with self._inventory as s:
-
             if kind == Kind.IMAGE:
                 content = (
                     s.query(ContentImage)

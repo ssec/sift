@@ -184,7 +184,6 @@ def _unit_format_func(info, units):
 
 
 def _unit_format_func_for_flags(info):
-
     # flag values don't have units
     if "flag_meanings" in info:
         flag_masks = info["flag_masks"] if "flag_masks" in info else [-1] * len(info["flag_values"])

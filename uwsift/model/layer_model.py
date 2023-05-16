@@ -174,7 +174,6 @@ class LayerModel(QAbstractItemModel):
         return Qt.MoveAction
 
     def headerData(self, section: int, orientation, role=None):
-
         if (orientation == Qt.Horizontal) and (role == Qt.DisplayRole):
             return self._headers[section]
         return None
@@ -962,7 +961,6 @@ class LayerModel(QAbstractItemModel):
         self.didUpdateLayers.emit()
 
     def _clear_layer(self, layer: LayerItem):
-
         self.removeLayerAsRecipeInput.emit(layer.uuid)
 
         datasets_sched_times = list(layer.timeline.keys())

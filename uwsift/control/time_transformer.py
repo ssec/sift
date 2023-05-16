@@ -22,7 +22,6 @@ class TimeTransformer:
     """
 
     def __init__(self, translation_policy: WrappingDrivingPolicy):
-
         self._translation_policy = translation_policy
 
         self.curr_tick_time: float = -1.0

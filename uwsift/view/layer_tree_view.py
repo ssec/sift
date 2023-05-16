@@ -74,7 +74,6 @@ class LayerTreeView(QTreeView):
             self.resizeColumnToContents(column)
 
     def rowsInserted(self, parent: QModelIndex, start: int, end: int) -> None:
-
         super(LayerTreeView, self).rowsInserted(parent, start, end)
         for idx in range(start, end + 1):
             model_idx = self.model().index(idx, 0, parent)
@@ -85,7 +84,6 @@ class LayerTreeView(QTreeView):
             self.setCurrentIndex(model_idx)
 
     def _open_layer_context_menu(self, position):
-
         menu = QMenu()
         selection_model_idx = self.selectionModel().currentIndex()
 
