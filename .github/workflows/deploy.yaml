@@ -6,6 +6,7 @@ concurrency:
   cancel-in-progress: true
 
 on:
+  pull_request:
   push:
     branches:
       - master
@@ -53,6 +54,8 @@ jobs:
 
       - name: Install SSH Key
         uses: shimataro/ssh-key-action@v2
+        # only upload on push (currently only master), otherwise SFTP key is not needed
+        if: github.event_name == 'push'
         with:
           key: ${{ secrets.SIFT_SFTP_UPLOAD_KEY }}
           name: id_rsa_sftp
@@ -83,6 +86,8 @@ jobs:
       # that would require uploading the bundles as artifacts which would
       # quickly hit our temporary storage limits
       - name: Upload bundle
+        # only upload on push (currently only master)
+        if: github.event_name == 'push'
         run: |
           continuous_integration/upload_conda_pack.sh
 
