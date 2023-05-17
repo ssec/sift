@@ -21,14 +21,14 @@ must be adjusted if `origin` points to your fork of the `sift` repository.
 
 6. Bump the version of the package:
 
-```bash
-python setup.py bump --new-version 1.0.5 -c -t
-```
+   ```bash
+   python setup.py bump --new-version 1.0.5 -c -t
+   ```
 
-See [semver.org](http://semver.org/) on how to write a version number.
+   See [semver.org](http://semver.org/) on how to write a version number.
 
-6. Push changes to github `git push --follow-tags`
+7. Push changes to github `git push --follow-tags`
 
-7. Create a release of the package on
+8. Create a release of the package on
    [github](https://github.com/ssec/sift/releases) by drafting a new release
    and copying the release notes from the changelog (see above).

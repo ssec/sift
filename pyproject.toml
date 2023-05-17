@@ -12,3 +12,16 @@ exclude = '''
 )
 
 '''
+
+[tool.coverage.run]
+relative_files = true
+omit = ["uwsift/version.py"]
+
+[tool.isort]
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+profile = "black"
+skip_gitignore = true
+force_to_top = true
+default_section = "THIRDPARTY"
+known_first_party = "uwsift"
+skip = [".gitignore"]
