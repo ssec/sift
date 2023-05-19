@@ -46,16 +46,16 @@ configurations have a look here: https://donfig.readthedocs.io/en/latest/.
 .. toctree::
    :maxdepth: 2
 
-   Logging <configuration-logging.rst>
-   Catalogue and Auto Update Mode <configuration-catalogue-auto_update_mode.rst>
-   Watchdog <configuration-watchdog.rst>
-   Default Colormaps <configuration-default_colormaps.rst>
-   Points Styles <configuration-points_styles.rst>
-   Display <configuration-display.rst>
-   Layer Manager Display Names <configuration-standard_names.rst>
-   External Satpy <configuration-external_satpy.rst>
-   Readers <configuration-readers.rst>
-   Latlon Grid Resolution <configuration-latlon-grid-resolution.rst>
-   Projections / Area Definitions <configuration-area_definitions.rst>
-   Units <configuration-units.rst>
-   Storage <configuration-storage.rst>
+   Logging <logging>
+   Catalogue and Auto Update Mode <catalogue-auto_update_mode>
+   Watchdog <watchdog>
+   Default Colormaps <default_colormaps>
+   Points Styles <points_styles>
+   Display <display>
+   Layer Manager Display Names <standard_names>
+   External Satpy <external_satpy>
+   Readers <readers>
+   Latlon Grid Resolution <latlon-grid-resolution>
+   Projections / Area Definitions <area_definitions>
+   Units <units>
+   Storage <storage>
