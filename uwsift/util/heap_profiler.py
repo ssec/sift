@@ -7,7 +7,10 @@ from collections import OrderedDict
 from datetime import datetime
 from threading import Event, Thread
 
-import psutil
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
 LOG = logging.getLogger(__name__)
 
@@ -55,6 +58,8 @@ class HeapProfiler:
     snapshot_idx = 0
 
     def __init__(self, sec_interval: float):
+        if psutil is None:
+            raise ImportError("Missing 'psutil' dependency which is required for heap profiling.")
         self.timer = RepeatableTimer(sec_interval, self._record_heap_usage)
 
         directory_name = datetime.now().strftime("%Y%m%d_%H-%M_uwsift_heap_profile")
