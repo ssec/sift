@@ -24,7 +24,7 @@ will slowly replace the low-level documents on the wiki.
    Contributing <CONTRIBUTING>
    Installation options for SIFT <INSTALLATION-sift>
    Initial setup for packaging SIFT with CMake <PACKAGING-sift>
-   Configuring SIFT <configuration>
+   Configuring SIFT <configuration/index>
    Auto Update Mode <auto_update_mode>
    profiling
 

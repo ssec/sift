@@ -63,7 +63,8 @@ version_info["micro"] = int(version_info["micro"])
 version_info["dev_version"] = int(version_info["dev_version"] or 0)
 
 extras_require = {
-    "docs": ["blockdiag", "sphinx", "sphinx_rtd_theme", "sphinxcontrib-seqdiag", "sphinxcontrib-blockdiag"],
+    "docs": ["blockdiag", "sphinx", "sphinx_rtd_theme", "sphinxcontrib-seqdiag", "sphinxcontrib-blockdiag", "psutil"],
+    "profiling": ["psutil"],
 }
 
 
