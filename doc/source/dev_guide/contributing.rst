@@ -77,7 +77,7 @@ Developer Installation
 The following instructions are for software developers or users who want to
 install the **unstable** version of SIFT directly from GitHub. The easiest way
 to do this is to first follow the
-:doc:`conda installation instructions </INSTALLATION-sift>`
+:doc:`conda installation instructions </installation>`
 by creating a new environment with the stable version of SIFT installed.
 
 Next we will need to uninstall the conda package of SIFT:
