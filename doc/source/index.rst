@@ -17,7 +17,7 @@ For source code see the `GitHub repository <https://github.com/ssec/sift>`_.
 .. toctree::
    :maxdepth: 2
 
-   Installation options for SIFT <INSTALLATION-sift>
+   installation
    Initial setup for packaging SIFT with CMake <PACKAGING-sift>
    Configuring SIFT <configuration/index>
    Auto Update Mode <auto_update_mode>

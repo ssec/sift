@@ -113,7 +113,7 @@ installed directly but it is pulled automatically when one of the other ones
 is installed to provide their common dependencies.
 
 Common Preparations
-+++++++++++++++++++
+^^^^^^^^^^^^^^^^^^^
 
 It is best to keep Conda environments intended for just using SIFT
 separate from ones for developing it. In detail, you should not install
@@ -139,8 +139,8 @@ environment for the desired task::
 	 this channel, by default it is ``~/conda-channels/uwsift/`` (see
 	 :ref:`conda-packaging`)
 
-Installation for using SIFT
-+++++++++++++++++++++++++++++++
+For Users
+^^^^^^^^^
 
 Install the package *uwsift* into an environment called e.g. ``work`` and
 prepared as described above::
@@ -153,8 +153,8 @@ Now you can start SIFT like so::
 
 .. _install-conda-uwsift-devel:
 
-Installation for developing SIFT
-+++++++++++++++++++++++++++++++++++++
+For Developers
+^^^^^^^^^^^^^^
 
 Set up the Conda environment as above - let's call it ``devel`` - and then
 install all dependencies for developing SIFT as follows::
@@ -170,19 +170,3 @@ Now you can run SIFT from the current sources with all your changes to the
 source code being active immediately just like so::
 
   (devel)%> python -m uwsift
-
-How to Install SIFT from PyInstaller Packages
--------------------------------------------------
-
-The SIFT packages created with PyInstaller are "portable software", i.e.,
-they neither need to be installed nor do they require administration
-privileges to be run. Depending on how your SIFT packager provides the
-software you may get it either as one single executable file *sift*
-(*sift.exe* for Windows) or as a directory *sift* (you may need to
-unpack it from an archive), which contains an executable *sift*
-(*sift.exe* for Windows) as well as all dependencies (libraries,
-configuration, databases).
-
-Note that the single executable file variant has significant slower startup
-since each time it is run the contained dependencies are extracted into a
-temporary directory.
