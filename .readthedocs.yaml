@@ -12,9 +12,9 @@ sphinx:
 
 
 conda:
-    environment: continuous_integration/environment.yaml
+  environment: continuous_integration/environment.yaml
 
-python:
-    install:
-        - method: pip
-          path: .[docs]
+#python:
+#  install:
+#    - method: pip
+#      path: .[docs]
