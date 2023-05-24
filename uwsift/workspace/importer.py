@@ -34,7 +34,7 @@ import numpy as np
 import satpy.readers.yaml_reader
 import satpy.resample
 import yaml
-from pyresample.geometry import AreaDefinition, StackedAreaDefinition
+from pyresample.geometry import AreaDefinition, StackedAreaDefinition, SwathDefinition
 from satpy import DataQuery, Scene, available_readers
 from satpy.dataset import DatasetDict
 from satpy.writers import get_enhanced_image
@@ -714,6 +714,12 @@ class SatpyImporter(aImporter):
         else:
             LOG.info(f"No data kind configured for reader '{self.reader}'." f" Falling back to 'IMAGE'.")
             attrs[Info.KIND] = Kind.IMAGE
+
+        if attrs[Info.KIND] is Kind["IMAGEorPOINTS"]:
+            if isinstance(attrs["area"], SwathDefinition) and len(attrs["area"].shape) == 1:
+                attrs[Info.KIND] = Kind.POINTS
+            else:
+                attrs[Info.KIND] = Kind.IMAGE
 
     def _set_wavelength_metadata(self, attrs: dict) -> None:
         self._get_platform_instrument(attrs)
