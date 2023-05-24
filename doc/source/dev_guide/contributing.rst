@@ -14,9 +14,7 @@ Development Team
 Development on SIFT was started by a team at the Space Science and Engineering
 Center (SSEC) at the University of Wisconsin - Madison, but has since had
 contributions from other organizations. EUMETSAT has made major revisions to
-SIFT including those from their contractor, leading up to SIFT 2.0,
-were carried out by
-`ask – Innovative Visualisierungslösungen GmbH <https://askvisual.de/>`_.
+SIFT including those from their contractor `ask – Innovative Visualisierungslösungen GmbH <https://askvisual.de/>`_, leading up to SIFT 2.0.
 Detailed information about these teams can be found below. In general,
 although these two teams may have differing goals, SIFT is kept in a flexible
 state that allows it to be used for forecast training, Cal/Val operations for
