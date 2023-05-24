@@ -12,7 +12,7 @@ sphinx:
 
 
 conda:
-  environment: continuous_integration/environment.yaml
+  environment: continuous_integration/rtd_environment.yaml
 
 #python:
 #  install:

@@ -121,7 +121,7 @@ Now we can install SIFT from the source code:
 .. code-block:: bash
 
    cd sift
-   pip install -e .
+   pip install -e . --no-deps
 
 Any changes made to the source code from here on out will take effect
 immediately.
