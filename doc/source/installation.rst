@@ -12,10 +12,10 @@ of dependencies used by SIFT.
 System Requirements
 -------------------
 
-SIFT works on Windows, Mac, and Linux, but depends on many complex libraries
-and relies heavily on GPU (video card) processing via the PyOpenGL and VisPy
+SIFT works on Windows, Mac, and Linux, but depends on many complex
 libraries which may make installation difficult on some platforms or systems.
-In general it is best to have a local physical system to run SIFT as opposed
+It also makes heavy use of GPU (video card) processing via the PyOpenGL and VisPy
+libraries. In general it is best to have a local physical system to run SIFT as opposed
 to a virtual machine or remote server. Virtual machines and remote servers
 commonly have limited ways of displaying OpenGL visualizations to another
 machine.
