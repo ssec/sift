@@ -51,17 +51,17 @@ parameters can be set:
   from for columns and rows. Usually this value is 0 or 1 and the same for both
   parameters and defaults to 0 if not given.
 
-Granule Merging Configuration
+GEO Segment Merging Configuration
 -----------------------------
 
 For segmented file formats (such as MSG SEVIRI HRIT and MTG FCI NetCDF), it is
 usually preferable to merge segments that are loaded in separate load operations
-but belong to the same data set into one data set, rather than creating a
-separate data set for each load operation. This is especially important when
-incrementally loading stripes in auto update mode.
+(Open File Wizard calls) but belong to the same disk into one dataset, rather than creating a
+separate dataset for each load operation. This is especially important when
+incrementally loading stripes in auto-update mode.
 
 To control this behaviour the ``data_reading``-setting ``merge_with_existing``
-can be configured as either ``True`` (the default) or ``False``.
+can be configured as either ``False`` (the default) or ``True``.
 
 .. note:: Currently, dataset merging does not work together with the caching
           database, so make sure you set ``storage.use_inventory_db:
