@@ -49,7 +49,7 @@ file extracted, the file `SIFT.bat` can be double clicked to start SIFT.
 
 By default SIFT caches files in a "workspace" located
 at the user's
-``/Users/<User>/AppData/Local/CIMSS-SSEC/SIFT/Cache/workspace`` directory.
+``\Users\<User>\AppData\Local\SIFT\Cache\workspace`` directory.
 Configuration files for the application are stored in the user's
 ``/Users/<User>/AppData/Roaming/SIFT/settings`` directory.
 
