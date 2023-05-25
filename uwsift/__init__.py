@@ -89,7 +89,6 @@ if satpy_import_path is not None:
 
 satpy_extra_readers_import_path = config.get("satpy_extra_readers_import_path", None)
 if satpy_extra_readers_import_path is not None:
-    # See https://gitlab.eumetsat.int/Meraner/fci_l1_geoobs_satpy_reader/-/blob/master/README.md
     sys.path.insert(0, satpy_extra_readers_import_path)
     os.environ["SATPY_CONFIG_PATH"] = satpy_extra_readers_import_path
 

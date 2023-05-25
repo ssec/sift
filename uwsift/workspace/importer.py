@@ -412,6 +412,30 @@ class aImporter(ABC):
         pass
 
 
+def determine_dynamic_dataset_kind(attrs: dict, reader_name: str) -> str:
+    """Determine kind of dataset dynamically based on dataset attributes.
+
+    This currently supports only the distinction between IMAGE and POINTS kinds.
+    It makes the assumption that if the dataset has a SwathDefinition, and is 1-D, it represents points.
+    """
+    if isinstance(attrs["area"], SwathDefinition) and len(attrs["area"].shape) == 1:
+        data_kind = "POINTS"
+    else:
+        data_kind = "IMAGE"
+    LOG.info(f"Selected dynamically kind {data_kind} for dataset {attrs['name']} from reader {reader_name}")
+    return data_kind
+
+
+def set_kind_metadata_from_reader_config(reader_name: str, reader_kind: str, attrs: dict) -> None:
+    """Determine the dataset kind starting from the reader configuration."""
+    data_kind = determine_dynamic_dataset_kind(attrs, reader_name) if reader_kind == "DYNAMIC" else reader_kind
+
+    try:
+        attrs[Info.KIND] = Kind[data_kind]
+    except KeyError:
+        raise KeyError(f"Unknown data kind '{data_kind}' used for reader {reader_name}.")
+
+
 class SatpyImporter(aImporter):
     """Generic SatPy importer"""
 
@@ -705,21 +729,14 @@ class SatpyImporter(aImporter):
         if "prerequisites" in attrs:
             attrs[Info.KIND] = Kind.MC_IMAGE
             return
-        reader_kind = config.get(f"data_reading.{self.reader}.kind", None)
-        if reader_kind:
-            try:
-                attrs[Info.KIND] = Kind[reader_kind]
-            except KeyError:
-                raise KeyError(f"Unknown data kind '{reader_kind}'" f" configured for reader {self.reader}.")
-        else:
-            LOG.info(f"No data kind configured for reader '{self.reader}'." f" Falling back to 'IMAGE'.")
-            attrs[Info.KIND] = Kind.IMAGE
 
-        if attrs[Info.KIND] is Kind["IMAGEorPOINTS"]:
-            if isinstance(attrs["area"], SwathDefinition) and len(attrs["area"].shape) == 1:
-                attrs[Info.KIND] = Kind.POINTS
-            else:
-                attrs[Info.KIND] = Kind.IMAGE
+        reader_kind = config.get(f"data_reading.{self.reader}.kind", None)
+
+        if reader_kind is None:
+            LOG.info(f"No data kind configured for reader '{self.reader}'. Falling back to 'IMAGE'.")
+            attrs[Info.KIND] = Kind.IMAGE
+        else:
+            set_kind_metadata_from_reader_config(self.reader, reader_kind, attrs)
 
     def _set_wavelength_metadata(self, attrs: dict) -> None:
         self._get_platform_instrument(attrs)
