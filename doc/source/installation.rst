@@ -112,17 +112,4 @@ Now you can start SIFT like so::
 For Developers
 ^^^^^^^^^^^^^^
 
-Set up the Conda environment as above - let's call it ``devel`` - and then
-install all dependencies for developing SIFT as follows::
-
-  (devel)%> conda install uwsift-devel-deps
-
-PIP-install SIFT in editable mode by run the following in the root
-directory of the SIFT sources::
-
-  (devel)%> pip install --editable .
-
-Now you can run SIFT from the current sources with all your changes to the
-source code being active immediately just like so::
-
-  (devel)%> python -m uwsift
+Check the :ref:`dedicated developer installation documentation <dev_install>`.
