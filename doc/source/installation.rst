@@ -73,8 +73,6 @@ This will create a ``SIFT_X.Y.Z`` directory. SIFT can then be run by doing:
 
 Adding a `-h` will show the available command line options, but the defaults should work in most cases.
 
-If SIFT will not start please ensure that the ``LD_LIBRARY_PATH`` environment variable is not set.
-
 SIFT will cache files in a ``~/.cache/SIFT`` directory and configuration
 files in a ``~/.config/SIFT`` directory.
 
