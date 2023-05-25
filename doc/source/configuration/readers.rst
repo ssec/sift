@@ -1,6 +1,9 @@
 Configuring Readers
 -------------------
 
+General Configuration
+=====================
+
 The readers offered by the Open File Wizard to be used for loading are a subset
 of the readers provided by Satpy and - if configured accordingly via
 ``satpy_extra_readers_import_path`` - in a directory of additional readers.
@@ -16,11 +19,11 @@ The list of these readers must be configured, e.g. as follows::
 This is enough to make the readers available, but the Open File Wizard works
 better with additional configuration.
 
-Pre-Reader Configuration
+Per-Reader Configuration
 ========================
 
 General Configuration
----------------------
+~~~~~~~~~~~~~~~~~~~~~
 
 For each reader it is recommended to
 configure:
@@ -39,7 +42,7 @@ Satpy Scene initialisation, these can be configured by adding a
 kwargs key-value pairs.
 
 Grid Numbering Configuration
-----------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In addition for GEOS files the grid layout can be configured to enable correct
 index display according to their PUGs. In the ``grid`` sub-config three
@@ -52,7 +55,7 @@ parameters can be set:
   parameters and defaults to 0 if not given.
 
 GEO Segment Merging Configuration
------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For segmented file formats (such as MSG SEVIRI HRIT and MTG FCI NetCDF), it is
 usually preferable to merge segments that are loaded in separate load operations
@@ -74,7 +77,8 @@ can be configured as either ``False`` (the default) or ``True``.
           visible.
 
 Example Configuration For Image Readers
----------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 As example for a complete configuration for a reader, this is one for SEVIRI
 Level 1B in HRIT format::
 
@@ -92,7 +96,7 @@ Level 1B in HRIT format::
          fill_hrv: True
 
 Point and Lines Readers Configuration
--------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The visualisation of point and lines can be activated for the according readers
 using the kind ``POINTS`` or ``LINES``. These kinds also support the
