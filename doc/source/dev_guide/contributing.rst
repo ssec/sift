@@ -70,6 +70,7 @@ also chat with SIFT developers on the
 you on how to add the feature.
 
 .. _dev_install:
+
 Developer Installation
 ----------------------
 
