@@ -71,7 +71,7 @@ Note however that SIFT may not be able to display or understand all data formats
 that Satpy can read.
 SIFT defaults to a limited set of readers; head to the
 [configuration documentation](https://sift.readthedocs.io/en/latest/configuration/index.html)
-for customising your SIFT.
+for customizing your SIFT.
 
 ## Installation
 
