@@ -63,13 +63,13 @@ must be extracted:
 
 .. code-block:: bash
 
-   tar -xzf SIFT_1.1.2.tar.gz
+   tar -xzf SIFT_X.Y.Z.tar.gz
 
-This will create a ``SIFT`` directory. SIFT can then be run by doing:
+This will create a ``SIFT_X.Y.Z`` directory. SIFT can then be run by doing:
 
 .. code-block:: bash
 
-   SIFT/SIFT.sh
+   SIFT_X.Y.Z/SIFT.sh
 
 Adding a `-h` will show the available command line options, but the defaults should work in most cases.
 
