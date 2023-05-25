@@ -36,8 +36,8 @@ https://sift.readthedocs.io/en/latest/.
 Many new features have been added starting from the version 2.0 of SIFT, including:
 - reading of data from both geostationary (GEO) as well as low-Earth-orbit (LEO)
   satellite instruments
-- visualisation of point data (e.g. lightning)
-- support for composite (RGB) visualisation
+- visualization of point data (e.g. lightning)
+- support for composite (RGB) visualization
 - an improved timeline manager
 - integration of a statistics module
 - full resampling functionalities using Pyresample
