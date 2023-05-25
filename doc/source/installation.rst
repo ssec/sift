@@ -95,48 +95,6 @@ files in a ``~/Library/Application Support/SIFT`` directory.
 How to Install SIFT from Conda Packages
 -------------------------------------------
 
-To get SIFT in a Conda environment you can choose from two packages.
-
-The first one - *uwsift* - installs the software ready to be run. It is
-intended for "end" users of the software who are not interested in developing
-it.
-
-The other package - *uwsift-devel-deps* - actually doesn't even provide
-SIFT but only makes sure, that the dependencies necessary to develop and
-package it are installed. SIFT itself must be provided as source tree
-e.g. by cloning from its Git repository or by extracting it from a tarball.
-
-There is a third Conda package - *uwsift-deps*. It is not meant to be
-installed directly but it is pulled automatically when one of the other ones
-is installed to provide their common dependencies.
-
-Common Preparations
-^^^^^^^^^^^^^^^^^^^
-
-It is best to keep Conda environments intended for just using SIFT
-separate from ones for developing it. In detail, you should not install
-*uwsift* but only *uwsift-devel-deps* into an development environment, since
-otherwise the installed SIFT software may interfere with the version from
-the sources. And vice versa.
-
-This said, let's assume that ``MY_ENV`` denotes the respective environment
-and ``SIFT_CHANNEL`` a Conda channel, where the SIFT packages can be
-found [#f1]_, the following common steps should be performed to prepare a clean
-environment for the desired task::
-
-  %> conda create --name MY_ENV --channel conda-forge --strict-channel-priority python=3.10
-  %> conda activate MY_ENV
-  (MY_ENV)%> conda config --env --add channels conda-forge
-  (MY_ENV)%> conda config --env --add channels SIFT_CHANNEL
-  (MY_ENV)%> conda config --set channel_priority strict
-
-.. rubric:: Footnotes
-
-.. [#f1] You need to ask for the URL or name of this ``SIFT_CHANNEL``. If you
-	 build packages yourself, the local build directory can be used as
-	 this channel, by default it is ``~/conda-channels/uwsift/`` (see
-	 :ref:`conda-packaging`)
-
 For Users
 ^^^^^^^^^
 
