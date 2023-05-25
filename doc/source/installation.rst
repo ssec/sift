@@ -92,20 +92,86 @@ files in a ``~/Library/Application Support/SIFT`` directory.
 
 .. _install-conda-packages:
 
-How to Install SIFT from Conda Packages
--------------------------------------------
+Python Package Installation
+---------------------------
 
-For Users
-^^^^^^^^^
+SIFT can be installed and run in a python environment with the same
+functionality as the application and bundle installations. SIFT can be installed
+with pip (PyPI) and with conda via the conda-forge channel. The SIFT team
+recommends using the conda installation method due to some of the more
+complex dependencies that SIFT has.
 
-Install the package *uwsift* into an environment called e.g. ``work`` and
-prepared as described above::
+Installing with Conda
+^^^^^^^^^^^^^^^^^^^^^
 
-  (work)%> conda install uwsift
+SIFT is made available as a conda package. This first requires installing a
+conda distribution (Anaconda, miniconda, miniforge, or mambaforge). To do this,
+first download Miniforge for Python 3 for your platform from the
+[Miniforge portion](https://github.com/conda-forge/miniforge#miniforge3) of the
+Miniforge download page and then follow the installation instructions on the
+download page.
 
-Now you can start SIFT like so::
+Miniforge is a version of Miniconda that comes
+pre-configured with the conda-forge channel (where most SIFT dependencies
+come from). Mambaforge is also available which comes with the alternative
+``mamba`` command. Mamba should behave similar to ``conda`` but with better
+performance. If you're unsure, use the conda-based miniforge installer.
+If you do choose ``mamba``, use the ``mamba`` command inplace of any ``conda``
+commands below.
 
-  (work)%> python -m uwsift
+You don't need admin privileges to install Miniforge. After installing it,
+create a conda environment specifically for SIFT.
+Starting with version 1.1, SIFT can be installed directly from the conda-forge
+conda channel. It is recommended that a separate conda environment be made
+specifically for working with SIFT. SIFT can be installed during environment
+creation by doing:
+
+.. code-block:: bash
+
+   conda create -n sift_env -c conda-forge --strict-channel-priority python uwsift
+
+Where ``sift_env`` is whatever you want to name your environment. You can then
+activate your environment by running:
+
+.. code-block:: bash
+
+   conda activate sift_env
+
+See the "Running from the python package" section below to learn how to run
+SIFT.
+
+Alternatively, if you'd like to install SIFT in an existing conda environment, first activate
+your conda environment and then run:
+
+.. code-block:: bash
+
+   conda install -c conda-forge uwsift
+
+Installing with pip
+^^^^^^^^^^^^^^^^^^^
+
+Starting with version 1.1, SIFT can be installed with ``pip`` in a normal python
+environment. To install it run:
+
+.. code-block:: bash
+
+   pip install uwsift
+
+Running from the python package
+-------------------------------
+
+To run the normal SIFT GUI run the following from the command line:
+
+.. code-block:: bash
+
+   python -m uwsift
+
+Note that if running from a conda environment, the environment *must* be
+activated before running the above command.
+
+Append the `-h` flag to the above call to see the available command line
+options. The python library will cache data and store application settings
+in the same locations that the application installations do (see above).
 
 .. _install-conda-uwsift-devel:
 
