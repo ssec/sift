@@ -1034,7 +1034,12 @@ class SatpyImporter(aImporter):
     def _area_to_sift_attrs(area):
         """Area to uwsift keys"""
         if not isinstance(area, AreaDefinition):
-            raise NotImplementedError("Only AreaDefinition datasets can " "be loaded at this time.")
+            raise NotImplementedError(
+                "Only AreaDefinition datasets can be loaded at this time. "
+                "If you're trying to read data that needs resampling, like LEO data, remember "
+                "to select a resampling method in the Open File Wizard, and set "
+                "'geometry_definition: SwathDefinition' in your reader config."
+            )
 
         return {
             Info.PROJ: area.proj_str,
