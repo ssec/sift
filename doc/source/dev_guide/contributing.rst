@@ -156,9 +156,9 @@ Additional Satpy Readers
 Starting with SIFT 1.1 Satpy is used for reading all input data files. 
 Check :doc:`the reader configuration docs </configuration/readers>` to configure which Satpy 
 readers are made available in SIFT. If you have a data source that is not yet supported in Satpy 
-(available readers are listed `here <https://satpy.readthedocs.io/en/stable/index.html#id1>`_ ), you 
+(available readers are listed `here <https://satpy.readthedocs.io/en/stable/index.html#id1>`__ ), you 
 have to write a Satpy reader in order to be able to visualize it in SIFT. Head to the Satpy 
-documentation for guidelines on writing a new reader `here <https://satpy.readthedocs.io/en/stable/dev_guide/custom_reader.html>`_, and consider 
+documentation for guidelines on writing a new reader `here <https://satpy.readthedocs.io/en/stable/dev_guide/custom_reader.html>`__, and consider 
 contributing your reader to Satpy via a GitHub Pull Request. If you don't want to publish your reader, or as an 
 intermediate solution, you can plugin "local" readers in SIFT, see the :doc:`external satpy documentation </configuration/external_satpy>`
 
