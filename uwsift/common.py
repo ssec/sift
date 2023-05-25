@@ -206,7 +206,6 @@ class Kind(Enum):
     VECTORS = 8
     POINTS = 9
     MC_IMAGE = 10
-    IMAGEorPOINTS = 11
 
 
 class Instrument(Enum):
