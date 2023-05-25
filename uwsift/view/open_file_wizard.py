@@ -25,7 +25,7 @@ import trollsift.parser as fnparser
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QPoint
 from PyQt5.QtWidgets import QMenu
-from satpy.readers import group_files
+from satpy.readers import find_files_and_readers, group_files
 
 from uwsift import config
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
@@ -549,7 +549,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         # get filenames from table's 'Filename' column
         # TODO: in future, use a data model for the table and get filenames from there
         folder = self.ui.folderTextBox.text()
-        selected_files = set(
+        selected_items = set(
             [
                 os.path.join(folder, self.ui.fileTable.item(r.row(), 1).text())
                 for r in self.ui.fileTable.selectionModel().selectedRows()
@@ -557,8 +557,17 @@ class OpenFileWizard(QtWidgets.QWizard):
         )
 
         # if there's nothing to group, return
-        if len(selected_files) == 0:
+        if len(selected_items) == 0:
             return True
+
+        selected_files_from_items = []
+        for selected_item in selected_items:
+            if os.path.isdir(selected_item):
+                files_in_dir = find_files_and_readers(base_dir=selected_item, reader=reader)
+                selected_files_from_items.extend(files_in_dir[reader])
+            else:
+                selected_files_from_items.extend([selected_item])
+        selected_files = set(selected_files_from_items)
 
         # Read group_keys from SIFT reader-specific config. If not present, Satpy's config is used.
         group_keys = config.get(DATA_READING_CONFIG_KEY + "." + reader + ".group_keys", None)
