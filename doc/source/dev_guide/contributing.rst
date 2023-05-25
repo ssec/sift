@@ -69,6 +69,7 @@ also chat with SIFT developers on the
 `Gitter chat <https://gitter.im/ssec/sift>`_. They may be able to help guide
 you on how to add the feature.
 
+.. _dev_install:
 Developer Installation
 ----------------------
 
