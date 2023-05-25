@@ -8,9 +8,9 @@
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/ssec/sift/master.svg)](https://results.pre-commit.ci/latest/github/ssec/sift/master)
 
 
-SIFT (Satellite Information Familiarization Tool) is a visualisation tool
+SIFT (Satellite Information Familiarization Tool) is a visualization tool
 for satellite data. It provides a graphical interface that can be used for
-e.g. fast visualisation, scientific data analysis, training, cal/val activities
+e.g. fast visualization, scientific data analysis, training, cal/val activities
 and operations.
 
 SIFT is built on open source technologies like Python, OpenGL, PyQt5, and
