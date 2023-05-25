@@ -25,10 +25,10 @@ lower end of machines for running SIFT. In general the better GPU and faster
 memory (RAM) the better experience you'll have with SIFT.
 
 * Windows 10+ / Mac OS X >11.0 / Linux >= Rocky Linux 8
-* 16GB RAM
-* SSD/NVMe drive with 128GB+ available
-* GPU with 4GB VRAM and OpenGL 3+ support
-* Data files to be loaded can require up to 1TB or more
+* 8GB RAM
+* Disk space (preferrably on a SSD/NVMe drive) with 20GB+ available
+* GPU with 2GB VRAM and OpenGL 3+ support
+* Data files to be loaded can require several GB of disk space
 
 Ultimately operating system support is limited to those supported by
 conda-forge as this is the primary package repository where dependencies
