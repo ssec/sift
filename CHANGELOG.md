@@ -1,3 +1,20 @@
+## Version 2.0.0 (2023/05/25)
+
+Much of the work for this version was done by a private contractor in a non-GitHub
+git service. As such, the normal GitHub issue/PR-based changelog is not available.
+Below is a summary of the changes.
+
+- reading of data from both geostationary (GEO) as well as low-Earth-orbit (LEO)
+  satellite instruments
+- visualization of point data (e.g. lightning)
+- support for composite (RGB) visualization
+- an improved timeline manager
+- integration of a statistics module
+- full resampling functionalities using Pyresample
+- an automatic update/monitoring mode
+- partial redesign of the UI/UX
+- ... many more small but useful features!
+
 ## Version 1.2.3 (2022/02/04)
 
 ### Issues Closed

@@ -8,14 +8,15 @@
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/ssec/sift/master.svg)](https://results.pre-commit.ci/latest/github/ssec/sift/master)
 
 
-Satellite Information Familiarization Tool (SIFT) was designed by the Space
-Science and Engineering Center (SSEC) at the University of Wisconsin - Madison
-to support scientists during forecaster training events. It provides a
-graphical interface for visualization and basic analysis of geostationary
-satellite data.
+SIFT (Satellite Information Familiarization Tool) is a visualization tool
+for satellite data. It provides a graphical interface that can be used for
+e.g. fast visualization, scientific data analysis, training, cal/val activities
+and operations.
 
-SIFT is built on open source technologies like Python, OpenGL, and PyQt5. It
-can be run from Mac, Windows, and Linux. The SIFT application is provided as
+SIFT is built on open source technologies like Python, OpenGL, PyQt5, and
+makes use of the [Pytroll framework](https://pytroll.github.io/) for reading
+and processing the input data.
+It can be run from Mac, Windows, and Linux. The SIFT application is provided as
 a python library called "uwsift". It can also be installed as a standalone
 application.
 
@@ -27,7 +28,22 @@ other documentation is on GitHub: https://github.com/ssec/sift
 The project wiki with some in-depth usage and installation instructions can
 also be found on GitHub: https://github.com/ssec/sift/wiki
 
-Developer documentation can be found on https://sift.readthedocs.io/en/latest/.
+Developer and configuration documentation can be found on
+https://sift.readthedocs.io/en/latest/.
+
+## What's new in SIFT 2.0
+
+Many new features have been added starting from the version 2.0 of SIFT, including:
+- reading of data from both geostationary (GEO) as well as low-Earth-orbit (LEO)
+  satellite instruments
+- visualization of point data (e.g. lightning)
+- support for composite (RGB) visualization
+- an improved timeline manager
+- integration of a statistics module
+- full resampling functionalities using Pyresample
+- an automatic update/monitoring mode
+- partial redesign of the UI/UX
+- ... many more small but useful features!
 
 ## History
 
@@ -47,18 +63,15 @@ EUMETSAT contributions, leading up to SIFT 2.0, were carried out by
 ## Data Access and Reading
 
 SIFT uses the open source python library Satpy to read input data. By using
-Satpy SIFT is able to read many satellite instrument file formats, but may not
-be able to display or understand all data formats that Satpy can read. SIFT
-defaults to a limited set of readers for loading satellite instrument data.
-This set of readers includes but is not limited to:
-
-* GOES-R ABI Level 1b
-* Himawari AHI HRIT
-* Himawari AHI HSD
-* GEO-KOMPSAT-2 AMI Level 1b
-
-Other readers can be accessed from SIFT but this is considered an advanced
-usage right now.
+Satpy, SIFT is able to read many satellite instrument file formats,
+especially in the meteorology domain. The full list of available Satpy readers
+can be found in
+[Satpy's documentation](https://satpy.readthedocs.io/en/stable/index.html#id1).
+Note however that SIFT may not be able to display or understand all data formats
+that Satpy can read.
+SIFT defaults to a limited set of readers; head to the
+[configuration documentation](https://sift.readthedocs.io/en/latest/configuration/index.html)
+for customizing your SIFT.
 
 ## Installation
 
