@@ -66,7 +66,7 @@ SIFT can be installed as an all-in-one bundled application or the python
 library "uwsift" can be installed in a traditional python environment.
 
 Detailed installation instructions can be found on the
-[GitHub Wiki](https://github.com/ssec/sift/wiki/Installation-Guide).
+[installation documentation](https://sift.readthedocs.io/en/latest/installation.html).
 
 ## Contributors
 
