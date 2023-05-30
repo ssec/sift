@@ -71,7 +71,7 @@ Detailed installation instructions can be found on the
 ## Contributors
 
 SIFT is an open source project welcoming all contributions. See the
-[Contributing Guide](https://github.com/ssec/sift/wiki/Contributing)
+[Contributing Guide](https://sift.readthedocs.io/en/latest/dev_guide/contributing.html)
 for more information on how you can help.
 
 ### Building and releasing
