@@ -49,7 +49,7 @@ def _get_mock_sd(fr, fn):
                 "frame_range": frame_range,
                 "include_footer": True,
                 "filename": filename,
-                "colorbar": True,
+                "colorbar": "vertical",
                 "font_size": 10,
                 "loop": True,
                 "fps": None,
@@ -75,11 +75,15 @@ def _get_mock_sgm(frame_order):
             # no need to get more UUIDs than what we're going to use in the test
             return list(range(max(self._frame_order))) if self._frame_order else []
 
+    class MockCanvas:
+        dpi = 100
+
     class MockSGM:
         fake_screenshot_shape = (5, 10, 4)
 
         def __init__(self):
             self.animation_controller = MockAnimationController()
+            self.main_canvas = MockCanvas()
 
         def get_screenshot_array(self, fr):
             if fr is None:
@@ -255,22 +259,17 @@ def test_create_filenames(uuids, base, exp, monkeypatch, window):
 )
 def test_save_screenshot(fr, fn, overwrite, exp, monkeypatch, window, tmp_path):
     """Test screenshot is saved correctly given the frame range and filename."""
-    # TODO: Remove append colorbar mock?
-    # TODO: Only mock overwrite dialog if overwrite should be needed
-    # TODO: Remove footer mock
-    # TODO: Create the file so it can be overwritten
-    fn = str(tmp_path / fn)
-    monkeypatch.setattr(window.export_image, "_screenshot_dialog", _get_mock_sd(fr, fn))
+    fn = tmp_path / fn
+    if overwrite:
+        fn.touch()
+        monkeypatch.setattr(window.export_image, "_overwrite_dialog", lambda: overwrite)
+
+    monkeypatch.setattr(window.export_image, "_screenshot_dialog", _get_mock_sd(fr, str(fn)))
     monkeypatch.setattr(window.export_image, "sgm", _get_mock_sgm(fr))
     monkeypatch.setattr(window.export_image, "model", _get_mock_model())
-    monkeypatch.setattr(window.export_image, "_overwrite_dialog", lambda: overwrite)
-    monkeypatch.setattr(window.export_image, "_append_colorbar", lambda x, y, z: y)
-    monkeypatch.setattr(window.export_image, "_add_screenshot_footer", lambda x, y, font_size=10: x)
 
     window.export_image._save_screenshot()
-
-    # assert len(writer.data) == exp
-    assert os.path.isfile(fn)
+    assert fn.is_file()
 
 
 def test_cmd_open_export_image_dialog(qtbot, window):
