@@ -15,19 +15,14 @@ As per http://api.vispy.org/en/latest/scene.html (abridged)
         3. add node instances to scene by making them children of canvas scene, or
            of nodes already in the scene
 
-REFERENCES
-http://api.vispy.org/en/latest/scene.html
-
-:author: R.K.Garcia <rayg@ssec.wisc.edu>
-:copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
-:license: GPLv3, see LICENSE for more details
 """
+from __future__ import annotations
 
 import logging
 import os
 from enum import Enum
 from numbers import Number
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
 import numpy as np
@@ -78,6 +73,10 @@ from uwsift.workspace.utils.metadata_utils import (
     get_point_style_by_name,
     map_point_style_to_marker_kwargs,
 )
+
+if TYPE_CHECKING:
+    import numpy.typing as npt
+
 
 LOG = logging.getLogger(__name__)
 DATA_DIR = get_package_data_dir()
@@ -313,9 +312,20 @@ class SceneGraphManager(QObject):
         self._setup_initial_canvas(center)
         self.pending_polygon = PendingPolygon(self.main_map)
 
-    def get_screenshot_array(self, frame_range=None):
-        """Get numpy arrays representing the current canvas."""
+    def get_screenshot_array(
+        self, frame_range: None | tuple[int, int] = None
+    ) -> list[tuple[str | UUID, npt.NDArray[np.uint8]]]:
+        """Get numpy arrays representing the current canvas.
 
+        Args:
+            frame_range: Start and end frame indexes to get arrays for.
+                Indexes are 0-based and both values (start and end) are
+                *inclusive*. Specifying ``(1, 3)`` means you'll get arrays
+                for frame at index 1 (the second frame), index 2, and index 3.
+                If not specified or ``None`` the current frame's data is
+                returned.
+
+        """
         if frame_range is None:
             self.main_canvas.on_draw(None)
             return [("", _screenshot())]

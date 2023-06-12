@@ -2,9 +2,10 @@ import io
 import logging
 import os
 
-import imageio
+import imageio.v3 as imageio
 import matplotlib as mpl
 import numpy
+import numpy as np
 from matplotlib import pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -21,6 +22,14 @@ DATA_DIR = get_package_data_dir()
 NUM_TICKS = 8
 TICK_SIZE = 14
 FONT = "arial"
+PYAV_ANIMATION_PARAMS = {
+    "codec": "libx264",
+    "plugin": "pyav",
+    "in_pixel_format": "rgba",
+    "filter_sequence": [
+        ("scale", "trunc(iw/2)*2:trunc(ih/2)*2"),
+    ],
+}
 
 
 def is_gif_filename(fn):
@@ -29,12 +38,6 @@ def is_gif_filename(fn):
 
 def is_video_filename(fn):
     return os.path.splitext(fn)[-1] in [".mp4", ".m4v", ".gif"]
-
-
-def get_imageio_format(fn):
-    """Ask imageio if it knows what to do with this filename."""
-    request = imageio.core.Request(fn, "w?")
-    return imageio.formats.search_write_format(request)
 
 
 class ExportImageDialog(QtWidgets.QDialog):
@@ -344,26 +347,34 @@ class ExportImageHelper(QtCore.QObject):
     def _get_animation_parameters(self, info, images):
         params = {}
         if info["fps"] is None:
-            t = [self.model.get_dataset_by_uuid(u).info.get(Info.SCHED_TIME) for u, im in images]
-            t_diff = [max(1, (t[i] - t[i - 1]).total_seconds()) for i in range(1, len(t))]
-            min_diff = float(min(t_diff))
-            # imageio seems to be using duration in seconds
-            # so use 1/10th of a second
-            duration = [0.1 * (this_diff / min_diff) for this_diff in t_diff]
-            duration = [duration[0]] + duration
-            if not info["loop"]:
-                duration = duration + duration[-2:0:-1]
-            params["duration"] = duration
+            params["duration"] = self._get_time_lapse_duration(images, info["loop"])
         else:
             params["fps"] = info["fps"]
 
+        is_gif = is_gif_filename(info["filename"])
         if is_gif_filename(info["filename"]):
             params["loop"] = 0  # infinite number of loops
         elif "duration" in params:
             # not gif but were given "Time Lapse", can only have one FPS
             params["fps"] = int(1.0 / params.pop("duration")[0])
 
+        if not is_gif:
+            params.update(PYAV_ANIMATION_PARAMS)
         return params
+
+    def _get_time_lapse_duration(self, images, is_loop):
+        if len(images) <= 1:
+            return [1.0]  # arbitrary single frame duration
+        t = [self.model.get_dataset_by_uuid(u).info.get(Info.SCHED_TIME) for u, im in images]
+        t_diff = [max(1, (t[i] - t[i - 1]).total_seconds()) for i in range(1, len(t))]
+        min_diff = float(min(t_diff))
+        # imageio seems to be using duration in seconds
+        # so use 1/10th of a second
+        duration = [0.1 * (this_diff / min_diff) for this_diff in t_diff]
+        duration = [duration[0]] + duration
+        if not is_loop:
+            duration = duration + duration[-2:0:-1]
+        return duration
 
     def _convert_frame_range(self, frame_range):
         """Convert 1-based frame range to SGM's 0-based"""
@@ -418,15 +429,7 @@ class ExportImageHelper(QtCore.QObject):
                 for (u, im), bt in zip(images, banner_text)
             ]
 
-        imageio_format = get_imageio_format(filenames[0])
-        if imageio_format:
-            format_name = imageio_format.name
-        elif filenames[0].upper().endswith(".M4V"):
-            format_name = "MP4"
-        else:
-            raise ValueError("Not sure how to handle file with format: {}".format(filenames[0]))
-
-        if is_video_filename(filenames[0]) and len(images) > 1:
+        if is_video_filename(filenames[0]):
             params = self._get_animation_parameters(info, images)
             if not info["loop"] and is_gif_filename(filenames[0]):
                 # rocking animation
@@ -439,11 +442,14 @@ class ExportImageHelper(QtCore.QObject):
             params = {}
             filenames = list(zip(filenames, [[x] for x in images]))
 
-        self._write_images(filenames, format_name, params)
+        self._write_images(filenames, params)
 
-    def _write_images(self, filenames, format_name, params):
+    def _write_images(self, filenames, params):
         for filename, file_images in filenames:
-            writer = imageio.get_writer(filename, format_name, **params)
-            for _, x in file_images:
-                writer.append_data(numpy.array(x))
-        writer.close()
+            images_arrays = [np.array(image) for _, image in file_images]
+            try:
+                imageio.imwrite(filename, images_arrays, **params)
+            except IOError:
+                msg = "Failed to write to file: {}".format(filename)
+                LOG.error(msg)
+                raise
