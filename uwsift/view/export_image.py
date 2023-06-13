@@ -4,8 +4,8 @@ import os
 
 import imageio.v3 as imageio
 import matplotlib as mpl
-import numpy
 import numpy as np
+import numpy.typing as npt
 from matplotlib import pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -243,7 +243,7 @@ class ExportImageHelper(QtCore.QObject):
         colors = COLORMAP_MANAGER[colormap]
 
         if colormap == "Square Root (Vis Default)":
-            colors = colors.map(numpy.linspace((0, 0, 0, 1), (1, 1, 1, 1), 256))
+            colors = colors.map(np.linspace((0, 0, 0, 1), (1, 1, 1, 1), 256))
         else:
             colors = colors.colors.rgba
 
@@ -266,9 +266,9 @@ class ExportImageHelper(QtCore.QObject):
                     self.model.get_dataset_by_uuid(u).info.get(Info.UNIT_CONVERSION)[1](t)
                 )
             )
-            for t in numpy.linspace(vmin, vmax, NUM_TICKS)
+            for t in np.linspace(vmin, vmax, NUM_TICKS)
         ]
-        cbar.set_ticks(numpy.linspace(vmin, vmax, NUM_TICKS))
+        cbar.set_ticks(np.linspace(vmin, vmax, NUM_TICKS))
         cbar.set_ticklabels(ticks)
 
         return fig
@@ -446,12 +446,21 @@ class ExportImageHelper(QtCore.QObject):
 
     def _write_images(self, filenames, params):
         for filename, file_images in filenames:
-            images_arrays = [np.array(image) for _, image in file_images]
-            if filename.endswith(".jpg"):
-                images_arrays = [image_arr[:, :, :3] for image_arr in images_arrays]
+            images_arrays = _image_to_frame_array(file_images, filename)
             try:
                 imageio.imwrite(filename, images_arrays, **params)
             except IOError:
                 msg = "Failed to write to file: {}".format(filename)
                 LOG.error(msg)
                 raise
+
+
+def _image_to_frame_array(file_images: list[Image], filename: str) -> list[npt.NDArray[np.uint8]]:
+    images_arrays = [np.array(image) for _, image in file_images]
+    if not _supports_rgba(filename):
+        images_arrays = [image_arr[:, :, :3] for image_arr in images_arrays]
+    return images_arrays
+
+
+def _supports_rgba(filename: str) -> bool:
+    return not (filename.endswith(".jpeg") or filename.endswith(".jpg"))
