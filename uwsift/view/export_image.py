@@ -447,6 +447,8 @@ class ExportImageHelper(QtCore.QObject):
     def _write_images(self, filenames, params):
         for filename, file_images in filenames:
             images_arrays = [np.array(image) for _, image in file_images]
+            if filename.endswith(".jpg"):
+                images_arrays = [image_arr[:, :, :3] for image_arr in images_arrays]
             try:
                 imageio.imwrite(filename, images_arrays, **params)
             except IOError:

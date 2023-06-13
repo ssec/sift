@@ -1,5 +1,6 @@
 import datetime
 import os
+from typing import Any
 
 import numpy as np
 import pytest
@@ -20,22 +21,26 @@ def _get_mock_model():
             self.climits = (0, 1)
 
     class MockDataset:
-        def __init__(self):
-            self.info = {}
+        def __init__(self, offset: int):
+            self.info: dict[str, Any] = {}
             self.info["unit_conversion"] = ("unit", lambda t: t, lambda t: t)
-            self.info["timeline"] = datetime.datetime(2000, 1, 1, 0, 0, 0, 0)
+            self.info["timeline"] = datetime.datetime(2000, 1, 1, 0, 0, 0, 0) + datetime.timedelta(minutes=offset)
             self.info["display_name"] = "name"
 
     class MockModel:
         def __init__(self):
             self.moc_prez = MockPrez()
-            self.moc_dataset = MockDataset()
+            self._offset = 0
+            self._offset_for_uuid = {}
 
         def get_dataset_presentation_by_uuid(self, u):
             return self.moc_prez
 
         def get_dataset_by_uuid(self, u):
-            return self.moc_dataset
+            self._offset_for_uuid[u] = self._offset
+            ds = MockDataset(self._offset)
+            self._offset += 1
+            return ds
 
     return MockModel()
 
@@ -99,22 +104,6 @@ def _get_mock_sgm(frame_order):
             return frames
 
     return MockSGM()
-
-
-def _get_mock_writer():
-    """Mock Writer class for testing."""
-
-    class MockWriter:
-        def __init__(self):
-            self.data = []
-
-        def append_data(self, data):
-            self.data.append(data)
-
-        def close(self):
-            pass
-
-    return MockWriter()
 
 
 @pytest.mark.parametrize(
@@ -248,16 +237,16 @@ def test_create_filenames(uuids, base, exp, monkeypatch, window):
 
 
 @pytest.mark.parametrize(
-    "fr,fn,overwrite,exp",
+    "fr,fn,overwrite",
     [
-        ([1, 2], "test.gif", True, 1),
-        ([1, 2], "test.m4v", True, 1),
-        ([1, 2], "test.mp4", True, 1),
-        (None, "test.m4v", True, 0),
-        ([1, 2], "test.gif", False, 0),
+        ([1, 2], "test.gif", True),
+        ([1, 2], "test.m4v", True),
+        ([1, 2], "test.mp4", True),
+        (None, "test.m4v", True),
+        ([1, 2], "test.gif", False),
     ],
 )
-def test_save_screenshot(fr, fn, overwrite, exp, monkeypatch, window, tmp_path):
+def test_save_screenshot_animations(fr, fn, overwrite, monkeypatch, window, tmp_path):
     """Test screenshot is saved correctly given the frame range and filename."""
     fn = tmp_path / fn
     if overwrite:
@@ -270,6 +259,37 @@ def test_save_screenshot(fr, fn, overwrite, exp, monkeypatch, window, tmp_path):
 
     window.export_image._save_screenshot()
     assert fn.is_file()
+
+
+@pytest.mark.parametrize(
+    "fr,fn,overwrite",
+    [
+        ([1, 2], "test_{start_time:%H%M%S}.jpg", True),
+        ([1, 2], "test_{start_time:%H%M%S}.png", True),
+        ([1, 2], "test_{start_time:%H%M%S}.png", False),
+        (None, "test_XXXXXX.png", True),
+        (None, "test_XXXXXX.png", False),
+    ],
+)
+def test_save_screenshot_images(fr, fn, overwrite, monkeypatch, window, tmp_path):
+    """Test screenshot is saved correctly given the frame range and filename."""
+    exp_num = 1 if fr is None else len(fr)
+    expected_files = [
+        tmp_path / fn.format(start_time=datetime.datetime(2000, 1, 1, 0, offset, 0)) for offset in range(exp_num)
+    ]
+    if overwrite:
+        for exp_file in expected_files:
+            exp_file.touch()
+        monkeypatch.setattr(window.export_image, "_overwrite_dialog", lambda: overwrite)
+
+    monkeypatch.setattr(window.export_image, "_screenshot_dialog", _get_mock_sd(fr, str(tmp_path / fn)))
+    monkeypatch.setattr(window.export_image, "sgm", _get_mock_sgm(fr))
+    monkeypatch.setattr(window.export_image, "model", _get_mock_model())
+
+    window.export_image._save_screenshot()
+    assert len(list(tmp_path.iterdir())) == len(expected_files)
+    for exp_file in expected_files:
+        assert exp_file.is_file()
 
 
 def test_cmd_open_export_image_dialog(qtbot, window):
