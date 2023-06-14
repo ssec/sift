@@ -287,6 +287,7 @@ class ExportImageHelper(QtCore.QObject):
 
         buf = io.BytesIO()
         fig.savefig(buf, format="png", bbox_inches="tight", dpi=self.sgm.main_canvas.dpi)
+        plt.close(fig)
         buf.seek(0)
         fig_im = Image.open(buf)
 
@@ -300,13 +301,12 @@ class ExportImageHelper(QtCore.QObject):
             for i in [im, fig_im]:
                 new_im.paste(i, (offset, 0))
                 offset += i.size[0]
-            return new_im
         else:
             new_im = Image.new(im.mode, (orig_w, orig_h + fig_h))
             for i in [im, fig_im]:
                 new_im.paste(i, (0, offset))
                 offset += i.size[1]
-            return new_im
+        return new_im
 
     def _create_filenames(self, uuids, base_filename):
         if not uuids or uuids[0] is None:
