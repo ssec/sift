@@ -187,7 +187,7 @@ def test_convert_frame_range(range, exp, window):
                 ],
             },
         ),
-        ({"fps": 1, "filename": "test.gif"}, {"fps": 1, "loop": 0}),
+        ({"fps": 1, "filename": "test.gif"}, {"duration": [1000.0, 1000.0], "loop": 0}),
         (
             {"fps": 1, "filename": "test.mp4"},
             {
