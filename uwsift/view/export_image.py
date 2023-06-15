@@ -30,7 +30,8 @@ PYAV_ANIMATION_PARAMS = {
     "plugin": "pyav",
     "in_pixel_format": "rgba",
     "filter_sequence": [
-        ("scale", "trunc(iw/2)*2:trunc(ih/2)*2"),
+        # Scale animation frames to the macro buffer size (16)
+        ("scale", "iw+gt(mod(iw,16), 0)*(16-mod(iw,16)):ih+gt(mod(ih,16), 0)*(16-mod(ih,16))"),
     ],
 }
 
@@ -452,7 +453,6 @@ class ExportImageHelper(QtCore.QObject):
 
     def _write_images(self, filenames, params):
         for filename, file_images in filenames:
-            print(filename, file_images)
             images_arrays = _image_to_frame_array(file_images, filename)
             try:
                 imageio.imwrite(filename, images_arrays, **params)

@@ -4,6 +4,7 @@ import datetime
 import os
 from typing import Any, Optional
 
+import imageio.v3 as imageio
 import numpy as np
 import pytest
 from matplotlib import pyplot as plt
@@ -95,16 +96,17 @@ def _get_mock_sgm(frame_order):
         def __init__(self):
             self.animation_controller = MockAnimationController()
             self.main_canvas = MockCanvas()
+            self.rng = np.random.default_rng()
 
         def get_screenshot_array(self, fr):
             if fr is None:
-                return [("", np.zeros(self.fake_screenshot_shape, dtype=np.uint8))]
+                return [("", self.rng.integers(0, 255, self.fake_screenshot_shape, dtype=np.uint8))]
             frames = []
             for frame_idx in range(fr[0], fr[1] + 1):
                 frames.append(
                     (
                         str(frame_idx),
-                        np.zeros(self.fake_screenshot_shape, dtype=np.uint8),
+                        self.rng.integers(0, 255, self.fake_screenshot_shape, dtype=np.uint8),
                     )
                 )
             return frames
@@ -185,7 +187,7 @@ def test_convert_frame_range(range, exp, window):
                 "plugin": "pyav",
                 "in_pixel_format": "rgba",
                 "filter_sequence": [
-                    ("scale", "trunc(iw/2)*2:trunc(ih/2)*2"),
+                    ("scale", "iw+gt(mod(iw,16), 0)*(16-mod(iw,16)):ih+gt(mod(ih,16), 0)*(16-mod(ih,16))"),
                 ],
             },
         ),
@@ -198,7 +200,7 @@ def test_convert_frame_range(range, exp, window):
                 "plugin": "pyav",
                 "in_pixel_format": "rgba",
                 "filter_sequence": [
-                    ("scale", "trunc(iw/2)*2:trunc(ih/2)*2"),
+                    ("scale", "iw+gt(mod(iw,16), 0)*(16-mod(iw,16)):ih+gt(mod(ih,16), 0)*(16-mod(ih,16))"),
                 ],
             },
         ),
@@ -266,6 +268,15 @@ def test_save_screenshot_animations(fr, fn, overwrite, fps, monkeypatch, window,
 
     window.export_image._save_screenshot()
     assert fn.is_file()
+    if fn.suffix == ".gif":
+        exp_frame_shape = (15, 20)
+        read_kwargs = {"plugin": "pillow", "mode": "RGBA"}
+    else:
+        exp_frame_shape = (480, 640)
+        read_kwargs = {"plugin": "pyav"}
+    frames = imageio.imread(fn, **read_kwargs)
+    assert frames.shape[0] == (len(fr) if fr is not None else 1)
+    assert frames[0].shape[:2] == exp_frame_shape
 
 
 @pytest.mark.parametrize(
