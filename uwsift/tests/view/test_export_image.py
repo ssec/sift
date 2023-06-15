@@ -1,6 +1,6 @@
 import datetime
 import os
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 import pytest
@@ -45,11 +45,15 @@ def _get_mock_model():
     return MockModel()
 
 
-def _get_mock_sd(fr, fn):
+def _get_mock_sd(
+    frame_range: Optional[list[int]],
+    filename: str,
+    fps: Optional[float] = None,
+):
     """Mock ScreenshotDialog class for testing."""
 
     class MockScreenshotDialog:
-        def __init__(self, frame_range, filename):
+        def __init__(self):
             self.info = {
                 "frame_range": frame_range,
                 "include_footer": True,
@@ -57,13 +61,13 @@ def _get_mock_sd(fr, fn):
                 "colorbar": "vertical",
                 "font_size": 10,
                 "loop": True,
-                "fps": None,
+                "fps": fps,
             }
 
         def get_info(self):
             return self.info
 
-    return MockScreenshotDialog(fr, fn)
+    return MockScreenshotDialog()
 
 
 def _get_mock_sgm(frame_order):
@@ -246,14 +250,15 @@ def test_create_filenames(uuids, base, exp, monkeypatch, window):
         ([1, 2], "test.gif", False),
     ],
 )
-def test_save_screenshot_animations(fr, fn, overwrite, monkeypatch, window, tmp_path):
+@pytest.mark.parametrize("fps", [None, 2.2])
+def test_save_screenshot_animations(fr, fn, overwrite, fps, monkeypatch, window, tmp_path):
     """Test screenshot is saved correctly given the frame range and filename."""
     fn = tmp_path / fn
     if overwrite:
         fn.touch()
         monkeypatch.setattr(window.export_image, "_overwrite_dialog", lambda: overwrite)
 
-    monkeypatch.setattr(window.export_image, "_screenshot_dialog", _get_mock_sd(fr, str(fn)))
+    monkeypatch.setattr(window.export_image, "_screenshot_dialog", _get_mock_sd(fr, str(fn), fps))
     monkeypatch.setattr(window.export_image, "sgm", _get_mock_sgm(fr))
     monkeypatch.setattr(window.export_image, "model", _get_mock_model())
 

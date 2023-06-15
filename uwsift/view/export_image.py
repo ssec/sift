@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import logging
 import os
+from fractions import Fraction
 
 import imageio.v3 as imageio
 import matplotlib as mpl
@@ -354,14 +355,17 @@ class ExportImageHelper(QtCore.QObject):
             params["fps"] = info["fps"]
 
         is_gif = is_gif_filename(info["filename"])
-        if is_gif_filename(info["filename"]):
+        if is_gif:
             params["loop"] = 0  # infinite number of loops
-        elif "duration" in params:
-            # not gif but were given "Time Lapse", can only have one FPS
-            params["fps"] = int(1.0 / params.pop("duration")[0])
-
-        if not is_gif:
+            if "fps" in params:
+                # PIL duration in milliseconds
+                params["duration"] = [1.0 / params.pop("fps") * 1000.0] * len(images)
+        else:
+            if "duration" in params:
+                # not gif but were given "Time Lapse", can only have one FPS
+                params["fps"] = 1.0 / params.pop("duration")[0]
             params.update(PYAV_ANIMATION_PARAMS)
+            params["fps"] = Fraction(params["fps"]).limit_denominator(65535)
         return params
 
     def _get_time_lapse_duration(self, images, is_loop):
@@ -448,6 +452,7 @@ class ExportImageHelper(QtCore.QObject):
 
     def _write_images(self, filenames, params):
         for filename, file_images in filenames:
+            print(filename, file_images)
             images_arrays = _image_to_frame_array(file_images, filename)
             try:
                 imageio.imwrite(filename, images_arrays, **params)
