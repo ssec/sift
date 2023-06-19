@@ -12,6 +12,7 @@ from numpy.testing import assert_array_equal
 from PIL import Image
 from PyQt5.QtCore import Qt
 
+from uwsift.common import Info
 from uwsift.view import export_image
 
 
@@ -25,10 +26,10 @@ def _get_mock_model():
 
     class MockDataset:
         def __init__(self, offset: int):
-            self.info: dict[str, Any] = {}
-            self.info["unit_conversion"] = ("unit", lambda t: t, lambda t: t)
-            self.info["timeline"] = datetime.datetime(2000, 1, 1, 0, 0, 0, 0) + datetime.timedelta(minutes=offset)
-            self.info["display_name"] = "name"
+            self.info: dict[Info, Any] = {}
+            self.info[Info.UNIT_CONVERSION] = ("unit", lambda t: t, lambda t: t)
+            self.info[Info.SCHED_TIME] = datetime.datetime(2000, 1, 1, 0, 0, 0, 0) + datetime.timedelta(minutes=offset)
+            self.info[Info.DISPLAY_NAME] = "name"
 
     class MockModel:
         def __init__(self):
@@ -75,43 +76,57 @@ def _get_mock_sd(
 
 def _get_mock_sgm(frame_order):
     """Mock SceneGraphManager class for testing."""
+    return _MockSGM(frame_order)
 
-    class MockAnimationController:
-        def __init__(self):
-            self._frame_order = frame_order
 
-        def get_current_frame_index(self):
-            return max(self._frame_order, 1) if self._frame_order else 0
+class _MockAnimationController:
+    def __init__(self, frame_order):
+        self._frame_order = frame_order
 
-        def get_frame_uuids(self):
-            # no need to get more UUIDs than what we're going to use in the test
-            return list(range(max(self._frame_order))) if self._frame_order else []
+    def get_current_frame_index(self):
+        # frame range of `False` (in these unit tests) means no data is loaded
+        return max(self._frame_order or 1, 1) if self._frame_order is not False else 0
 
-    class MockCanvas:
-        dpi = 100
+    def get_frame_uuids(self):
+        if self._frame_order is False:
+            # no data loaded, so no UUIDs
+            return []
+        if self._frame_order is None:
+            # single "current layer" being shown
+            # start fake UUIDs at 1 to avoid `if not uuid:` failures with 0
+            return [1]
+        # no need to get more UUIDs than what we're going to use in the test
+        return list(range(1, max(self._frame_order) + 1))
 
-    class MockSGM:
-        fake_screenshot_shape = (5, 10, 4)
 
-        def __init__(self):
-            self.animation_controller = MockAnimationController()
-            self.main_canvas = MockCanvas()
-            self.rng = np.random.default_rng()
+class _MockCanvas:
+    dpi = 100
 
-        def get_screenshot_array(self, fr):
-            if fr is None:
-                return [("", self.rng.integers(0, 255, self.fake_screenshot_shape, dtype=np.uint8))]
-            frames = []
-            for frame_idx in range(fr[0], fr[1] + 1):
-                frames.append(
-                    (
-                        str(frame_idx),
-                        self.rng.integers(0, 255, self.fake_screenshot_shape, dtype=np.uint8),
-                    )
+
+class _MockSGM:
+    fake_screenshot_shape = (5, 10, 4)
+
+    def __init__(self, frame_order):
+        self.animation_controller = _MockAnimationController(frame_order)
+        self.main_canvas = _MockCanvas()
+        self.rng = np.random.default_rng()
+        self._frame_order = frame_order
+
+    def get_screenshot_array(self, fr):
+        if self._frame_order is False and fr is None:
+            # no data loaded
+            return [("", self.rng.integers(0, 255, self.fake_screenshot_shape, dtype=np.uint8))]
+        if fr is None:
+            fr = (1, 1)
+        frames = []
+        for frame_idx in range(fr[0], fr[1] + 1):
+            frames.append(
+                (
+                    str(frame_idx),
+                    self.rng.integers(0, 255, self.fake_screenshot_shape, dtype=np.uint8),
                 )
-            return frames
-
-    return MockSGM()
+            )
+        return frames
 
 
 @pytest.mark.parametrize(
@@ -262,7 +277,7 @@ def test_save_screenshot_animations(fr, fn, overwrite, fps, monkeypatch, window,
         fn.touch()
         monkeypatch.setattr(window.export_image, "_overwrite_dialog", lambda: overwrite)
 
-    monkeypatch.setattr(window.export_image, "_screenshot_dialog", _get_mock_sd(fr, str(fn), fps))
+    monkeypatch.setattr(window.export_image, "_screenshot_dialog", _get_mock_sd(fr or None, str(fn), fps))
     monkeypatch.setattr(window.export_image, "sgm", _get_mock_sgm(fr))
     monkeypatch.setattr(window.export_image, "model", _get_mock_model())
 
@@ -275,7 +290,7 @@ def test_save_screenshot_animations(fr, fn, overwrite, fps, monkeypatch, window,
         exp_frame_shape = (480, 640)
         read_kwargs = {"plugin": "pyav"}
     frames = imageio.imread(fn, **read_kwargs)
-    assert frames.shape[0] == (len(fr) if fr is not None else 1)
+    assert frames.shape[0] == (len(fr) if fr else 1)
     assert frames[0].shape[:2] == exp_frame_shape
 
 
@@ -287,11 +302,12 @@ def test_save_screenshot_animations(fr, fn, overwrite, fps, monkeypatch, window,
         ([1, 2], "test_{start_time:%H%M%S}.png", False),
         (None, "test_XXXXXX.png", True),
         (None, "test_XXXXXX.png", False),
+        (False, "test_XXXXXX.png", False),
     ],
 )
 def test_save_screenshot_images(fr, fn, overwrite, monkeypatch, window, tmp_path):
     """Test screenshot is saved correctly given the frame range and filename."""
-    exp_num = 1 if fr is None else len(fr)
+    exp_num = 1 if not fr else len(fr)
     expected_files = [
         tmp_path / fn.format(start_time=datetime.datetime(2000, 1, 1, 0, offset, 0)) for offset in range(exp_num)
     ]
@@ -300,7 +316,7 @@ def test_save_screenshot_images(fr, fn, overwrite, monkeypatch, window, tmp_path
             exp_file.touch()
         monkeypatch.setattr(window.export_image, "_overwrite_dialog", lambda: overwrite)
 
-    monkeypatch.setattr(window.export_image, "_screenshot_dialog", _get_mock_sd(fr, str(tmp_path / fn)))
+    monkeypatch.setattr(window.export_image, "_screenshot_dialog", _get_mock_sd(fr or None, str(tmp_path / fn)))
     monkeypatch.setattr(window.export_image, "sgm", _get_mock_sgm(fr))
     monkeypatch.setattr(window.export_image, "model", _get_mock_model())
 
@@ -308,6 +324,8 @@ def test_save_screenshot_images(fr, fn, overwrite, monkeypatch, window, tmp_path
     assert len(list(tmp_path.iterdir())) == len(expected_files)
     for exp_file in expected_files:
         assert exp_file.is_file()
+        img = imageio.imread(exp_file)
+        assert img.shape[:2] == (15, 20)
 
 
 def test_cmd_open_export_image_dialog(qtbot, window):

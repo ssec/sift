@@ -30,7 +30,7 @@ PYAV_ANIMATION_PARAMS = {
     "plugin": "pyav",
     "in_pixel_format": "rgba",
     "filter_sequence": [
-        # Scale animation frames to the macro buffer size (16)
+        # Scale animation frames to the macro block size (16)
         ("scale", "iw+gt(mod(iw,16), 0)*(16-mod(iw,16)):ih+gt(mod(ih,16), 0)*(16-mod(ih,16))"),
     ],
 }
