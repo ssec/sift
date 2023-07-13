@@ -51,7 +51,7 @@ Furthermore the desired readers need to be added to the configuration
 For example assuming that the repository has been cloned as follows::
 
     git clone https://gitlab.eumetsat.int/satpy/local_readers.git /path/to/satpy_extra_config_path/readers
-    
+
 the readers for the *FCI L1 Landmark Locations Catalogue*, *FCI L1 GEOOBS
 Landmarks* (landmark locations) and *FCI L1 GEOOBS Landmark Matching Results*
 (landmark navigation error) can be made available in MTG-SIFT with::
