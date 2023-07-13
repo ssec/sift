@@ -23,18 +23,26 @@ It is your responsibility to make sure the setting points to a suitable Satpy
 package: If the given path doesn't point to a Python package directory or not to
 one providing Satpy, the application may exit immediately throwing Exceptions.
 
-Using Extra Readers
+Using Extra Satpy component configuration
 ===================
+
+SIFT can use external `Satpy component configuration <https://satpy.readthedocs.io/en/stable/config.html#component-configuration>`_ folder,
+that hosts extra ``readers``, ``composites``, ``enhancements`` and ``areas`` definitions.
+To use external satpy component configuration it is necessary to define
+``satpy_extra_config_path`` in `external_satpy.yaml <https://github.com/ssec/sift/blob/master/uwsift/etc/SIFT/config/external_satpy.yaml>`_: ::
+
+    satpy_extra_config_path: [directory path]
+
+or it can be defined via environmet variable ``SATPY_CONFIG_PATH`` as described `here <https://satpy.readthedocs.io/en/stable/config.html#config-path-setting>`_.
+
+Example of external readers configuration
+`````````````
 
 Several data formats which are or will be produced by EUMETSAT need special
 readers which are not (yet) part of the official Satpy distribution. EUMETSAT
 maintains a Git repository ``satpy/local_readers`` on their `GitLab
 <https://gitlab.eumetsat.int/satpy/local_readers>`_ providing these special
-readers. To use these readers in addition to those included in Satpy the path to
-the root directory of a clone of this repository must be configured via the
-following setting first::
-
-    satpy_extra_readers_import_path: [directory path]
+readers. To use these readers it is neccsary to put them into folder: ``satpy_extra_config_path/readers``.
 
 Furthermore the desired readers need to be added to the configuration
 ``data_reading.readers`` and their reader specific configuration as well (see
@@ -42,13 +50,13 @@ Furthermore the desired readers need to be added to the configuration
 
 For example assuming that the repository has been cloned as follows::
 
-    git clone https://gitlab.eumetsat.int/satpy/local_readers.git /path/to/clone/of/satpy/local_readers
-
+    git clone https://gitlab.eumetsat.int/satpy/local_readers.git /path/to/satpy_extra_config_path/readers
+    
 the readers for the *FCI L1 Landmark Locations Catalogue*, *FCI L1 GEOOBS
 Landmarks* (landmark locations) and *FCI L1 GEOOBS Landmark Matching Results*
-(landmark navigation error) can be made available in SIFT with::
+(landmark navigation error) can be made available in MTG-SIFT with::
 
-    satpy_extra_readers_import_path: /path/to/clone/of/satpy/local_readers
+    satpy_extra_config_path: /path/to/satpy_extra_config_path
 
     data_reading:
       readers:

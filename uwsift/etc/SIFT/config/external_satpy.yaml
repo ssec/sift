@@ -2,5 +2,5 @@
 # This can be used during development to load a different version of Satpy without the need to package it first.
 # satpy_import_path: "/path/to/your/satpy/repo/clone/satpy"
 
-# Define the path to a folder containing custom Satpy readers to be used in SIFT.
-# satpy_extra_readers_import_path: "path/to/your/local_readers/repo/clone/local_readers"
+# Define the path to a folder containing custom Satpy configuration of readers, composites, enhancements and areas to be used in SIFT.
+# satpy_extra_config_path: "path/to/your/local_component_configuration"
