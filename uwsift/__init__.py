@@ -100,7 +100,7 @@ if satpy_config_path_yml is not None:
         os.environ["SATPY_CONFIG_PATH"] = satpy_config_path_yml
 else:
     if satpy_config_path_env is not None:
-        os.environ["SATPY_CONFIG_PATH"] = os.getenv('SATPY_CONFIG_PATH', None).replace('"', '')
+        os.environ["SATPY_CONFIG_PATH"] = satpy_config_path_env.replace('"', '')
 
 def _map_str_to_image_display_mode(image_display_mode_str: str) -> ImageDisplayMode:
     for idm in ImageDisplayMode:
