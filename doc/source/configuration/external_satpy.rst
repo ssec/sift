@@ -24,7 +24,7 @@ package: If the given path doesn't point to a Python package directory or not to
 one providing Satpy, the application may exit immediately throwing Exceptions.
 
 Using Extra Satpy component configuration
-===================
+=========================================
 
 SIFT can use external `Satpy component configuration <https://satpy.readthedocs.io/en/stable/config.html#component-configuration>`_ folder,
 that hosts extra ``readers``, ``composites``, ``enhancements`` and ``areas`` definitions.
@@ -36,7 +36,7 @@ To use external satpy component configuration it is necessary to define
 or it can be defined via environmet variable ``SATPY_CONFIG_PATH`` as described `here <https://satpy.readthedocs.io/en/stable/config.html#config-path-setting>`_.
 
 Example of external readers configuration
-`````````````
+`````````````````````````````````````````
 
 Several data formats which are or will be produced by EUMETSAT need special
 readers which are not (yet) part of the official Satpy distribution. EUMETSAT
