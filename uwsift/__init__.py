@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import satpy
 import sys
 import warnings
 from importlib.machinery import PathFinder
@@ -90,17 +91,8 @@ if satpy_import_path is not None:
 
 # get satpy_config_path from config file
 satpy_config_path_yml = config.get("satpy_extra_config_path", None)
-# get satpy_config_path from env variable
-satpy_config_path_env = os.getenv("SATPY_CONFIG_PATH", None)
-# expand or set environment variable SATPY_CONFIG_PATH if satpy_config_path is defined in configuration file
 if satpy_config_path_yml is not None:
-    if satpy_config_path_env is not None:
-        os.environ["SATPY_CONFIG_PATH"] = satpy_config_path_env.replace('"', "") + os.pathsep + satpy_config_path_yml
-    else:
-        os.environ["SATPY_CONFIG_PATH"] = satpy_config_path_yml
-else:
-    if satpy_config_path_env is not None:
-        os.environ["SATPY_CONFIG_PATH"] = satpy_config_path_env.replace('"', "")
+    satpy.config.set(config_path=satpy.config.get("config_path") + [satpy_config_path_yml])
 
 
 def _map_str_to_image_display_mode(image_display_mode_str: str) -> ImageDisplayMode:
