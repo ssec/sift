@@ -47,7 +47,8 @@ def init_user_config_dirs(user_config_dirs: list):
 init_user_config_dirs(USER_CONFIG_PATHS)
 
 print(f"Reading configuration from:\n\t{CONFIG_PATHS}", file=sys.stderr)
-config = Config("uwsift", paths=CONFIG_PATHS)
+deprecations = {"satpy_extra_readers_import_path": "satpy_extra_config_path"}
+config = Config("uwsift", paths=CONFIG_PATHS, deprecations=deprecations)
 
 
 def overwrite_import(package_name: str, custom_import_path: str, *, verbose=True):
