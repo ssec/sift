@@ -54,7 +54,7 @@ For example assuming that the repository has been cloned as follows::
 
 the readers for the *FCI L1 Landmark Locations Catalogue*, *FCI L1 GEOOBS
 Landmarks* (landmark locations) and *FCI L1 GEOOBS Landmark Matching Results*
-(landmark navigation error) can be made available in MTG-SIFT with::
+(landmark navigation error) can be made available in SIFT with::
 
     satpy_extra_config_path: /path/to/satpy_extra_config_path
 
