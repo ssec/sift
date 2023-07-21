@@ -26,7 +26,7 @@ one providing Satpy, the application may exit immediately throwing Exceptions.
 Using Extra Satpy component configuration
 =========================================
 
-SIFT can use external `Satpy component configuration <https://satpy.readthedocs.io/en/stable/config.html#component-configuration>`_ folder,
+SIFT can use external :ref:`Satpy component configuration <satpy:component_configuration>` folder,
 that hosts extra ``readers``, ``composites``, ``enhancements`` and ``areas`` definitions.
 To use external satpy component configuration it is necessary to define
 ``satpy_extra_config_path`` in `external_satpy.yaml <https://github.com/ssec/sift/blob/master/uwsift/etc/SIFT/config/external_satpy.yaml>`_::
