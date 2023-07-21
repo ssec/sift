@@ -94,6 +94,7 @@ if satpy_import_path is not None:
 satpy_config_path_yml = config.get("satpy_extra_config_path", None)
 if satpy_config_path_yml is not None:
     satpy.config.set(config_path=satpy.config.get("config_path") + [satpy_config_path_yml])
+    sys.path.insert(0, satpy_config_path_yml)
 
 
 def _map_str_to_image_display_mode(image_display_mode_str: str) -> ImageDisplayMode:
