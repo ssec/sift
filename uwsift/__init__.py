@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
 import os
-import satpy
 import sys
 import warnings
 from importlib.machinery import PathFinder
 from importlib.util import spec_from_file_location
 
+import satpy
 from donfig import Config
 
 from uwsift.common import ImageDisplayMode
