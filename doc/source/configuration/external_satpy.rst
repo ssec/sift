@@ -28,13 +28,12 @@ Using Extra Satpy component configuration
 
 SIFT can use external :ref:`Satpy component configuration <satpy:component_configuration>` folder,
 that hosts extra ``readers``, ``composites``, ``enhancements`` and ``areas`` definitions.
-To use external satpy component configuration it is necessary to define
-``satpy_extra_config_path`` in ``*.yaml`` file in USER_SIFT_CONFIG_DIR according to the example in 
-`external_satpy.yaml <https://github.com/ssec/sift/blob/master/uwsift/etc/SIFT/config/external_satpy.yaml>`_::
+To use the external satpy component configuration it is necessary to define either 
+``satpy_extra_config_path`` in the personal user configs (e.g. inside a file called `external_satpy.yaml`)::
 
     satpy_extra_config_path: [directory path]
 
-or it can be defined via environmet variable ``SATPY_CONFIG_PATH`` as described `here <https://satpy.readthedocs.io/en/stable/config.html#config-path-setting>`_.
+or the environment variable ``SATPY_CONFIG_PATH`` as described `here <https://satpy.readthedocs.io/en/stable/config.html#config-path-setting>`_.
 
 Example of external readers configuration
 `````````````````````````````````````````
