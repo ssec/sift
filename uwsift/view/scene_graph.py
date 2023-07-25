@@ -326,13 +326,18 @@ class SceneGraphManager(QObject):
                 returned.
 
         """
-        if frame_range is None:
+        # Store current index to reset the view once we are done
+        # Or use it as the frame to screenshot if no frame range is specified
+        current_frame = self.animation_controller.get_current_frame_index()
+        if not current_frame:
+            # no data loaded
             self.main_canvas.on_draw(None)
             return [("", _screenshot())]
+        if frame_range is None:
+            # screenshot the current view
+            s = e = current_frame
         else:
             s, e = frame_range
-        # Store current index to reset the view once we are done
-        current_frame = self.animation_controller.get_current_frame_index()
 
         images = []
         for i in range(s, e + 1):
