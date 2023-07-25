@@ -54,7 +54,7 @@ config = Config("uwsift", paths=CONFIG_PATHS, deprecations=deprecations)
 def overwrite_import(package_name: str, custom_import_path: str, *, verbose=True):
     if (custom_import_path is not None) and (not os.path.exists(custom_import_path)):
         raise FileNotFoundError(
-            f"Package '{package_name}' " f"doesn't exist at given custom import path '{custom_import_path}'"
+            f"Package '{package_name}' doesn't exist at given custom import path '{custom_import_path}'"
         )
 
     class CustomPathFinder(PathFinder):
@@ -88,6 +88,10 @@ def overwrite_import(package_name: str, custom_import_path: str, *, verbose=True
 satpy_import_path = config.get("satpy_import_path", None)
 if satpy_import_path is not None:
     overwrite_import("satpy", satpy_import_path)
+    for mod_name in list(sys.modules.keys()):
+        if mod_name.startswith("satpy"):
+            del sys.modules[mod_name]
+    import satpy  # noqa: F811
 
 
 # get satpy_config_path from config file

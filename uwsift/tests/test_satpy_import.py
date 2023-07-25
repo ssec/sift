@@ -44,10 +44,12 @@ def test_config_satpy_import_path(tmp_path):
 
         # Use stderr, because other print statements will confuse the `literal_eval`.
         # If an import is overwritten, then `overwrite_import` will output to stdout.
+        # uwsift *must* be imported first otherwise any path changes in uwsift/__init__.py
+        # for where satpy comes from may not be respected.
         command = [
             get_python_path(),
             "-c",
-            "import sys, uwsift, satpy, satpy.readers\n"
+            "import uwsift; import sys, satpy, satpy.readers\n"
             "print({'base_config_dir': uwsift.USER_CONFIG_PATHS[0], "
             "'overwritten_satpy_import_path': uwsift.config.get('satpy_import_path', None), "
             "'satpy_init_path': satpy.__file__})",
