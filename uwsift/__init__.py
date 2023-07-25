@@ -85,16 +85,7 @@ def overwrite_import(package_name: str, custom_import_path: str, *, verbose=True
     sys.meta_path.insert(0, CustomPathFinder)
 
 
-satpy_import_path = config.get("satpy_import_path", None)
-if satpy_import_path is not None:
-    overwrite_import("satpy", satpy_import_path)
-    for mod_name in list(sys.modules.keys()):
-        if mod_name.startswith("satpy"):
-            del sys.modules[mod_name]
-    import satpy  # noqa: F811
-
-
-# get satpy_config_path from config file
+# Add additional satpy configuration paths
 satpy_config_path_yml = config.get("satpy_extra_config_path", None)
 if satpy_config_path_yml is not None:
     satpy.config.set(config_path=satpy.config.get("config_path") + [satpy_config_path_yml])
