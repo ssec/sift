@@ -227,7 +227,7 @@ class ExportImageHelper(QtCore.QObject):
         # give one extra pixel on the left to make sure letters
         # don't get cut off
         new_draw.text([1, orig_h], banner_text, fill="#ffffff", font=font)
-        txt_w, txt_h = new_draw.textsize("SIFT", font)
+        txt_w = new_draw.textlength("SIFT", font)
         new_draw.text([orig_w - txt_w, orig_h], "SIFT", fill="#ffffff", font=font)
         new_im.paste(im, (0, 0, orig_w, orig_h))
         return new_im
