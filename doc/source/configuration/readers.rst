@@ -6,7 +6,7 @@ General Configuration
 
 The readers offered by the Open File Wizard to be used for loading are a subset
 of the readers provided by Satpy and - if configured accordingly via
-``satpy_extra_readers_import_path`` - in a directory of additional readers.
+``satpy_extra_config_path`` - in a directory of additional readers.
 The list of these readers must be configured, e.g. as follows::
 
   data_reading:

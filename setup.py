@@ -199,7 +199,7 @@ setup(
     include_package_data=True,
     install_requires=[
         "appdirs",
-        "donfig",
+        "donfig>=0.8.1",
         "h5py",
         "imageio",
         "av",

@@ -6,6 +6,7 @@ import warnings
 from importlib.machinery import PathFinder
 from importlib.util import spec_from_file_location
 
+import satpy
 from donfig import Config
 
 from uwsift.common import ImageDisplayMode
@@ -46,13 +47,14 @@ def init_user_config_dirs(user_config_dirs: list):
 init_user_config_dirs(USER_CONFIG_PATHS)
 
 print(f"Reading configuration from:\n\t{CONFIG_PATHS}", file=sys.stderr)
-config = Config("uwsift", paths=CONFIG_PATHS)
+deprecations = {"satpy_extra_readers_import_path": "satpy_extra_config_path"}
+config = Config("uwsift", paths=CONFIG_PATHS, deprecations=deprecations)
 
 
 def overwrite_import(package_name: str, custom_import_path: str, *, verbose=True):
     if (custom_import_path is not None) and (not os.path.exists(custom_import_path)):
         raise FileNotFoundError(
-            f"Package '{package_name}' " f"doesn't exist at given custom import path '{custom_import_path}'"
+            f"Package '{package_name}' doesn't exist at given custom import path '{custom_import_path}'"
         )
 
     class CustomPathFinder(PathFinder):
@@ -83,14 +85,11 @@ def overwrite_import(package_name: str, custom_import_path: str, *, verbose=True
     sys.meta_path.insert(0, CustomPathFinder)
 
 
-satpy_import_path = config.get("satpy_import_path", None)
-if satpy_import_path is not None:
-    overwrite_import("satpy", satpy_import_path)
-
-satpy_extra_readers_import_path = config.get("satpy_extra_readers_import_path", None)
-if satpy_extra_readers_import_path is not None:
-    sys.path.insert(0, satpy_extra_readers_import_path)
-    os.environ["SATPY_CONFIG_PATH"] = satpy_extra_readers_import_path
+# Add additional satpy configuration paths
+satpy_config_path_yml = config.get("satpy_extra_config_path", None)
+if satpy_config_path_yml is not None:
+    satpy.config.set(config_path=satpy.config.get("config_path") + [satpy_config_path_yml])
+    sys.path.insert(0, satpy_config_path_yml)
 
 
 def _map_str_to_image_display_mode(image_display_mode_str: str) -> ImageDisplayMode:

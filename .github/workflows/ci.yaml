@@ -117,7 +117,7 @@ jobs:
         if: matrix.experimental == true
         run: |
           python -m pip install \
-          --index-url https://pypi.anaconda.org/scipy-wheels-nightly/simple/ \
+          --index-url https://pypi.anaconda.org/scientific-python-nightly-wheels/simple/ \
           --trusted-host pypi.anaconda.org \
           --no-deps --pre --upgrade \
           matplotlib \
@@ -145,8 +145,7 @@ jobs:
           pytest --cov=uwsift uwsift/tests
 
       - name: Coveralls Parallel
-        # See https://github.com/AndreMiras/coveralls-python-action/pull/16
-        uses: djhoese/coveralls-python-action@feature-cython-coverage
+        uses: AndreMiras/coveralls-python-action@develop
         with:
           flag-name: run-${{ matrix.test_number }}
           parallel: true
@@ -157,7 +156,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Coveralls Finished
-        # See https://github.com/AndreMiras/coveralls-python-action/pull/16
-        uses: djhoese/coveralls-python-action@feature-cython-coverage
+        uses: AndreMiras/coveralls-python-action@develop
         with:
           parallel-finished: true
