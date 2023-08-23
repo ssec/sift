@@ -201,9 +201,6 @@ def test_convert_frame_range(range, exp, window):
                 "codec": "libx264",
                 "plugin": "pyav",
                 "in_pixel_format": "rgba",
-                "filter_sequence": [
-                    ("scale", "iw+gt(mod(iw,16), 0)*(16-mod(iw,16)):ih+gt(mod(ih,16), 0)*(16-mod(ih,16))"),
-                ],
             },
         ),
         ({"fps": 1, "filename": "test.gif"}, {"duration": [1000.0, 1000.0], "loop": 0}),
@@ -214,9 +211,6 @@ def test_convert_frame_range(range, exp, window):
                 "codec": "libx264",
                 "plugin": "pyav",
                 "in_pixel_format": "rgba",
-                "filter_sequence": [
-                    ("scale", "iw+gt(mod(iw,16), 0)*(16-mod(iw,16)):ih+gt(mod(ih,16), 0)*(16-mod(ih,16))"),
-                ],
             },
         ),
     ],
@@ -287,7 +281,7 @@ def test_save_screenshot_animations(fr, fn, overwrite, fps, monkeypatch, window,
         exp_frame_shape = (15, 20)
         read_kwargs = {"plugin": "pillow", "mode": "RGBA"}
     else:
-        exp_frame_shape = (480, 640)
+        exp_frame_shape = (14, 20)
         read_kwargs = {"plugin": "pyav"}
     frames = imageio.imread(fn, **read_kwargs)
     assert frames.shape[0] == (len(fr) if fr else 1)

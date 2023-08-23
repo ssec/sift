@@ -29,10 +29,6 @@ PYAV_ANIMATION_PARAMS = {
     "codec": "libx264",
     "plugin": "pyav",
     "in_pixel_format": "rgba",
-    "filter_sequence": [
-        # Scale animation frames to the macro block size (16)
-        ("scale", "iw+gt(mod(iw,16), 0)*(16-mod(iw,16)):ih+gt(mod(ih,16), 0)*(16-mod(ih,16))"),
-    ],
 }
 
 
@@ -466,7 +462,18 @@ def _image_to_frame_array(file_images: list[Image], filename: str) -> list[npt.N
     images_arrays = [np.array(image) for _, image in file_images]
     if not _supports_rgba(filename):
         images_arrays = [image_arr[:, :, :3] for image_arr in images_arrays]
+    # make sure frames are divisible by 2 to make ffmpeg happy
+    if is_video_filename(filename) and not is_gif_filename(filename):
+        images_arrays = [_array_divisible_by_2(img_array) for img_array in images_arrays]
     return images_arrays
+
+
+def _array_divisible_by_2(img_array: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:
+    shape = img_array.shape
+    shape_by_2 = tuple(dim_size - dim_size % 2 for dim_size in shape)
+    if shape_by_2 == shape:
+        return img_array
+    return img_array[: shape_by_2[0], : shape_by_2[1], :]
 
 
 def _supports_rgba(filename: str) -> bool:
