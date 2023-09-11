@@ -72,7 +72,8 @@ jobs:
 
       - name: Install conda pack
         run: |
-          conda install conda-pack
+          conda install conda-pack curl
+          curl -V
 
       - name: Install uwsift
         run: |
