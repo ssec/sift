@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 import io
 import logging
 import os
+from fractions import Fraction
 
-import imageio
+import imageio.v3 as imageio
 import matplotlib as mpl
-import numpy
+import numpy as np
+import numpy.typing as npt
 from matplotlib import pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -21,6 +25,11 @@ DATA_DIR = get_package_data_dir()
 NUM_TICKS = 8
 TICK_SIZE = 14
 FONT = "arial"
+PYAV_ANIMATION_PARAMS = {
+    "codec": "libx264",
+    "plugin": "pyav",
+    "in_pixel_format": "rgba",
+}
 
 
 def is_gif_filename(fn):
@@ -29,12 +38,6 @@ def is_gif_filename(fn):
 
 def is_video_filename(fn):
     return os.path.splitext(fn)[-1] in [".mp4", ".m4v", ".gif"]
-
-
-def get_imageio_format(fn):
-    """Ask imageio if it knows what to do with this filename."""
-    request = imageio.core.Request(fn, "w?")
-    return imageio.formats.search_write_format(request)
 
 
 class ExportImageDialog(QtWidgets.QDialog):
@@ -240,7 +243,7 @@ class ExportImageHelper(QtCore.QObject):
         colors = COLORMAP_MANAGER[colormap]
 
         if colormap == "Square Root (Vis Default)":
-            colors = colors.map(numpy.linspace((0, 0, 0, 1), (1, 1, 1, 1), 256))
+            colors = colors.map(np.linspace((0, 0, 0, 1), (1, 1, 1, 1), 256))
         else:
             colors = colors.colors.rgba
 
@@ -263,9 +266,9 @@ class ExportImageHelper(QtCore.QObject):
                     self.model.get_dataset_by_uuid(u).info.get(Info.UNIT_CONVERSION)[1](t)
                 )
             )
-            for t in numpy.linspace(vmin, vmax, NUM_TICKS)
+            for t in np.linspace(vmin, vmax, NUM_TICKS)
         ]
-        cbar.set_ticks(numpy.linspace(vmin, vmax, NUM_TICKS))
+        cbar.set_ticks(np.linspace(vmin, vmax, NUM_TICKS))
         cbar.set_ticklabels(ticks)
 
         return fig
@@ -282,6 +285,7 @@ class ExportImageHelper(QtCore.QObject):
 
         buf = io.BytesIO()
         fig.savefig(buf, format="png", bbox_inches="tight", dpi=self.sgm.main_canvas.dpi)
+        plt.close(fig)
         buf.seek(0)
         fig_im = Image.open(buf)
 
@@ -295,13 +299,12 @@ class ExportImageHelper(QtCore.QObject):
             for i in [im, fig_im]:
                 new_im.paste(i, (offset, 0))
                 offset += i.size[0]
-            return new_im
         else:
             new_im = Image.new(im.mode, (orig_w, orig_h + fig_h))
             for i in [im, fig_im]:
                 new_im.paste(i, (0, offset))
                 offset += i.size[1]
-            return new_im
+        return new_im
 
     def _create_filenames(self, uuids, base_filename):
         if not uuids or uuids[0] is None:
@@ -344,26 +347,37 @@ class ExportImageHelper(QtCore.QObject):
     def _get_animation_parameters(self, info, images):
         params = {}
         if info["fps"] is None:
-            t = [self.model.get_dataset_by_uuid(u).info.get(Info.SCHED_TIME) for u, im in images]
-            t_diff = [max(1, (t[i] - t[i - 1]).total_seconds()) for i in range(1, len(t))]
-            min_diff = float(min(t_diff))
-            # imageio seems to be using duration in seconds
-            # so use 1/10th of a second
-            duration = [0.1 * (this_diff / min_diff) for this_diff in t_diff]
-            duration = [duration[0]] + duration
-            if not info["loop"]:
-                duration = duration + duration[-2:0:-1]
-            params["duration"] = duration
+            params["duration"] = self._get_time_lapse_duration(images, info["loop"])
         else:
             params["fps"] = info["fps"]
 
-        if is_gif_filename(info["filename"]):
+        is_gif = is_gif_filename(info["filename"])
+        if is_gif:
             params["loop"] = 0  # infinite number of loops
-        elif "duration" in params:
-            # not gif but were given "Time Lapse", can only have one FPS
-            params["fps"] = int(1.0 / params.pop("duration")[0])
-
+            if "fps" in params:
+                # PIL duration in milliseconds
+                params["duration"] = [1.0 / params.pop("fps") * 1000.0] * len(images)
+        else:
+            if "duration" in params:
+                # not gif but were given "Time Lapse", can only have one FPS
+                params["fps"] = 1.0 / params.pop("duration")[0]
+            params.update(PYAV_ANIMATION_PARAMS)
+            params["fps"] = Fraction(params["fps"]).limit_denominator(65535)
         return params
+
+    def _get_time_lapse_duration(self, images, is_loop):
+        if len(images) <= 1:
+            return [1.0]  # arbitrary single frame duration
+        t = [self.model.get_dataset_by_uuid(u).info.get(Info.SCHED_TIME) for u, im in images]
+        t_diff = [max(1, (t[i] - t[i - 1]).total_seconds()) for i in range(1, len(t))]
+        min_diff = float(min(t_diff))
+        # imageio seems to be using duration in seconds
+        # so use 1/10th of a second
+        duration = [0.1 * (this_diff / min_diff) for this_diff in t_diff]
+        duration = [duration[0]] + duration
+        if not is_loop:
+            duration = duration + duration[-2:0:-1]
+        return duration
 
     def _convert_frame_range(self, frame_range):
         """Convert 1-based frame range to SGM's 0-based"""
@@ -418,15 +432,7 @@ class ExportImageHelper(QtCore.QObject):
                 for (u, im), bt in zip(images, banner_text)
             ]
 
-        imageio_format = get_imageio_format(filenames[0])
-        if imageio_format:
-            format_name = imageio_format.name
-        elif filenames[0].upper().endswith(".M4V"):
-            format_name = "MP4"
-        else:
-            raise ValueError("Not sure how to handle file with format: {}".format(filenames[0]))
-
-        if is_video_filename(filenames[0]) and len(images) > 1:
+        if is_video_filename(filenames[0]):
             params = self._get_animation_parameters(info, images)
             if not info["loop"] and is_gif_filename(filenames[0]):
                 # rocking animation
@@ -439,11 +445,36 @@ class ExportImageHelper(QtCore.QObject):
             params = {}
             filenames = list(zip(filenames, [[x] for x in images]))
 
-        self._write_images(filenames, format_name, params)
+        self._write_images(filenames, params)
 
-    def _write_images(self, filenames, format_name, params):
+    def _write_images(self, filenames, params):
         for filename, file_images in filenames:
-            writer = imageio.get_writer(filename, format_name, **params)
-            for _, x in file_images:
-                writer.append_data(numpy.array(x))
-        writer.close()
+            images_arrays = _image_to_frame_array(file_images, filename)
+            try:
+                imageio.imwrite(filename, images_arrays, **params)
+            except IOError:
+                msg = "Failed to write to file: {}".format(filename)
+                LOG.error(msg)
+                raise
+
+
+def _image_to_frame_array(file_images: list[Image], filename: str) -> list[npt.NDArray[np.uint8]]:
+    images_arrays = [np.array(image) for _, image in file_images]
+    if not _supports_rgba(filename):
+        images_arrays = [image_arr[:, :, :3] for image_arr in images_arrays]
+    # make sure frames are divisible by 2 to make ffmpeg happy
+    if is_video_filename(filename) and not is_gif_filename(filename):
+        images_arrays = [_array_divisible_by_2(img_array) for img_array in images_arrays]
+    return images_arrays
+
+
+def _array_divisible_by_2(img_array: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:
+    shape = img_array.shape
+    shape_by_2 = tuple(dim_size - dim_size % 2 for dim_size in shape)
+    if shape_by_2 == shape:
+        return img_array
+    return img_array[: shape_by_2[0], : shape_by_2[1], :]
+
+
+def _supports_rgba(filename: str) -> bool:
+    return not (filename.endswith(".jpeg") or filename.endswith(".jpg"))
