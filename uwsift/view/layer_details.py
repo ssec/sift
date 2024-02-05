@@ -377,9 +377,9 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         self._details_pane_ui.layerResolutionValue.setText(resolution_str)
 
     def _update_displayed_time(self):
-        active_product_dataset: Optional[
-            ProductDataset
-        ] = self._current_selected_layer.get_first_active_product_dataset()
+        active_product_dataset: Optional[ProductDataset] = (
+            self._current_selected_layer.get_first_active_product_dataset()
+        )
         if active_product_dataset:
             self._details_pane_ui.layerVisibleSchedTimeValue.setText(
                 self._current_selected_layer.get_first_active_product_dataset().info.get(Info.DISPLAY_TIME)
