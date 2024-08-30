@@ -2,14 +2,14 @@ exclude: '^$'
 fail_fast: false
 repos:
   - repo: https://github.com/psf/black
-    rev: 23.7.0
+    rev: 23.12.1
     hooks:
       - id: black
         language_version: python3
         args:
           - --target-version=py38
   - repo: https://github.com/pycqa/isort
-    rev: 5.12.0
+    rev: 5.13.2
     hooks:
       - id: isort
         language_version: python3
@@ -21,7 +21,7 @@ repos:
         additional_dependencies: [flake8-docstrings, flake8-debugger, flake8-bugbear, mccabe]
         args: [--max-complexity, "10"]
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v4.5.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -30,21 +30,22 @@ repos:
         # conda-recipes use jinja templating which isn't valid YAML syntax
         exclude: conda-recipe\/
   - repo: https://github.com/PyCQA/bandit
-    rev: '1.7.5'
+    rev: '1.7.6'
     hooks:
       - id: bandit
         args: [--ini, .bandit]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 'v1.5.1'  # Use the sha / tag you want to point at
+    rev: 'v1.8.0'  # Use the sha / tag you want to point at
     hooks:
       - id: mypy
         additional_dependencies:
           - types-docutils
-          - types-pkg-resources
+          - types-setuptools
           - types-PyYAML
           - types-requests
           - types-python-dateutil
 ci:
   # To trigger manually, comment on a pull request with "pre-commit.ci autofix"
   autofix_prs: false
+  autoupdate_schedule: "monthly"
   skip: []

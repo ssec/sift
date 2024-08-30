@@ -227,7 +227,7 @@ setup(
         "cfgrib",
     ],
     tests_requires=["pytest", "pytest-qt", "pytest-mock"],
-    python_requires=">=3.8",
+    python_requires=">=3.8, <=3.11",  # limiting to 3.11 until ecmwflibs is not available for 3.12
     extras_require=extras_require,
     packages=find_packages(),
     entry_points={
