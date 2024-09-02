@@ -2,11 +2,13 @@ name: test-environment
 channels:
   - conda-forge
 dependencies:
+  # limiting python due to ecmwflibs
+  - python<=3.11
   - appdirs
   - defusedxml
   - Cython
   - imageio
-  - imageio-ffmpeg
+  - av
   - matplotlib
   - numba
   - numpy
