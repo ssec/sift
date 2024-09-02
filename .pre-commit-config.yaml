@@ -40,7 +40,7 @@ repos:
       - id: mypy
         additional_dependencies:
           - types-docutils
-          - types-pkg-resources
+          - types-setuptools
           - types-PyYAML
           - types-requests
           - types-python-dateutil
