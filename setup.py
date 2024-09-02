@@ -202,6 +202,7 @@ setup(
         "donfig>=0.8.1",
         "h5py",
         "imageio",
+        "av",
         "matplotlib",
         "netCDF4",
         "numba",

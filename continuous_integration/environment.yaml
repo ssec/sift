@@ -8,7 +8,7 @@ dependencies:
   - defusedxml
   - Cython
   - imageio
-  - imageio-ffmpeg
+  - av
   - matplotlib
   - numba
   - numpy
