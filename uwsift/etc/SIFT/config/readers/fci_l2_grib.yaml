@@ -1,0 +1,3 @@
+data_reading:
+  fci_l2_grib:
+    filter_patterns: ['{pflag}_{location_indicator},{data_designator},MTI{spacecraft_id:1d}+FCI-2-{type}-{subtype}-{coverage}-{subsetting}-{component1}-{component2}-{component3}-{purpose}-GRIB2_{oflag}_{originator}_{processing_time:%Y%m%d%H%M%S}_{facility_or_tool}_{environment}_{start_time:%Y%m%d%H%M%S}_{end_time:%Y%m%d%H%M%S}_{processing_mode}_{special_compression}_{disposition_mode}_{repeat_cycle_in_day:>04d}_{count_in_repeat_cycle:>04d}.bin']
