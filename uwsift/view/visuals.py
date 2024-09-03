@@ -324,10 +324,10 @@ class SIFTTiledGeolocatedMixin:
                 # we should have already loaded the texture data in to the GPU so get the index of that texture
                 tex_tile_idx = self.texture_state[(preferred_stride, tiy, tix)]
                 factor_rez, offset_rez = self.calc.calc_tile_fraction(tiy, tix, preferred_stride)
-                tex_coords[
-                    tl * used_tile_idx * 6 : tl * (used_tile_idx + 1) * 6, :
-                ] = self.calc.calc_texture_coordinates(
-                    tex_tile_idx, factor_rez, offset_rez, tessellation_level=TESS_LEVEL
+                tex_coords[tl * used_tile_idx * 6 : tl * (used_tile_idx + 1) * 6, :] = (
+                    self.calc.calc_texture_coordinates(
+                        tex_tile_idx, factor_rez, offset_rez, tessellation_level=TESS_LEVEL
+                    )
                 )
                 vertices[tl * used_tile_idx * 6 : tl * (used_tile_idx + 1) * 6, :] = self.calc.calc_vertex_coordinates(
                     tiy,
