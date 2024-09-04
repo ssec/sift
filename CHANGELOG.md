@@ -1,4 +1,41 @@
-## Version 2.0.0 (2023/05/25)
+## Version 2.0.0b1 (2024/09/04)
+
+### Issues Closed
+
+* [Issue 380](https://github.com/ssec/sift/issues/380) - Allow setting of satpy config path via env variable
+* [Issue 376](https://github.com/ssec/sift/issues/376) - MTG FCI FDSS 500m does not work with LEO data
+* [Issue 372](https://github.com/ssec/sift/issues/372) - "Export image"-functionality does not know how to deal with .jpg/.png formats? ([PR 375](https://github.com/ssec/sift/pull/375) by [@djhoese](https://github.com/djhoese))
+* [Issue 276](https://github.com/ssec/sift/issues/276) - 'del' key to remove layers in 1.1.1 crashes SIFT if no layer is selected
+* [Issue 118](https://github.com/ssec/sift/issues/118) - Column sorting in open/import/cache dialog
+* [Issue 14](https://github.com/ssec/sift/issues/14) - imageio now requires separate imageio-ffmpeg package
+* [Issue 13](https://github.com/ssec/sift/issues/13) - Data probing not accurate
+* [Issue 9](https://github.com/ssec/sift/issues/9) - Overview image of data layers are misaligned
+* [Issue 7](https://github.com/ssec/sift/issues/7) - Loading / Displaying pre-defined RGB'S from Satpy
+
+In this release 9 issues were closed.
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 428](https://github.com/ssec/sift/pull/428) - Fix resolution formatting for numpy floats
+* [PR 382](https://github.com/ssec/sift/pull/382) - Fix usage of deprecated Pillow "textsize" method
+* [PR 375](https://github.com/ssec/sift/pull/375) - Fix export image and switch to imageio v3 API ([372](https://github.com/ssec/sift/issues/372))
+
+#### Features added
+
+* [PR 422](https://github.com/ssec/sift/pull/422) - Fix MTG-LI filepattern filter and add FCI L2 BUFR/GRIB readers to list
+* [PR 381](https://github.com/ssec/sift/pull/381) - Fix setting of external Satpy component configuration
+
+#### Documentation changes
+
+* [PR 428](https://github.com/ssec/sift/pull/428) - Fix resolution formatting for numpy floats
+* [PR 367](https://github.com/ssec/sift/pull/367) - Update readme for install and contributing docs
+
+In this release 7 pull requests were closed.
+
+
+## Version 2.0.0b0 (2023/05/25)
 
 Much of the work for this version was done by a private contractor in a non-GitHub
 git service. As such, the normal GitHub issue/PR-based changelog is not available.
