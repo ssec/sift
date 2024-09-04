@@ -305,6 +305,9 @@ def format_resolution(resolution: float) -> str:
     """Return string representing the given resolution (interpreted in meters)
     in the unit km for values greater than 1 km, otherwise in m, including the
     unit symbol."""
+    if isinstance(resolution, np.number):
+        # Decimal requires a python numeric value
+        resolution = resolution.item()
     resolution_dec = Decimal(resolution)
     if resolution_dec < 1000:
         return str(resolution_dec.quantize(Decimal("1."))) + " m"
