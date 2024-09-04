@@ -8,6 +8,10 @@ codebase. The documentation below is meant to point you in the right direction
 on how you can contribute and what the SIFT team might expect for contributions
 we receive.
 
+If you'd like to chat with the developers about SIFT programming and design
+questions you can do so on our `Gitter Chat <https://gitter.im/ssec/sift>`_ or
+through GitHub issues (see below).
+
 Development Team
 ----------------
 
@@ -20,9 +24,6 @@ although these two teams may have differing goals, SIFT is kept in a flexible
 state that allows it to be used for forecast training, Cal/Val operations for
 instruments, or many other use cases.
 
-If you'd like to chat with the developers about SIFT programming and design
-questions you can do so on our `Gitter Chat <https://gitter.im/ssec/sift>`_ or
-through GitHub issues (see below).
 
 SSEC
 ^^^^

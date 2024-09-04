@@ -31,6 +31,8 @@ also be found on GitHub: https://github.com/ssec/sift/wiki
 Developer and configuration documentation can be found on
 https://sift.readthedocs.io/en/latest/.
 
+The recording of a SIFT Short Course organised by EUMETSAT can be found [here](https://classroom.eumetsat.int/course/view.php?id=478).
+
 ## What's new in SIFT 2.0
 
 Many new features have been added starting from the version 2.0 of SIFT, including:
@@ -44,6 +46,10 @@ Many new features have been added starting from the version 2.0 of SIFT, includi
 - an automatic update/monitoring mode
 - partial redesign of the UI/UX
 - ... many more small but useful features!
+
+Note that SIFT v2.0 is still in Beta phase. Until a full release is reached, the
+packaged builds are available in the [experimental ftp folder](https://bin.ssec.wisc.edu/pub/sift/dist/experimental/).
+See the Installatio section below for more information.
 
 ## History
 
