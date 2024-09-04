@@ -47,7 +47,7 @@ Many new features have been added starting from the version 2.0 of SIFT, includi
 - partial redesign of the UI/UX
 - ... many more small but useful features!
 
-Note that SIFT v2.0 is still in Beta phase. Until a full release is reached, the
+Note that SIFT v2.0 is still in Beta phase (see [Releases](https://github.com/ssec/sift/releases)). Until a full release is reached, the
 packaged builds are available in the [experimental ftp folder](https://bin.ssec.wisc.edu/pub/sift/dist/experimental/).
 See the Installatio section below for more information.
 
