@@ -3,18 +3,12 @@ data_reading:
   readers:
     - abi_l1b
     - abi_l2_nc
-    - fci_l1_cat_lmk_loc
-    - fci_l1_geoobs_lmk_loc
-    - fci_l1_geoobs_lmk_nav_err
     - fci_l1c_nc
-    - fci_l1c_iqt_fdhsi
     - fci_l2_nc
     - fci_l2_bufr
     - fci_l2_grib
     - li_l1b_nc
-    - li_l1b_bck_nc_sift
     - li_l2_nc
-    - li_l2_a_nc_sift
     - seviri_l1b_hrit
     - seviri_l1b_native
     - seviri_l2_binary
