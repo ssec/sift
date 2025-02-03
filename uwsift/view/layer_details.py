@@ -389,14 +389,18 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         else:
             area_def = AreaDefinitionsManager.area_def_by_id(self._resampling_info["area_id"])
             if self._resampling_info["custom"]:
-                resolution_values = AreaDefinitionsManager.area_def_custom_resolution_values(area_def, self._resampling_info["shape"][0], self._resampling_info["shape"][1])
+                resolution_values = AreaDefinitionsManager.area_def_custom_resolution_values(
+                    area_def, self._resampling_info["shape"][0], self._resampling_info["shape"][1]
+                )
             else:
                 resolution_values = (area_def.pixel_size_x, area_def.pixel_size_y)
 
             resolution_x = resolution_values[0]
             resolution_y = resolution_values[1]
 
-            self._details_pane_ui.layerAreaResolutionValue.setText(f"{format_resolution(resolution_x)} / {format_resolution(resolution_y)} ")
+            self._details_pane_ui.layerAreaResolutionValue.setText(
+                f"{format_resolution(resolution_x)} / {format_resolution(resolution_y)} "
+            )
 
     def _update_displayed_time(self):
         active_product_dataset: Optional[ProductDataset] = (
