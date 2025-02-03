@@ -23,3 +23,4 @@ REQUIRES
 """
 
 from uwsift.model.document import Document  # noqa
+

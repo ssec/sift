@@ -1,6 +1,9 @@
 # PyCharm project settings
 .idea
 
+# VSCode project settings
+.vscode
+
 # OSX DS files
 .DS_Store
 
@@ -115,3 +118,6 @@ CMakeCache.txt
 cmake_install.cmake
 CMakeFiles/
 Makefile
+
+# Windows soft links
+*.lnk
