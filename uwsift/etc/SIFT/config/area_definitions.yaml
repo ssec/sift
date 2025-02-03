@@ -1,21 +1,54 @@
 area_definitions:
 
-  MTG FCI FDSS 1km: mtg_fci_fdss_1km
-  MTG FCI FDSS 2km: mtg_fci_fdss_2km
-  MTG FCI FDSS 500m: mtg_fci_fdss_500m
-  MSG SEVIRI FES 3km: msg_seviri_fes_3km
-  MSG SEVIRI FES 1km: msg_seviri_fes_1km
-  MSG SEVIRI RSS 3km: msg_seviri_rss_3km
-  MSG SEVIRI RSS 1km: msg_seviri_rss_1km
-  MSG SEVIRI IODC 3km: msg_seviri_iodc_3km
-  MSG SEVIRI IODC 1km: msg_seviri_iodc_1km
-  GOES-East ABI F 500m: goes_east_abi_f_500m
-  GOES-East ABI F 1km: goes_east_abi_f_1km
-  GOES-East ABI F 2km: goes_east_abi_f_2km
-  GOES-West ABI F 500m: goes_west_abi_f_500m
-  GOES-West ABI F 1km: goes_west_abi_f_1km
-  GOES-West ABI F 2km: goes_west_abi_f_2km
-  EUROL: eurol
+  MTG FCI FDSS:
+    {
+        1km: mtg_fci_fdss_1km,
+        2km: mtg_fci_fdss_2km,
+        500m: mtg_fci_fdss_500m,
+        32km: mtg_fci_fdss_32km 
+    }
+
+  MSG SEVERI FES:
+    {
+        3km: msg_seviri_fes_3km,
+        1km: msg_seviri_fes_1km,
+        9km: msg_seviri_fes_9km
+    }
+  MSG SEVIRI RSS:
+    {
+        3km: msg_seviri_rss_3km,
+        1km: msg_seviri_rss_1km
+    }
+  MSG SEVIRI IODC:
+    {
+        3km: msg_seviri_iodc_3km,
+        1km: msg_seviri_iodc_1km
+    }
+  GOES-East ABI F:
+    {
+        500m: goes_east_abi_f_500m,
+        1km: goes_east_abi_f_1km,
+        2km: goes_east_abi_f_2km
+    }
+    
+  GOES-West ABI F:
+    {
+        500m: goes_west_abi_f_500m,
+        1km: goes_west_abi_f_1km,
+        2km: goes_west_abi_f_2km
+    }
+    
+  EUROL:
+    {
+        eurol: eurol
+    }
+  
+  
+  
+  
+  
+  
+
 
 #---- SIFT doesn't implement proj=eqc correctly/completely ----
 #  Plate Carree 3km: worldeqc3km

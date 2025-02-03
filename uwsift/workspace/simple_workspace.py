@@ -265,6 +265,7 @@ class SimpleWorkspace(BaseWorkspace):
             return arrays.data
 
         truck = aImporter.from_product(prod, workspace_cwd=self.cache_dir, database_session=None, **importer_kwargs)
+
         if not truck:
             # aImporter.from_product() didn't return an Importer instance
             # since all files represent data granules, which are already

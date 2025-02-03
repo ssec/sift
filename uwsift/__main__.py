@@ -76,6 +76,7 @@ from uwsift.view.scene_graph import SceneGraphManager
 from uwsift.workspace import CachingWorkspace, SimpleWorkspace
 from uwsift.workspace.collector import ResourceSearchPathCollector
 
+
 LOG = logging.getLogger(__name__)
 configure_loggers()
 
@@ -1099,6 +1100,11 @@ class Main(QtWidgets.QMainWindow):
 
         if self._wizard_dialog.exec_():
             LOG.info("Loading products from open wizard...")
+            # The selected projection in the main window is the same as the one chosen in the open file wizard
+            self.ui.projectionComboBox.setCurrentIndex(self._wizard_dialog.ui.projectionComboBox.currentIndex())
+            #setting resampling info in layer details pane for displaying the resolution of the Area
+            self.ui.layerDetailsPane.set_resampling_info(self._wizard_dialog.resampling_info)
+            #
             scenes = self._wizard_dialog.scenes
             reader = self._wizard_dialog.get_reader()
 
