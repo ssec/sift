@@ -208,7 +208,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             info[Info.FAMILY] = self._family_for_product_or_info(info)
         presentation = self._insert_dataset_with_info(info, insert_before=insert_before)
 
-
         # signal updates from the document
         self.didAddDataset.emit(info, presentation)
 

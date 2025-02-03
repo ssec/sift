@@ -34,7 +34,6 @@ import numpy as np
 import satpy.readers.yaml_reader
 import satpy.resample
 import yaml
-from docutils.nodes import target
 from pyresample.geometry import AreaDefinition, StackedAreaDefinition, SwathDefinition
 from satpy import DataQuery, Scene, available_readers
 from satpy.dataset import DatasetDict
@@ -48,7 +47,6 @@ from uwsift.satpy_compat import DataID, get_id_items, get_id_value, id_from_attr
 from uwsift.util import USER_CACHE_DIR
 from uwsift.util.common import get_reader_kwargs_dict
 from uwsift.workspace.guidebook import ABI_AHI_Guidebook
-
 
 from .metadatabase import (
     Content,
@@ -1262,26 +1260,30 @@ class SatpyImporter(aImporter):
     def _preprocess_products_with_resampling(self) -> None:
         resampler: str = self.resampling_info["resampler"]
         max_area = self.scn.finest_area()
-        if isinstance(max_area, AreaDefinition) and max_area.area_id == self.resampling_info["area_id"] and self.resampling_info["custom"] == False:
-            #resampling is not needed
+        if (
+            isinstance(max_area, AreaDefinition)
+            and max_area.area_id == self.resampling_info["area_id"]
+            and self.resampling_info["custom"] is False
+        ):
+            # resampling is not needed
             LOG.info(
                 f"Source and target area ID are identical:"
                 f" '{self.resampling_info['area_id']}'."
                 f" Skipping resampling."
             )
         else:
-            #resampling is needed
+            # resampling is needed
             area_name = max_area.area_id if hasattr(max_area, "area_id") else max_area.name
             target_area_def = AreaDefinitionsManager.area_def_by_id(self.resampling_info["area_id"])
 
-            if(self.resampling_info["custom"] == False):
+            if self.resampling_info["custom"] is False:
                 LOG.info(
                     f"Resampling from area ID/name '{area_name}'"
                     f" to area ID '{self.resampling_info['area_id']}'"
                     f" with method '{resampler}'"
                 )
             else:
-                #custom resolution
+                # custom resolution
                 resampler_shape = self.resampling_info["shape"]
                 resampler_width = resampler_shape[0]
                 resampler_height = resampler_shape[1]
@@ -1291,7 +1293,9 @@ class SatpyImporter(aImporter):
                     f" with CUSTOM SHAPE: '{resampler_width}, {resampler_height}'"
                 )
 
-                AreaDefinitionsManager.prepare_area_def_for_resampling(target_area_def, resampler_width, resampler_height)
+                AreaDefinitionsManager.prepare_area_def_for_resampling(
+                    target_area_def, resampler_width, resampler_height
+                )
 
             # About the next strange line of code: keep a reference to the
             # original scene to work around an issue in the resampling
@@ -1308,7 +1312,7 @@ class SatpyImporter(aImporter):
                 radius_of_influence=self.resampling_info["radius_of_influence"],
                 reduce_data=reduce_data,
             )
-  
+
     def _get_fci_segment_height(self, segment_number: int, segment_width: int) -> int:
         try:
             seg_heights = self.scn._readers[self.reader].segment_heights
