@@ -25,8 +25,6 @@ import trollsift.parser as fnparser
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QPoint
 from PyQt5.QtWidgets import QMenu
-from PyQt5.QtWidgets import QMessageBox
-
 from satpy.readers import find_files_and_readers, group_files
 
 from uwsift import config
@@ -45,6 +43,7 @@ CHECKMARK = "✔️"
 
 PAGE_ID_FILE_SELECTION = 0
 PAGE_ID_PRODUCT_SELECTION = 1
+
 
 class Conf(Enum):
     # Just to have a well-defined constant to express "skip this resampler"
@@ -88,7 +87,6 @@ class OpenFileWizard(QtWidgets.QWizard):
     inputParametersChanged = QtCore.pyqtSignal()
     directoryChanged = QtCore.pyqtSignal(str)
 
-
     def __init__(self, base_dir=None, base_reader=None, parent=None):
         super(OpenFileWizard, self).__init__(parent)
         super(OpenFileWizard, self).__init__(parent)
@@ -122,7 +120,6 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui = Ui_openFileWizard()
         self.ui.setupUi(self)
 
-        
         # ------------------------------------------------------------------------------------------
         # SIGNAL & SLOT CONNECTIONS
         # ------------------------------------------------------------------------------------------
@@ -165,7 +162,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.radiusOfInfluenceSpinBox.valueChanged.connect(self._update_resampling_info)
 
         self.ui.projectionComboBox.setModel(parent.ui.projectionComboBox.model())
-        #self.ui.projectionComboBox.currentIndexChanged.connect(self._update_resampling_info)
+        # self.ui.projectionComboBox.currentIndexChanged.connect(self._update_resampling_info)
         self._update_resampling_shape_spin_boxes()
         self.ui.projectionComboBox.currentIndexChanged.connect(self._update_resampling_shape_spin_boxes)
         self.ui.projectionComboBox.currentIndexChanged.connect(self._update_resampling_info)
@@ -173,9 +170,11 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.resamplingShapeRowSpinBox.valueChanged.connect(self._update_resampling_info)
         self.ui.resamplingShapeColumnSpinBox.valueChanged.connect(self._update_resampling_info)
 
-        #connect signals and slots for the resolutionComboBox
-        self.ui.resolutionComboBox.currentIndexChanged.connect(self._update_resampling_shape_spin_boxes_by_resolution_change)
-        
+        # connect signals and slots for the resolutionComboBox
+        self.ui.resolutionComboBox.currentIndexChanged.connect(
+            self._update_resampling_shape_spin_boxes_by_resolution_change
+        )
+
         # GUI has been initialized, make sure we have a consistent
         # resampling_info
         self.resampling_info = None
@@ -195,15 +194,16 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.resolutionComboBox.blockSignals(True)
         self.ui.resolutionComboBox.clear()
         self.ui.resolutionComboBox.blockSignals(False)
-        self.ui.resolutionComboBox.addItems(tuple(AreaDefinitionsManager.available_area_def_group_resolutions(self.ui.projectionComboBox.currentText())))
+        self.ui.resolutionComboBox.addItems(
+            tuple(AreaDefinitionsManager.available_area_def_group_resolutions(self.ui.projectionComboBox.currentText()))
+        )
         self.ui.resolutionComboBox.addItem("custom")
-        
+
     def initializePage(self, page_id: int):
         if page_id == PAGE_ID_FILE_SELECTION:
             self._initialize_page_file_selection()
         elif page_id == PAGE_ID_PRODUCT_SELECTION:
             self._initialize_page_product_selection()
-
 
     def validateCurrentPage(self) -> bool:
         """Check that the current page will generate the necessary data."""
@@ -741,48 +741,49 @@ class OpenFileWizard(QtWidgets.QWizard):
         area_def_name = self.ui.projectionComboBox.currentText()
         resolution = self.ui.resolutionComboBox.currentText()
         custom = False
-        if(resolution != "custom"):
+        if resolution != "custom":
             area_def = AreaDefinitionsManager.area_def_by_group_name_and_resolution(area_def_name, resolution)
         else:
             area_def = AreaDefinitionsManager.area_def_by_name(area_def_name)
             custom = True
-     
+
         resampler = self.ui.resamplingMethodComboBox.currentData()
         if not resampler or resampler.lower() == "none":
             # gracefully interpret capitalization variants of 'None' as:
             # "do not resample"
             self.resampling_info = None
         else:
-            #added custom info to this structure
+            # added custom info to this structure
             self.resampling_info = {
                 "resampler": resampler,
                 "area_id": area_def.area_id,
                 "projection": area_def.proj_str,
                 "radius_of_influence": self.ui.radiusOfInfluenceSpinBox.value(),
                 "shape": (self.ui.resamplingShapeRowSpinBox.value(), self.ui.resamplingShapeColumnSpinBox.value()),
-                "custom" : custom
+                "custom": custom,
             }
 
-  
     def _set_resampling_shape_spin_boxes_disabled(self, is_disabled):
         self.ui.resamplingShapeRowSpinBox.setDisabled(is_disabled)
         self.ui.resamplingShapeColumnSpinBox.setDisabled(is_disabled)
 
     def _set_opts_disabled(self, is_disabled):
         self.ui.radiusOfInfluenceSpinBox.setDisabled(is_disabled)
-        self.ui.projectionComboBox.setDisabled(is_disabled) 
+        self.ui.projectionComboBox.setDisabled(is_disabled)
         self.ui.resolutionComboBox.setDisabled(is_disabled)
-        #spin boxes should be disabled when is_disabled = True or when resolution != custom
-        self._set_resampling_shape_spin_boxes_disabled(is_disabled or self.ui.resolutionComboBox.currentData() != "custom") 
+        # spin boxes should be disabled when is_disabled = True or when resolution != custom
+        self._set_resampling_shape_spin_boxes_disabled(
+            is_disabled or self.ui.resolutionComboBox.currentData() != "custom"
+        )
 
-        '''
+        """
         #
         # The user should not change the projection nor the resampling shape,
         # thus:
         self.ui.projectionComboBox.setDisabled(True)  # instead of 'is_disabled'
         self.ui.resamplingShapeRowSpinBox.setDisabled(True)  # instead of 'is_disabled'
         self.ui.resamplingShapeColumnSpinBox.setDisabled(True)  # instead of 'is_disabled'
-        '''
+        """
 
     def _reset_fields(self):
         self.ui.resamplingMethodComboBox.setCurrentIndex(0)
@@ -794,31 +795,30 @@ class OpenFileWizard(QtWidgets.QWizard):
     def _update_resampling_shape_spin_boxes(self):
         area_def_name = self.ui.projectionComboBox.currentText()
         area_def = AreaDefinitionsManager.area_def_by_name(area_def_name)
-      
-        #clear all existing items in self.ui.resolutionComboBox and then add resolution values for the chosen projection
+
+        # clear all existing items in self.ui.resolutionComboBox and then add resolution values
+        # for the chosen projection
         self.initializeResolutionComboBox()
-        
+
         self.ui.resamplingShapeRowSpinBox.setValue(area_def.shape[0])
         self.ui.resamplingShapeColumnSpinBox.setValue(area_def.shape[1])
-        
-        
+
     def _update_resampling_shape_spin_boxes_by_resolution_change(self):
-        #This function sets the correct values for the shape based on the selected resolution and projection
+        # This function sets the correct values for the shape based on the selected resolution and projection
         area_def_name = self.ui.projectionComboBox.currentText()
         resolution = self.ui.resolutionComboBox.currentText()
 
-        if(resolution != "custom"):
+        if resolution != "custom":
             area_def = AreaDefinitionsManager.area_def_by_group_name_and_resolution(area_def_name, resolution)
             self.ui.resamplingShapeRowSpinBox.setValue(area_def.shape[0])
             self.ui.resamplingShapeColumnSpinBox.setValue(area_def.shape[1])
             self._set_resampling_shape_spin_boxes_disabled(True)
         else:
             self._set_resampling_shape_spin_boxes_disabled(False)
-    
+
     def _update_parent_projection_combobox(self):
         parent = self.parent()
         parent.ui.projectionComboBox.setCurrentIndex(self.ui.projectionComboBox.currentIndex())
-
 
     def _update_grouping_mode_combobox(self):
         reader = self.get_reader()

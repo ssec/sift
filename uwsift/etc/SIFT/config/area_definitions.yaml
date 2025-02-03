@@ -5,7 +5,7 @@ area_definitions:
         1km: mtg_fci_fdss_1km,
         2km: mtg_fci_fdss_2km,
         500m: mtg_fci_fdss_500m,
-        32km: mtg_fci_fdss_32km 
+        32km: mtg_fci_fdss_32km
     }
 
   MSG SEVERI FES:
@@ -30,24 +30,24 @@ area_definitions:
         1km: goes_east_abi_f_1km,
         2km: goes_east_abi_f_2km
     }
-    
+
   GOES-West ABI F:
     {
         500m: goes_west_abi_f_500m,
         1km: goes_west_abi_f_1km,
         2km: goes_west_abi_f_2km
     }
-    
+
   EUROL:
     {
         eurol: eurol
     }
-  
-  
-  
-  
-  
-  
+
+
+
+
+
+
 
 
 #---- SIFT doesn't implement proj=eqc correctly/completely ----
