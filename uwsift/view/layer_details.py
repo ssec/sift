@@ -23,6 +23,7 @@ from typing import Optional, Tuple
 from PyQt5 import QtWidgets
 
 from uwsift.common import FALLBACK_RANGE, INVALID_COLOR_LIMITS, Info, Kind
+from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.model.layer_item import LayerItem
 from uwsift.model.layer_model import LayerModel
 from uwsift.model.product_dataset import ProductDataset
@@ -43,6 +44,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
     """Shows details about one layer that is currently selected."""
 
     _slider_steps = 100
+    _resampling_info = None
 
     def __init__(self, *args, **kwargs):
         """Initialise subwidgets and layout.
@@ -149,6 +151,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         self._details_pane_ui.layerInstrumentValue.setText("N/A")
         self._details_pane_ui.layerWavelengthValue.setText("N/A")
         self._details_pane_ui.layerResolutionValue.setText("N/A")
+        self._details_pane_ui.layerAreaResolutionValue.setText("N/A")
         self._details_pane_ui.layerColormapValue.setText("N/A")
         self._details_pane_ui.layerColorLimitsValue.setText("N/A")
         self._details_pane_ui.layerColormapVisual.setHtml("")
@@ -296,6 +299,9 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         model = self._current_selected_layer.model
         model.change_color_limits_for_layer(self._current_selected_layer.uuid, new_clims)
 
+    def set_resampling_info(self, resampling_info):
+        self._resampling_info = resampling_info
+
     def _slider_changed(self, value=None, is_max=True):
         spin_box = self._details_pane_ui.vmax_spinbox if is_max else self._details_pane_ui.vmin_spinbox
         if value is None:
@@ -329,6 +335,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         self._update_displayed_instrument()
         self._update_displayed_wavelength()
         self._update_displayed_resolution()
+        self._update_displayed_area_resolution()
         self.update_displayed_clims()
 
         self._update_displayed_kind_details()
@@ -375,6 +382,25 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
             resolution_str += format_resolution(resolution_y) if resolution_y else "N/A"
 
         self._details_pane_ui.layerResolutionValue.setText(resolution_str)
+
+    def _update_displayed_area_resolution(self):
+        if self._resampling_info is None:
+            self._details_pane_ui.layerAreaResolutionValue.setText("N/A")
+        else:
+            area_def = AreaDefinitionsManager.area_def_by_id(self._resampling_info["area_id"])
+            if self._resampling_info["custom"]:
+                resolution_values = AreaDefinitionsManager.area_def_custom_resolution_values(
+                    area_def, self._resampling_info["shape"][0], self._resampling_info["shape"][1]
+                )
+            else:
+                resolution_values = (area_def.pixel_size_x, area_def.pixel_size_y)
+
+            resolution_x = resolution_values[0]
+            resolution_y = resolution_values[1]
+
+            self._details_pane_ui.layerAreaResolutionValue.setText(
+                f"{format_resolution(resolution_x)} / {format_resolution(resolution_y)} "
+            )
 
     def _update_displayed_time(self):
         active_product_dataset: Optional[ProductDataset] = (
