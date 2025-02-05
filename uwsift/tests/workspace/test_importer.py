@@ -4,6 +4,7 @@
 
 import os
 from datetime import datetime
+from unittest.mock import patch
 
 import dask.array as da
 import numpy as np
@@ -15,6 +16,7 @@ from satpy import Scene
 from satpy.tests.utils import make_dataid
 
 from uwsift.common import Info, Instrument, Platform
+from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.workspace.importer import SatpyImporter, available_satpy_readers
 
 
@@ -164,3 +166,87 @@ def test_satpy_importer_basic(get_scene, exp_platform, tmpdir, monkeypatch, mock
     assert products[0].info[Info.STANDARD_NAME] == "toa_bidirectional_reflectance"
     assert products[0].info[Info.PLATFORM] == exp_platform
     assert products[0].info[Info.INSTRUMENT] == Instrument.ABI
+
+
+# Test if the resampling method is used with a custom resampling and does calculations
+def test_satpy_importer_resampling(tmpdir, monkeypatch, mocker):
+    """Basic import test using Satpy."""
+    db_sess = mocker.MagicMock()
+    scn = _get_fake_g16_abi_c01_scene(mocker)
+    reader_name = "fci_l1c_nc"
+    imp = SatpyImporter(
+        ["/test/file.nc"], tmpdir, db_sess, scene=scn, reader=reader_name, dataset_ids=[make_dataid(name="vis_06")]
+    )
+    resampling_info = {
+        "resampler": "nearest",
+        "area_id": "mtg_fci_fdss_1km",
+        "projection": "+ellps=WGS84 +h=35786400 +lon_0=0 +no_defs +proj=geos +type=crs +units=m +x_0=0 +y_0=0",
+        "radius_of_influence": 5000,
+        # This is not yet an arbitrary shape, expect that values going into resample do not deviate from initial
+        # when custom is set to "True"
+        "shape": (11136, 11136),
+        "custom": False,
+    }
+    imp.resampling_info = resampling_info
+
+    # The result of Scene.finest_area needs to be corrected for our needs
+    def finest_area_sideeffect(*args, **kwargs):
+        orig_fa = orig_finest_area(*args, **kwargs)
+        orig_fa.area_id = resampling_info["area_id"]
+        return orig_fa
+
+    area_def_resampled = None
+
+    # Catch the Scene.resample call and harvest the arguments provided by the caller
+    def resample_sideeffect(*args, **kwargs):
+        nonlocal area_def_resampled
+        area_def_resampled = args[0]
+        return scn  # just return back the original scene
+
+    # Setup patch for Scene.finest_are
+    orig_finest_area = scn.finest_area
+    finest_area_patcher = patch.object(Scene, "finest_area")
+    mock_finest_area = finest_area_patcher.start()
+    mock_finest_area.side_effect = finest_area_sideeffect
+
+    # Setup patch for Scene.resample
+    resample_patcher = patch.object(Scene, "resample")
+    mock_resample = resample_patcher.start()
+    mock_resample.side_effect = resample_sideeffect
+
+    # Call _preprocess_products_with_resampling with a shape not being "custom"
+    imp._preprocess_products_with_resampling()
+    assert not mock_resample.called  # Scene.resample should not have been called
+
+    # Grab the original area definition values before resampling
+    area_def = AreaDefinitionsManager.area_def_by_id(resampling_info["area_id"])
+    prev_ad_p_size_x = area_def.pixel_size_x
+    prev_ad_p_size_y = area_def.pixel_size_y
+    prev_ad_p_upper_left = area_def.pixel_upper_left
+    prev_ad_p_offset_x = area_def.pixel_offset_x
+    prev_ad_p_offset_y = area_def.pixel_offset_y
+    # Now Scene.resample must be called but the area definition values provided must not have changes
+    resampling_info["custom"] = True
+    imp._preprocess_products_with_resampling()
+    # Check that the are definition values have NOT been recalculated as the shape itself is still not custom
+    assert prev_ad_p_size_x == area_def_resampled.pixel_size_x
+    assert prev_ad_p_size_y == area_def_resampled.pixel_size_y
+    assert prev_ad_p_upper_left[0] == area_def_resampled.pixel_upper_left[0]
+    assert prev_ad_p_upper_left[1] == area_def_resampled.pixel_upper_left[1]
+    assert prev_ad_p_offset_x == area_def_resampled.pixel_offset_x
+    assert prev_ad_p_offset_y == area_def_resampled.pixel_offset_y
+
+    # Some arbitrary shape, expect that resample is now being called with recalculated definition values
+    resampling_info["shape"] = (5000, 5000)
+    imp._preprocess_products_with_resampling()
+    # Check that the are definition values have been recalculated
+    assert prev_ad_p_size_x != area_def_resampled.pixel_size_x
+    assert prev_ad_p_size_y != area_def_resampled.pixel_size_y
+    assert prev_ad_p_upper_left[0] != area_def_resampled.pixel_upper_left[0]
+    assert prev_ad_p_upper_left[1] != area_def_resampled.pixel_upper_left[1]
+    assert prev_ad_p_offset_x != area_def_resampled.pixel_offset_x
+    assert prev_ad_p_offset_y != area_def_resampled.pixel_offset_y
+
+    # Clean up
+    finest_area_patcher.stop()
+    resample_patcher.stop()
