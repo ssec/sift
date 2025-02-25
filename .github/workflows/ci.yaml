@@ -72,10 +72,10 @@ jobs:
         # XXX: We don't currently have OpenGL installation on other platforms
         #os: ["windows-latest", "ubuntu-latest", "macos-latest"]
         os: ["ubuntu-latest"]
-        python-version: ["3.9", "3.11"]
+        python-version: ["3.9", "3.11", "3.12"]
         experimental: [false]
         include:
-          - python-version: "3.11"
+          - python-version: "3.12"
             os: "ubuntu-latest"
             experimental: true
 
