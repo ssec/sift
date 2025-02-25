@@ -28,6 +28,7 @@ dependencies:
   - donfig
   # 2.19.1 seems to cause library linking issues
   - eccodes>=2.20
+  - ecmwflibs
   - cfgrib
   - fsspec
   - h5netcdf
@@ -61,4 +62,3 @@ dependencies:
     - trollimage
     - pyspectral
     - pyorbital
-    - ecmwflibs
