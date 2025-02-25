@@ -134,7 +134,7 @@ class AreaDefinitionsManager:
     def area_group_by_group_name(cls, group_name):
         return cls._available_area_defs_group_by_group_name.get(group_name)
 
-    # returns area definition by its name and resolution --- for example if a group_name = MSG SEVERI FES and
+    # returns area definition by its name and resolution --- for example if a group_name = MSG SEVIRI FES and
     # resolution = 3km , a return value will be area definition for id = msg_seviri_fes_3km
     @classmethod
     def area_def_by_group_name_and_resolution(cls, group_name, resolution):
