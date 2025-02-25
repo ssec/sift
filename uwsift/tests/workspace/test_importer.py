@@ -203,7 +203,7 @@ def test_satpy_importer_resampling(tmpdir, monkeypatch, mocker):
         area_def_resampled = args[0]
         return scn  # just return back the original scene
 
-    # Setup patch for Scene.finest_are
+    # Setup patch for Scene.finest_area
     orig_finest_area = scn.finest_area
     finest_area_patcher = patch.object(Scene, "finest_area")
     mock_finest_area = finest_area_patcher.start()
