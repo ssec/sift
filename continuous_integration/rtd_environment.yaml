@@ -26,9 +26,6 @@ dependencies:
   - bottleneck
   - dask
   - donfig
-  # 2.19.1 seems to cause library linking issues
-  - eccodes>=2.20
-  - ecmwflibs
   - cfgrib
   - fsspec
   - h5netcdf
@@ -39,7 +36,6 @@ dependencies:
   - pooch
   - pyhdf
   - pyresample
-  - python-eccodes
   - python-geotiepoints
   - pyyaml
   - rasterio
@@ -69,3 +65,4 @@ dependencies:
     - sphinxcontrib-seqdiag
     - sphinxcontrib-blockdiag
     - psutil
+    - eccodes>=2.37 # 2.37.0 has ecmwflibs integrated
