@@ -3,7 +3,7 @@ channels:
   - conda-forge
 dependencies:
   # limiting python due to ecmwflibs
-  - python<=3.11
+  - python<=3.12
   - appdirs
   - defusedxml
   - Cython
