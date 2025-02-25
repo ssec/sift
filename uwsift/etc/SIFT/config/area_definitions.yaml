@@ -8,7 +8,7 @@ area_definitions:
         32km: mtg_fci_fdss_32km
     }
 
-  MSG SEVERI FES:
+  MSG SEVIRI FES:
     {
         3km: msg_seviri_fes_3km,
         1km: msg_seviri_fes_1km,
