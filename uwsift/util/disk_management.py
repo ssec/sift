@@ -3,7 +3,7 @@ import atexit
 from time import sleep
 from typing import Dict, List, Optional
 
-from psutil import NoSuchProcess, PermissionError, Process, process_iter
+from psutil import NoSuchProcess, Process, process_iter
 
 
 class DiskManagement:
