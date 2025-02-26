@@ -86,6 +86,12 @@ DEFAULT_STATES_SHAPE_FILE = os.path.join(
 )
 DEFAULT_TEXTURE_SHAPE = (4, 16)
 
+class CustomImage(Image):
+    """Custom image override to fix issue #404."""
+
+    def _init_texture(self, data, texture_format, **texture_kwargs):
+        return super()._init_texture(data, texture_format, internalformat="r32f")
+
 
 class Markers2(Markers):
     pass
@@ -952,7 +958,7 @@ class SceneGraphManager(QObject):
             image.determine_reference_points()
         elif IMAGE_DISPLAY_MODE == ImageDisplayMode.SIMPLE_GEOLOCATED:
             grid = self._calc_subdivision_grid(product_dataset.info)
-            image = Image(
+            image = CustomImage(
                 image_data,
                 name=str(product_dataset.uuid),
                 interpolation="nearest",
@@ -965,7 +971,7 @@ class SceneGraphManager(QObject):
                 translate=(product_dataset.info[Info.ORIGIN_X], product_dataset.info[Info.ORIGIN_Y], 0),
             )
         else:
-            image = Image(
+            image = CustomImage(
                 image_data,
                 name=str(product_dataset.uuid),
                 interpolation="nearest",
