@@ -362,7 +362,7 @@ class ExportImageHelper(QtCore.QObject):
                 # not gif but were given "Time Lapse", can only have one FPS
                 params["fps"] = 1.0 / params.pop("duration")[0]
             params.update(PYAV_ANIMATION_PARAMS)
-            params["fps"] = Fraction(params["fps"]).limit_denominator(65535)
+            params["fps"] = Fraction(float(params["fps"])).limit_denominator(65535)
         return params
 
     def _get_time_lapse_duration(self, images, is_loop):
