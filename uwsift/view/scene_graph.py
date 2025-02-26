@@ -91,7 +91,7 @@ class CustomImage(Image):
     """Custom image override to fix issue #404."""
 
     def _init_texture(self, data, texture_format, **texture_kwargs):
-        return super()._init_texture(data, texture_format, internalformat="r32f")
+        return super()._init_texture(data, texture_format, internalformat="r32f", **texture_kwargs)
 
 
 class Markers2(Markers):
