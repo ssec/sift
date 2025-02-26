@@ -86,6 +86,7 @@ DEFAULT_STATES_SHAPE_FILE = os.path.join(
 )
 DEFAULT_TEXTURE_SHAPE = (4, 16)
 
+
 class CustomImage(Image):
     """Custom image override to fix issue #404."""
 
