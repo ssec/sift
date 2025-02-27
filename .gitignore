@@ -1,6 +1,7 @@
 # PyCharm project settings
 .idea
 
+
 # Ignore IDE settings and configuration files
 .vscode/
 
@@ -118,3 +119,6 @@ CMakeCache.txt
 cmake_install.cmake
 CMakeFiles/
 Makefile
+
+# Windows soft links
+/*.lnk

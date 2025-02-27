@@ -142,6 +142,21 @@ class Ui_openFileWizard(object):
         self.projectionComboBox.setSizeIncrement(QtCore.QSize(1, 0))
         self.projectionComboBox.setObjectName("projectionComboBox")
         self.productSelectionButtonLayout.addWidget(self.projectionComboBox)
+        self.resolutionLabel = QtWidgets.QLabel(self.productSelectionPage)
+        self.resolutionLabel.setObjectName("resolutionLabel")
+        self.productSelectionButtonLayout.addWidget(self.resolutionLabel)
+        self.resolutionComboBox = QtWidgets.QComboBox(self.productSelectionPage)
+        sizePolicy1 = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy1.setHorizontalStretch(1)
+        sizePolicy1.setVerticalStretch(0)
+        sizePolicy1.setHeightForWidth(self.resolutionComboBox.sizePolicy().hasHeightForWidth())
+        self.resolutionComboBox.setSizePolicy(sizePolicy1)
+        self.resolutionComboBox.setSizeIncrement(QtCore.QSize(1, 0))
+        self.resolutionComboBox.setObjectName("resolutionComboBox")
+        self.productSelectionButtonLayout.addWidget(self.resolutionComboBox)
+
+        #
+
         self.resamplingShapeLabel = QtWidgets.QLabel(self.productSelectionPage)
         self.resamplingShapeLabel.setObjectName("resamplingShapeLabel")
         self.productSelectionButtonLayout.addWidget(self.resamplingShapeLabel)
@@ -207,6 +222,7 @@ class Ui_openFileWizard(object):
         self.radiusOfInfluenceLabel.setText(_translate("openFileWizard", "Radius of Influence:"))
         self.radiusOfInfluenceSpinBox.setSuffix(_translate("openFileWizard", " m"))
         self.projectionLabel.setText(_translate("openFileWizard", "Projection:"))
+        self.resolutionLabel.setText(_translate("openFileWizard", "Resolution:"))
         self.resamplingShapeLabel.setText(_translate("openFileWizard", "Shape:"))
         self.selectIDTable.setSortingEnabled(True)
 
