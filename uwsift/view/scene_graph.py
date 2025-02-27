@@ -88,10 +88,12 @@ DEFAULT_TEXTURE_SHAPE = (4, 16)
 
 
 class CustomImage(Image):
-    """Custom image override to fix issue #404."""
+    """Custom Image class to override the texture init.
 
-    """The override of this class was made to prevent the texture's "internalFormat" from being set to None in the
-     _init_texture method. Instead, "internalFormat" is explicitly set to r32f"""
+    This class was made to prevent the texture's "internalFormat" from being set to None in the
+    parent _init_texture method. Instead, "internalFormat" is explicitly set to r32f in the overridden method. 
+    This fixes issue #404.
+    """
 
     def _init_texture(self, data, texture_format, **texture_kwargs):
         return super()._init_texture(data, texture_format, internalformat="r32f", **texture_kwargs)
