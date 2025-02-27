@@ -91,7 +91,7 @@ class CustomImage(Image):
     """Custom Image class to override the texture init.
 
     This class was made to prevent the texture's "internalFormat" from being set to None in the
-    parent _init_texture method. Instead, "internalFormat" is explicitly set to r32f in the overridden method. 
+    parent _init_texture method. Instead, "internalFormat" is explicitly set to r32f in the overridden method.
     This fixes issue #404.
     """
 
