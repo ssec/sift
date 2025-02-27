@@ -1,8 +1,9 @@
 # PyCharm project settings
 .idea
 
-# VSCode project settings
-.vscode
+
+# Ignore IDE settings and configuration files
+.vscode/
 
 # OSX DS files
 .DS_Store
