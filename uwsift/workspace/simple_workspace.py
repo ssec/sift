@@ -295,6 +295,10 @@ class SimpleWorkspace(BaseWorkspace):
         ac = self._overview_content_for_uuid(
             merge_target_uuid if merge_target_uuid else prod.uuid, kind=default_prod_kind
         )
+
+        # Issue #415: When done with the importer processing we should release the importer resources if applicable.
+        truck.release_resources()
+
         if ac is None:
             return None
         return ac.data

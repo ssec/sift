@@ -14,6 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with SIFT.  If not, see <http://www.gnu.org/licenses/>.
+import gc
 import logging
 import os
 from collections import OrderedDict
@@ -335,6 +336,17 @@ class OpenFileWizard(QtWidgets.QWizard):
     # PUBLIC CUSTOM INTERFACE
     # ==============================================================================================
 
+    def reset_state(self):
+        """Reset the state of this wizard."""
+        # Unload the satpy scenes properly:
+        for scene in self.scenes.values():
+            scene.unload()
+        self.scenes.clear()
+        gc.collect()
+
+        self.file_groups = {}
+        self.unknown_files = set()
+
     def collect_selected_ids(self):
         selected_ids = []
         prime_key = self.config["id_components"][0]
@@ -560,9 +572,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         """Group provided files by some keys, especially time step."""
 
         # reset state
-        self.scenes = {}
-        self.file_groups = {}
-        self.unknown_files = set()
+        self.reset_state()
 
         # get filenames from table's 'Filename' column
         # TODO: in future, use a data model for the table and get filenames from there

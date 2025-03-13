@@ -346,6 +346,11 @@ class Main(QtWidgets.QMainWindow):
         """
         self.didFinishLoading.emit(uuid_list)
 
+        if self._wizard_dialog is not None:
+            # Issue #415: reset the state of the wizard here to release
+            # the satpy scenes:
+            self._wizard_dialog.reset_state()
+
         if not uuid_list:
             raise ValueError("no UUIDs provided by background open" " in _bgnd_open_paths_finish")
         if not isok:
@@ -1143,6 +1148,10 @@ class Main(QtWidgets.QMainWindow):
             self.open_paths(self._wizard_dialog.files_to_load, **importer_kwargs)
         else:
             LOG.debug("Wizard closed, nothing to load")
+            # Issue #415: We still need to reset the state of the wizard here
+            # as a satpy scene might have been loaded already even if the user cancels
+            # the opening process.
+            self._wizard_dialog.reset_state()
 
     def _reload_config(self):
         config.refresh()
