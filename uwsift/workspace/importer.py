@@ -412,6 +412,7 @@ class aImporter(ABC):
         # FUTURE: this should be async def coroutine
         pass
 
+    @abstractmethod
     def release_resources(self):
         """Release the resources associated to this importer."""
 
