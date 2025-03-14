@@ -167,9 +167,9 @@ class Ui_LayerDetailsPane(object):
         self.climitsCurrentTime = QtWidgets.QPushButton(self.page_IMAGE)
         self.climitsCurrentTime.setObjectName("climitsCurrentTime")
         self.currentTimeLayout.addWidget(self.climitsCurrentTime)
-        self.invertCurrentTime = QtWidgets.QPushButton(self.page_IMAGE)
-        self.invertCurrentTime.setObjectName("invertCurrentTime")
-        self.currentTimeLayout.addWidget(self.invertCurrentTime)
+        self.climitsCurrentTimeInvert = QtWidgets.QPushButton(self.page_IMAGE)
+        self.climitsCurrentTimeInvert.setObjectName("climitsCurrentTimeInvert")
+        self.currentTimeLayout.addWidget(self.climitsCurrentTimeInvert)
         self.horizontalLayout.addLayout(self.currentTimeLayout)
         self.allTimesLayout = QtWidgets.QVBoxLayout()
         self.climitsAllTimes = QtWidgets.QPushButton(self.page_IMAGE)
@@ -180,10 +180,16 @@ class Ui_LayerDetailsPane(object):
         self.climitsAllTimes.setSizePolicy(sizePolicy)
         self.climitsAllTimes.setObjectName("climitsAllTimes")
         self.allTimesLayout.addWidget(self.climitsAllTimes)
-        self.invertAllTimes = QtWidgets.QPushButton(self.page_IMAGE)
-        self.invertAllTimes.setObjectName("invertAllTimes")
-        self.allTimesLayout.addWidget(self.invertAllTimes)
+        self.climitsAllTimesInvert = QtWidgets.QPushButton(self.page_IMAGE)
+        self.climitsAllTimesInvert.setObjectName("climitsAllTimesInvert")
+        self.allTimesLayout.addWidget(self.climitsAllTimesInvert)
         self.horizontalLayout.addLayout(self.allTimesLayout)
+        self.buttonGroup = QtWidgets.QButtonGroup(LayerDetailsPane)
+        self.buttonGroup.addButton(self.climitsCurrentTime)
+        self.buttonGroup.addButton(self.climitsCurrentTimeInvert)
+        self.buttonGroup.addButton(self.climitsAllTimes)
+        self.buttonGroup.addButton(self.climitsAllTimesInvert)
+        self.buttonGroup.setExclusive(True)
         self.formLayout_2.setLayout(7, QtWidgets.QFormLayout.SpanningRole, self.horizontalLayout)
         self.verticalLayout_2.addLayout(self.formLayout_2)
         self.kindDetailsStackedWidget.addWidget(self.page_IMAGE)
@@ -221,9 +227,24 @@ class Ui_LayerDetailsPane(object):
         self.colormap_reset_button.setText(_translate("LayerDetailsPane", "Reset"))
         self.fitDataLabel.setText(_translate("LayerDetailsPane", "Fit to data:"))
         self.climitsCurrentTime.setText(_translate("LayerDetailsPane", "Current Time"))
-        self.invertCurrentTime.setText(_translate("LayerDetailsPane", "Invert Current Time"))
+        self.climitsCurrentTimeInvert.setText(_translate("LayerDetailsPane", "Current Time Invert"))
         self.climitsAllTimes.setText(_translate("LayerDetailsPane", "All Times"))
-        self.invertAllTimes.setText(_translate("LayerDetailsPane", "Invert All Times"))
+        self.climitsAllTimesInvert.setText(_translate("LayerDetailsPane", "All Times Invert"))
+
+        self.setUniformButtonSize()
+
+    def setUniformButtonSize(self):
+        max_width = max(button.sizeHint().width() for button in self.buttonGroup.buttons())
+        max_height = max(button.sizeHint().height() for button in self.buttonGroup.buttons())
+
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+
+        for button in self.buttonGroup.buttons():
+            button.setMinimumWidth(max_width)
+            button.setMinimumHeight(max_height)
+            button.setSizePolicy(sizePolicy)
 
 
 from uwsift.ui.custom_widgets import QNoScrollDoubleSpinBox, QNoScrollWebView
