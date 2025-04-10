@@ -313,10 +313,12 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         spin_box.blockSignals(True)
         spin_box.setValue(display_val)
         spin_box.blockSignals(False)
+        # print(f"~~~~~~~~~~>{display_val}")
         return self._set_new_clims(value, is_max)
 
     def _spin_box_changed(self, is_max=True):
         slider = self._details_pane_ui.vmax_slider if is_max else self._details_pane_ui.vmin_slider
+        ##slider2 = self._details_pane_ui.vmin_slider if is_max else self._details_pane_ui.vmax_slider
         spin_box = self._details_pane_ui.vmax_spinbox if is_max else self._details_pane_ui.vmin_spinbox
         dis_val = spin_box.value()
         val = self._current_selected_layer.info[Info.UNIT_CONVERSION][1](dis_val, inverse=True)
@@ -324,9 +326,27 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
             "spin box %s %s => %f => %f" % (self._current_selected_layer.uuid, "max" if is_max else "min", dis_val, val)
         )
         sv = self._create_slider_value(val)
+        ##current_slider_max = slider.maximum()
+        ##current_slider_min = slider.minimum()
+        # block the slider signals
         slider.blockSignals(True)
+        ##slider2.blockSignals(True)
+
+        # change minimum and maximum of sliders if needed
+        ##if current_slider_max < sv:
+        ##    slider.setMaximum(sv)
+        ##    slider2.setMaximum(sv)
+        ##if current_slider_min > sv:
+        ##    slider.setMinimum(sv)
+        ##    slider2.setMinimum(sv)
+
+        # set value to the slider
         slider.setValue(sv)
+
+        # unblock the slider signals
         slider.blockSignals(False)
+        ##slider2.blockSignals(False)
+
         return self._set_new_clims(val, is_max)
 
     def _update_displayed_info(self):
@@ -435,6 +455,9 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         conv = self._current_selected_layer.info[Info.UNIT_CONVERSION]
         self._details_pane_ui.vmin_spinbox.setRange(conv[1](self._valid_min), conv[1](self._valid_max))
         self._details_pane_ui.vmin_spinbox.setValue(conv[1](current_vmin))
+        # self._details_pane_ui.vmin_spinbox.setValue(
+        #    conv[1](self._valid_min) if conv[1](self._valid_min) > conv[1](current_vmin) else conv[1](current_vmin)
+        # )
 
     def _update_vmax(self):
         current_vmax = self._current_selected_layer.presentation.climits[1]
@@ -446,3 +469,10 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         conv = self._current_selected_layer.info[Info.UNIT_CONVERSION]
         self._details_pane_ui.vmax_spinbox.setRange(conv[1](self._valid_min), conv[1](self._valid_max))
         self._details_pane_ui.vmax_spinbox.setValue(conv[1](current_vmax))
+        # print(
+        #    f"==========> setValue: {conv[1](self._valid_max) if conv[1](self._valid_max) < conv[1](current_vmax)
+        # else conv[1](current_vmax)}"
+        # )
+        # self._details_pane_ui.vmax_spinbox.setValue(
+        #    conv[1](self._valid_max) if conv[1](self._valid_max) < conv[1](current_vmax) else conv[1](current_vmax)
+        # )
