@@ -108,8 +108,8 @@ def _load_satpy_readers_cache(force_refresh=None):
     try:
         if force_refresh:
             raise RuntimeError("Forcing refresh of available Satpy readers list")
-        if not satpy_version:
-            raise RuntimeError("Satpy version cannot be determined, regenerating available readers...")
+        # if not satpy_version:
+        #    raise RuntimeError("Satpy version cannot be determined, regenerating available readers...")
         with open(SATPY_READER_CACHE_FILE, "r") as cfile:
             LOG.info("Loading cached available Satpy readers from {}".format(SATPY_READER_CACHE_FILE))
             cache_contents = yaml.load(cfile, yaml.SafeLoader)

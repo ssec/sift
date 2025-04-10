@@ -31,6 +31,7 @@ from glob import glob
 from types import FrameType
 from uuid import UUID
 
+import netCDF4
 from PyQt5 import QtCore, QtGui, QtWidgets
 from vispy import app
 
@@ -75,6 +76,8 @@ from uwsift.view.rgb_config import RGBLayerConfigPane
 from uwsift.view.scene_graph import SceneGraphManager
 from uwsift.workspace import CachingWorkspace, SimpleWorkspace
 from uwsift.workspace.collector import ResourceSearchPathCollector
+
+print(netCDF4.__file__)
 
 LOG = logging.getLogger(__name__)
 configure_loggers()
