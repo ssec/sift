@@ -798,7 +798,6 @@ class Metadatabase(object):
 
     def __init__(self, uri=None, **kwargs):
         self.session_nesting = defaultdict(int)
-        global _MDB
         if _MDB is not None:
             raise AssertionError("Metadatabase is a singleton and already exists")
         self._MDB = self
