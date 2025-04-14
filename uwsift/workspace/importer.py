@@ -11,6 +11,7 @@ REQUIRES
 :copyright: 2017 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
+import gc
 import logging
 import os
 from abc import ABC, abstractmethod
@@ -411,6 +412,10 @@ class aImporter(ABC):
         # FUTURE: this should be async def coroutine
         pass
 
+    @abstractmethod
+    def release_resources(self):
+        """Release the resources associated to this importer."""
+
 
 def determine_dynamic_dataset_kind(attrs: dict, reader_name: str) -> str:
     """Determine kind of dataset dynamically based on dataset attributes.
@@ -499,6 +504,18 @@ class SatpyImporter(aImporter):
     def is_relevant(cls, source_path=None, source_uri=None):
         # this importer should only be used if specifically requested
         return False
+
+    def release_resources(self):
+        """Release the satpy scene associated to this importer."""
+        if self.scn_original is not None:
+            self.scn_original.unload()
+            self.scn_original = None
+
+        if self.scn is not None:
+            self.scn.unload()
+            self.scn = None
+
+        gc.collect()
 
     def merge_resources(self):
         if len(self._resources) == len(self.filenames):

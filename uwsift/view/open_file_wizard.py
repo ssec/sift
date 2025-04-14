@@ -14,6 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with SIFT.  If not, see <http://www.gnu.org/licenses/>.
+import gc
 import logging
 import os
 from collections import OrderedDict
@@ -72,6 +73,28 @@ RESAMPLING_METHODS = {
     "bucket_count": ("Bucket Count", "AreaDefinition"),
     "bucket_fraction": ("Bucket Fraction", "AreaDefinition"),
 }
+
+
+class NumericTableWidgetItem(QtWidgets.QTableWidgetItem):
+    """Custom QTableWidgetItem class to override the __lt__ method
+
+    This class is designed for table cells in the Open File Wizard window that need to be
+    treated as numerical values during sorting. By default, the QTableWidgetItem class compares
+    values as strings, so the __lt__ method is overridden to ensure correct numerical comparison.
+    The constructor accepts both a string value that is displayed in the table and a corresponding
+    numerical value. If the numerical value is None, it is treated as the maximum float value.
+    This fixes issue #392.
+    """
+
+    def __init__(self, text, value):
+        super().__init__(text)
+        self.value = value if value is not None else float("inf")
+
+    def __lt__(self, other):
+        try:
+            return self.value < other.value
+        except ValueError:
+            return QtWidgets.QTableWidgetItem.__lt__(self, other)
 
 
 class GroupingMode(Enum):
@@ -292,7 +315,12 @@ class OpenFileWizard(QtWidgets.QWizard):
                     continue
 
                 self.ui.selectIDTable.setRowCount(idx + 1)
-                item = QtWidgets.QTableWidgetItem(pretty_val)
+                if id_key == "wavelength":
+                    item = NumericTableWidgetItem(pretty_val, id_val[1] if id_val is not None else None)
+                elif id_key == "level" or id_key == "resolution":
+                    item = NumericTableWidgetItem(pretty_val, int(id_val) if id_val is not None else None)
+                else:
+                    item = QtWidgets.QTableWidgetItem(pretty_val)
                 item.setData(QtCore.Qt.UserRole, ds_id if col_idx == 0 else id_val)
                 item.setFlags((item.flags() ^ QtCore.Qt.ItemIsEditable) | QtCore.Qt.ItemIsUserCheckable)
                 if id_key == "name":
@@ -334,6 +362,17 @@ class OpenFileWizard(QtWidgets.QWizard):
     # ==============================================================================================
     # PUBLIC CUSTOM INTERFACE
     # ==============================================================================================
+
+    def reset_state(self):
+        """Reset the state of this wizard."""
+        # Unload the satpy scenes properly:
+        for scene in self.scenes.values():
+            scene.unload()
+        self.scenes.clear()
+        gc.collect()
+
+        self.file_groups = {}
+        self.unknown_files = set()
 
     def collect_selected_ids(self):
         selected_ids = []
@@ -494,9 +533,11 @@ class OpenFileWizard(QtWidgets.QWizard):
                 table.setItem(table.rowCount() - 1, 1, QtWidgets.QTableWidgetItem(file))
                 p = fnparser.parse(filter_pattern, file)
                 for col in range(2, len(column_names)):
-                    table.setItem(
-                        table.rowCount() - 1, col, QtWidgets.QTableWidgetItem(str(p.get(column_names[col], "")))
-                    )
+                    value = p.get(column_names[col], "")
+                    if isinstance(value, (int, float)):
+                        table.setItem(table.rowCount() - 1, col, NumericTableWidgetItem(str(value), value))
+                    else:
+                        table.setItem(table.rowCount() - 1, col, QtWidgets.QTableWidgetItem(str(value)))
         except Exception:  # FIXME: Don't catch generic Exception
             # As the error thrown by trollsift's validate function in case of an
             # unparsable pattern has no class, a general 'Exception' is caught although
@@ -560,9 +601,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         """Group provided files by some keys, especially time step."""
 
         # reset state
-        self.scenes = {}
-        self.file_groups = {}
-        self.unknown_files = set()
+        self.reset_state()
 
         # get filenames from table's 'Filename' column
         # TODO: in future, use a data model for the table and get filenames from there
