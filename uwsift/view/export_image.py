@@ -257,7 +257,11 @@ class ExportImageHelper(QtCore.QObject):
 
         cmap = mpl.colors.ListedColormap(colors)
         vmin, vmax = self.model.get_dataset_presentation_by_uuid(u).climits
-        norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+        # Issue #333: need to take into consideration that the vmin/vmax order might be
+        # inverted here:
+        mini = min(vmin, vmax)
+        maxi = max(vmin, vmax)
+        norm = mpl.colors.Normalize(vmin=mini, vmax=maxi)
         cbar = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation=mode)
 
         ticks = [
@@ -266,7 +270,7 @@ class ExportImageHelper(QtCore.QObject):
                     self.model.get_dataset_by_uuid(u).info.get(Info.UNIT_CONVERSION)[1](t)
                 )
             )
-            for t in np.linspace(vmin, vmax, NUM_TICKS)
+            for t in np.linspace(mini, maxi, NUM_TICKS)
         ]
         cbar.set_ticks(np.linspace(vmin, vmax, NUM_TICKS))
         cbar.set_ticklabels(ticks)
