@@ -222,8 +222,7 @@ setup(
         "trollsift",
         "vispy>=0.10.0",
         'pygrib;sys_platform=="linux" or sys_platform=="darwin"',
-        "ecmwflibs",
-        "eccodes",
+        "eccodes>=2.37",  # has ecmwflibs included
         "cfgrib",
     ],
     tests_requires=["pytest", "pytest-qt", "pytest-mock"],
