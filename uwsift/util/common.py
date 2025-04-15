@@ -356,6 +356,8 @@ def range_hull_no_fail(range_1: Optional[tuple], range_2: Optional[tuple], fallb
         lower = min(range_1[0], range_2[0])  # type: ignore
         upper = max(range_1[1], range_2[1])  # type: ignore
     except TypeError:
-        return fallback
+        # In case the fallback is used we also need apply the semantics from above and assure that lower < upper.
+        lower = min(fallback[0], fallback[1])
+        upper = max(fallback[0], fallback[1])
 
     return lower, upper
