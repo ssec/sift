@@ -3,7 +3,7 @@ from decimal import Decimal
 import numpy as np
 import pytest
 
-from uwsift.util.common import format_resolution
+from uwsift.util.common import format_resolution, range_hull_no_fail
 
 
 @pytest.mark.parametrize(
@@ -23,3 +23,15 @@ from uwsift.util.common import format_resolution
 )
 def test_format_resolution(resolution, expected):
     assert format_resolution(resolution) == expected
+
+
+@pytest.mark.parametrize(
+    "range_1, range_2, fallback, expected",
+    [
+        ((1, 2), (3, 4), (), (1, 4)),  # simple case, hull from 1 to 4
+        ((5, 6), None, (5, 6), (5, 6)),  # test if the fallback is being used
+        ((8, 7), None, (8, 7), (7, 8)),  # test if the fallback is being used and the values are sorted ascending
+    ],
+)
+def test_range_hull_no_fail(range_1, range_2, fallback, expected):
+    assert range_hull_no_fail(range_1, range_2, fallback) == expected
