@@ -346,6 +346,12 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         slider.blockSignals(False)
         slider2.blockSignals(False)
 
+        # Workaround for the strange behavior in the spinbox, where the value
+        # increases or decreases twice with a single arrow click when the maximum
+        # or minimum of the range is changed
+        spin_box.setEnabled(False)
+        spin_box.setEnabled(True)
+
         return self._set_new_clims(val, is_max)
 
     def _update_displayed_info(self):
