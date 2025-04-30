@@ -522,7 +522,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         self._details_pane_ui.vmin_spinbox.setValue(
             conv[1](self._valid_min) if conv[1](self._valid_min) > conv[1](current_vmin) else conv[1](current_vmin)
         )
-        self._update_spin_box(self._details_pane_ui.vmin_spinbox, current_vmin)
+        # self._update_spin_box(self._details_pane_ui.vmin_spinbox, current_vmin)
 
     def _update_vmax(self):
         current_vmax = self._current_selected_layer.presentation.climits[1]
@@ -537,4 +537,4 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         self._details_pane_ui.vmax_spinbox.setValue(
             conv[1](self._valid_max) if conv[1](self._valid_max) < conv[1](current_vmax) else conv[1](current_vmax)
         )
-        self._update_spin_box(self._details_pane_ui.vmax_spinbox, current_vmax)
+        # self._update_spin_box(self._details_pane_ui.vmax_spinbox, current_vmax)
