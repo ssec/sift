@@ -107,6 +107,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         self._details_pane_ui.climitsCurrentTimeInvert.clicked.connect(self._invert_fit_clims_to_current_times)
 
         self._details_pane_ui.colormap_reset_button.clicked.connect(self._reset_to_initial_state)
+        self._details_pane_ui.colormap_reassign_button.clicked.connect(self._reassign_color_limits)
 
     # Slot functions
 
@@ -353,6 +354,37 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         self._update_vmin()
         self._update_vmax()
         self._update_gamma()
+
+    def _reassign_color_limits(self):
+        spin_box_max = self._details_pane_ui.vmax_spinbox
+        spin_box_min = self._details_pane_ui.vmin_spinbox
+        val_max = spin_box_max.value()
+        val_min = spin_box_min.value()
+
+        val_max = self._current_selected_layer.info[Info.UNIT_CONVERSION][1](val_max, inverse=True)
+        val_min = self._current_selected_layer.info[Info.UNIT_CONVERSION][1](val_min, inverse=True)
+        val_max = self._create_slider_value(val_max)
+        val_min = self._create_slider_value(val_min)
+
+        slider_max = self._details_pane_ui.vmax_slider
+        slider_min = self._details_pane_ui.vmin_slider
+
+        slider_max.blockSignals(True)
+        slider_min.blockSignals(True)
+
+        slider_max.setMaximum(val_max)
+        slider_min.setMaximum(val_max)
+
+        slider_max.setMinimum(val_min)
+        slider_min.setMinimum(val_min)
+
+        # set value to the slider
+        slider_max.setValue(val_max)
+        slider_min.setValue(val_min)
+
+        # unblock the slider signals
+        slider_max.blockSignals(False)
+        slider_min.blockSignals(False)
 
     def _set_new_clims(self, val, is_max):
         if is_max:

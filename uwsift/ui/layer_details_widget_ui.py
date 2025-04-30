@@ -154,9 +154,20 @@ class Ui_LayerDetailsPane(object):
         self.gammaSpinBox.setProperty("value", 1.0)
         self.gammaSpinBox.setObjectName("gammaSpinBox")
         self.formLayout_2.setWidget(4, QtWidgets.QFormLayout.FieldRole, self.gammaSpinBox)
+        # colormap buttons
+        self.colormap_reassign_button = QtWidgets.QPushButton(self.page_IMAGE)
+        self.colormap_reassign_button.setObjectName("colormap_reassign_button")
+        #
         self.colormap_reset_button = QtWidgets.QPushButton(self.page_IMAGE)
         self.colormap_reset_button.setObjectName("colormap_reset_button")
-        self.formLayout_2.setWidget(5, QtWidgets.QFormLayout.FieldRole, self.colormap_reset_button)
+        #
+        self.colormap_button_layout = QtWidgets.QHBoxLayout()
+        self.colormap_button_layout.addWidget(self.colormap_reassign_button)
+        self.colormap_button_layout.addWidget(self.colormap_reset_button)
+        self.colormap_button_container = QtWidgets.QWidget(self.page_IMAGE)
+        self.colormap_button_container.setLayout(self.colormap_button_layout)
+        self.formLayout_2.setWidget(5, QtWidgets.QFormLayout.SpanningRole, self.colormap_button_container)
+        #
         self.line = QtWidgets.QFrame(self.page_IMAGE)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -229,6 +240,7 @@ class Ui_LayerDetailsPane(object):
         self.vmax_slider.setToolTip(_translate("LayerDetailsPane", "maximum color limit"))
         # self.vmax_spinbox.
         self.gammaLabel.setText(_translate("LayerDetailsPane", "Gamma: "))
+        self.colormap_reassign_button.setText(_translate("LayerDetailsPane", "Reassign"))
         self.colormap_reset_button.setText(_translate("LayerDetailsPane", "Reset"))
         self.fit_data_group_box.setTitle(_translate("LayerDetailsPane", "Fit to data:"))
         self.climitsCurrentTime.setText(_translate("LayerDetailsPane", "Current Time"))
