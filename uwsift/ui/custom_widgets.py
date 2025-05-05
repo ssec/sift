@@ -1,6 +1,7 @@
-from PyQt5.QtCore import QEvent, Qt, pyqtSignal
+from PyQt5.QtCore import QEvent, QObject, Qt, pyqtSignal
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWidgets import (
+    QApplication,
     QComboBox,
     QDoubleSpinBox,
     QListWidget,
@@ -117,18 +118,70 @@ class InitiallyIncompleteWizardPage(QWizardPage):
 
 
 class QAdaptiveDoubleSpinBox(QDoubleSpinBox):
-    """QDoubleSpinBox that notifies the clicking of the inc/dec buttons"""
+    """QDoubleSpinBox that increments/decrements on the last two digits (with modifyed)"""
 
     upArrowClicked = pyqtSignal()
     downArrowClicked = pyqtSignal()
 
     def __init__(self, *args, **kwargs):
         super(QAdaptiveDoubleSpinBox, self).__init__(*args, **kwargs)
+        self._decimal_places = self.decimals()
+        # Install event filter to detect modifier keys. It needs to be on application level as the focus can be anywhere
+        # before clicking on the inc/dec butons with a modifier.
+        QApplication.instance().installEventFilter(self)
+        # Flag to track if Shift is pressed
+        self._shift_pressed = False
+        self.setToolTip("Hold Ctrl and/or Shift for larger increment/decrement")
+
+    def eventFilter(self, obj, event):
+        """Filter events to detect modifier keys"""
+        if event.type() == QEvent.KeyPress:
+            if event.key() == Qt.Key_Shift:
+                self._shift_pressed = True
+        elif event.type() == QEvent.KeyRelease:
+            if event.key() == Qt.Key_Shift:
+                self._shift_pressed = False
+        return super().eventFilter(obj, event)
+
+    def textFromValue(self, value):
+        """Override to set the effective amount of decimals the user intends to have"""
+        tfv = super().textFromValue(value)
+        if "." in tfv:  # Do we have decimals at all?
+            parts = tfv.split(".")
+            if self._decimal_places > 0:  # Do we actually have effective decimals?
+                tfv = f"{parts[0]}.{parts[1][: self._decimal_places]}"
+            else:
+                tfv = parts[0]
+        return tfv
+
+    def valueFromText(self, text):
+        """Override to evaluate the effective amount of decimals the user intends to have"""
+        vft = super().valueFromText(text)
+        self._eval_num_decimals_displayed()
+        return vft
 
     def stepBy(self, steps):
-        """Override stepBy by adding notification about the button cklick"""
-        super().stepBy(steps)
+        """Override stepBy to provide custom increment/decrement behavior and notification about the button cklick"""
+        if self._shift_pressed:
+            # If shift is pressed, 'boost' by 100.
+            steps *= 100
+        if self._decimal_places:
+            # If we have decimals we need to take care that the inc/dec is on the last one
+            step_size = 10**-self._decimal_places
+            new_value = round(self.value() + (step_size * steps), self._decimal_places)
+        else:
+            new_value = round(self.value() + steps)
+
+        self.setValue(new_value)
+
         if steps > 0:
             self.upArrowClicked.emit()
         elif steps < 0:
             self.downArrowClicked.emit()
+
+    def _eval_num_decimals_displayed(self):
+        """Get the amount of decimals the user has entered"""
+        current_value_as_str = self.lineEdit().text()
+        # Count decimal places to determine step size
+        decimal_str = current_value_as_str.split(".")[-1]
+        self._decimal_places = len(decimal_str)
