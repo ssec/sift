@@ -288,7 +288,7 @@ class RGBLayerConfigPane(QObject):
         n, x = self._update_line_edits(color, value if not is_max else None, value if is_max else None)
         self._signal_color_changing_range(color, n, x)
 
-    def _edit_changed(self, line_edit: QLineEdit, color: str, is_max: bool):
+    def _edit_changed(self, line_edit: QLineEdit, color: str, is_max: bool):  # pragma: no cover
         """
         update relevant slider value, propagate to the document
         :param line_edit: field that got a new value

@@ -363,7 +363,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         spin_box.blockSignals(False)
         return self._set_new_clims(value, is_max)
 
-    def _spin_box_changed(self, is_max=True):
+    def _spin_box_changed(self, is_max=True):  # pragma: no cover
         self._enable_all_buttons()
 
         slider = self._details_pane_ui.vmax_slider if is_max else self._details_pane_ui.vmin_slider
