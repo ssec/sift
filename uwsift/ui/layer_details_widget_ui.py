@@ -109,6 +109,7 @@ class Ui_LayerDetailsPane(object):
         self.formLayout_2.setWidget(2, QtWidgets.QFormLayout.LabelRole, self.vmin_slider)
         self.vmin_spinbox = QAdaptiveDoubleSpinBox(self.page_IMAGE)
         self.vmin_spinbox.setRange(-32767, 32767)
+        self.vmin_spinbox.setDecimals(10)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -128,6 +129,7 @@ class Ui_LayerDetailsPane(object):
         self.formLayout_2.setWidget(3, QtWidgets.QFormLayout.LabelRole, self.vmax_slider)
         self.vmax_spinbox = QAdaptiveDoubleSpinBox(self.page_IMAGE)
         self.vmax_spinbox.setRange(-32767, 32767)
+        self.vmax_spinbox.setDecimals(10)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -225,6 +227,7 @@ class Ui_LayerDetailsPane(object):
         self.layerAreaResolutionValue.setText(_translate("LayerDetailsPane", "N/A"))
         self.vmin_slider.setToolTip(_translate("LayerDetailsPane", "minimum color limit"))
         self.vmax_slider.setToolTip(_translate("LayerDetailsPane", "maximum color limit"))
+        # self.vmax_spinbox.
         self.gammaLabel.setText(_translate("LayerDetailsPane", "Gamma: "))
         self.colormap_reset_button.setText(_translate("LayerDetailsPane", "Reset"))
         self.fit_data_group_box.setTitle(_translate("LayerDetailsPane", "Fit to data:"))
