@@ -12,6 +12,9 @@ import numpy.typing as npt
 from matplotlib import pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import QSignalBlocker, Qt
+from PyQt5.QtGui import QIntValidator
+from vispy import gloo
 
 from uwsift.common import Info
 from uwsift.model.layer_model import LayerModel
@@ -74,8 +77,97 @@ class ExportImageDialog(QtWidgets.QDialog):
         self.ui.frameRangeRadio.clicked.connect(self._change_frame_range)
         self._change_frame_range()  # set default
 
-        self.ui.customWidthEdit.setDisabled(True)
-        self.ui.customHeightEdit.setDisabled(True)
+        self.max_img_dim = gloo.gl.glGetParameter(gloo.gl.GL_MAX_TEXTURE_SIZE)
+        LOG.debug("Max texture size: %d", self.max_img_dim)
+
+        width_validator = QIntValidator(1, self.max_img_dim)
+        height_validator = QIntValidator(1, self.max_img_dim)
+        self.ui.customWidthEdit.setValidator(width_validator)
+        self.ui.customHeightEdit.setValidator(height_validator)
+
+        self.ui.customWidthEdit.setAlignment(Qt.AlignRight)
+        self.ui.customHeightEdit.setAlignment(Qt.AlignRight)
+
+        self.ui.customWidthEdit.textChanged.connect(self.width_changed)
+        self.ui.customHeightEdit.textChanged.connect(self.height_changed)
+
+        self.default_size = (800, 600)
+        self.optimal_size = (800, 600)
+
+        self.ui.resolutionDefaultRadio.clicked.connect(self._update_image_size)
+        self.ui.resolutionOptimalRadio.clicked.connect(self._update_image_size)
+        self.ui.resolutionCustomRadio.clicked.connect(self._update_image_size)
+        self._update_image_size()
+
+    def width_changed(self):
+        """Handle change of the image width value."""
+        # Calculate new height based on width while maintaining aspect ratio
+        try:
+            width = int(self.ui.customWidthEdit.text())
+            if width <= 0:
+                width = 1
+                self.ui.customWidthEdit.setText("1")
+            if width > self.max_img_dim:
+                width = self.max_img_dim
+                self.ui.customWidthEdit.setText(str(width))
+
+            aspect = self.default_size[0] / self.default_size[1]
+
+            # Calculate the corresponding height
+            height = int(round(width / aspect))
+
+            # Block signals to prevent recursive calls
+            with QSignalBlocker(self.ui.customHeightEdit):
+                self.ui.customHeightEdit.setText(str(height))
+        except ValueError:
+            self.ui.customWidthEdit.setText("1")
+
+    def height_changed(self):
+        """Handle change of the image height value."""
+        # Calculate new width based on height while maintaining aspect ratio
+        try:
+            height = int(self.ui.customHeightEdit.text())
+            if height <= 0:
+                height = 1
+                self.ui.customHeightEdit.setText("1")
+            if height > self.max_img_dim:
+                height = self.max_img_dim
+                self.ui.customHeightEdit.setText(str(height))
+
+            aspect = self.default_size[0] / self.default_size[1]
+
+            # Calculate the corresponding width
+            width = int(round(height * aspect))
+
+            # Block signals to prevent recursive calls
+            with QSignalBlocker(self.ui.customWidthEdit):
+                self.ui.customWidthEdit.setText(str(width))
+        except ValueError:
+            self.ui.customHeightEdit.setText("1")
+
+    def set_sizes(self, def_size, optimal_size):
+        """Set the current canvas size."""
+        self.default_size = def_size
+        self.optimal_size = optimal_size
+
+        self._update_image_size()
+
+    def _get_image_size(self):
+        return (int(self.ui.customWidthEdit.text()), int(self.ui.customHeightEdit.text()))
+
+    def _update_image_size(self):
+        fixed = True
+        if self.ui.resolutionDefaultRadio.isChecked():
+            self.ui.customWidthEdit.setText(str(self.default_size[0]))
+            self.ui.customHeightEdit.setText(str(self.default_size[1]))
+        elif self.ui.resolutionOptimalRadio.isChecked():
+            self.ui.customWidthEdit.setText(str(self.optimal_size[0]))
+            self.ui.customHeightEdit.setText(str(self.optimal_size[1]))
+        else:
+            fixed = False
+
+        self.ui.customWidthEdit.setDisabled(fixed)
+        self.ui.customHeightEdit.setDisabled(fixed)
 
     def set_total_frames(self, n):
         self.ui.frameRangeFrom.validator().setBottom(1)
@@ -177,7 +269,7 @@ class ExportImageDialog(QtWidgets.QDialog):
         elif self.ui.constantDelayRadio.isChecked():
             delay = self.ui.constantDelaySpin.value()
             fps = 1000 / delay
-        elif self.ui.fpsDelayRadio.isChecked():
+        else:
             fps = self.ui.fpsDelaySpin.value()
 
         # loop is actually an integer of number of times to loop (0 infinite)
@@ -190,6 +282,7 @@ class ExportImageDialog(QtWidgets.QDialog):
             "fps": fps,
             "font_size": self.ui.footerFontSizeSpinBox.value(),
             "colorbar": self._get_append_direction(),
+            "size": self._get_image_size(),
         }
         return info
 
@@ -221,6 +314,10 @@ class ExportImageHelper(QtCore.QObject):
             self._screenshot_dialog.accepted.connect(self._save_screenshot)
         frame_count = self.sgm.animation_controller.get_frame_count()
         self._screenshot_dialog.set_total_frames(max(frame_count, 1))
+
+        def_size = self.sgm.main_canvas.size
+        opt_size = self.sgm.compute_optimal_screenshot_size()
+        self._screenshot_dialog.set_sizes(def_size, opt_size)
         self._screenshot_dialog.show()
 
     def _add_screenshot_footer(self, im, banner_text, font_size=11):
@@ -425,7 +522,7 @@ class ExportImageHelper(QtCore.QObject):
             return
 
         # get canvas screenshot arrays (numpy arrays of canvas pixels)
-        img_arrays = self.sgm.get_screenshot_array(info["frame_range"])
+        img_arrays = self.sgm.get_screenshot_array(info["frame_range"], info["size"])
         if not img_arrays or len(uuids) != len(img_arrays):
             LOG.error(
                 f"Number of frames: {0 if not img_arrays else len(img_arrays)}"

@@ -337,6 +337,9 @@ class SceneGraphManager(QObject):
             max_ds_width = max(max_ds_width, shape[1])
             max_ds_height = max(max_ds_height, shape[1])
 
+        if max_ds_width == 0 or max_ds_height == 0:
+            return None
+
         # Get the scale ratio between the coord systems:
         rw = self.initial_rect.width / max_ds_width
         rh = self.initial_rect.height / max_ds_height
@@ -344,24 +347,27 @@ class SceneGraphManager(QObject):
 
         return sratio
 
-    def _compute_screenshot_size(self):
-        """Compute the target screenshot FBO size."""
+    def compute_optimal_screenshot_size(self):
+        """Compute the optimal screenshot FBO size."""
         sratio = self._get_optimal_pixel_ratio()
-
         cam = self.pz_camera
         cv_size = self.main_canvas.size
 
-        LOG.debug("Canvas size is: %s", cv_size)
+        if sratio is None:
+            # No optimal size can be computed.
+            return cv_size
+
+        # LOG.debug("Canvas size is: %s", cv_size)
 
         ptl = cam.transform.imap(np.array([0.0, 0.0]))
         ptr = cam.transform.imap(np.array([cv_size[0], 0.0]))
         pbl = cam.transform.imap(np.array([0.0, cv_size[1]]))
-        pbr = cam.transform.imap(np.array([cv_size[0], cv_size[1]]))
+        # pbr = cam.transform.imap(np.array([cv_size[0], cv_size[1]]))
         w = ptr[0] - ptl[0]
         h = ptl[1] - pbl[1]
 
-        LOG.debug("Image corner coords: tl=%s, tr=%s, bl=%s, br=%s", ptl[:2], ptr[:2], pbl[:2], pbr[:2])
-        LOG.debug("Computed local width: %s, height: %s", w, h)
+        # LOG.debug("Image corner coords: tl=%s, tr=%s, bl=%s, br=%s", ptl[:2], ptr[:2], pbl[:2], pbr[:2])
+        # LOG.debug("Computed local width: %s, height: %s", w, h)
 
         # sratio is the scale factor we need to go from dataset pixels
         # to camera local unit.
@@ -370,14 +376,14 @@ class SceneGraphManager(QObject):
         # So with the current canvas w,h we compute the number of pixels we are covering:
         pw, ph = w / sratio, h / sratio
 
-        LOG.debug("Computed pixel width: %s, height: %s", pw, ph)
+        # LOG.debug("Computed pixel width: %s, height: %s", pw, ph)
 
         # And this is what we use as fbo size:
         fbo_size = (int(pw), int(ph))
         return fbo_size
 
     def get_screenshot_array(
-        self, frame_range: None | tuple[int, int] = None
+        self, frame_range: None | tuple[int, int], img_size
     ) -> list[tuple[str | UUID, npt.NDArray[np.uint8]]]:
         """Get numpy arrays representing the current canvas.
 
@@ -404,14 +410,13 @@ class SceneGraphManager(QObject):
         else:
             s, e = frame_range
 
-        fbo_size = self._compute_screenshot_size()
-        fbo = gloo.FrameBuffer(color=gloo.RenderBuffer(fbo_size[::-1]), depth=gloo.RenderBuffer(fbo_size[::-1]))
+        fbo = gloo.FrameBuffer(color=gloo.RenderBuffer(img_size[::-1]), depth=gloo.RenderBuffer(img_size[::-1]))
 
         cv = self.main_canvas
 
         fbo.activate()
-        cv.context.set_viewport(0, 0, *fbo_size)
-        cv.transforms.configure(viewport=(0, 0, *fbo_size), fbo_size=fbo_size, fbo_rect=(0, 0, *cv.size))
+        cv.context.set_viewport(0, 0, *img_size)
+        cv.transforms.configure(viewport=(0, 0, *img_size), fbo_size=img_size, fbo_rect=(0, 0, *cv.size))
 
         images = []
         for i in range(s, e + 1):
