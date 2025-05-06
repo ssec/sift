@@ -236,8 +236,11 @@ class ExportImageHelper(QtCore.QObject):
         return new_im
 
     def _create_colorbar(self, mode, u, size):
+        # Size ratio factor:
+        sr = size[1] / 600
+
         mpl.rcParams["font.sans-serif"] = FONT
-        mpl.rcParams.update({"font.size": TICK_SIZE})
+        mpl.rcParams.update({"font.size": TICK_SIZE * sr})
 
         colormap = self.model.get_dataset_presentation_by_uuid(u).colormap
         colors = COLORMAP_MANAGER[colormap]
@@ -265,7 +268,8 @@ class ExportImageHelper(QtCore.QObject):
         cbar = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation=mode)
 
         ticks = [
-            str(
+            " "
+            + str(
                 self.model.get_dataset_by_uuid(u).info.get(Info.UNIT_CONVERSION)[2](
                     self.model.get_dataset_by_uuid(u).info.get(Info.UNIT_CONVERSION)[1](t)
                 )
@@ -274,6 +278,11 @@ class ExportImageHelper(QtCore.QObject):
         ]
         cbar.set_ticks(np.linspace(vmin, vmax, NUM_TICKS))
         cbar.set_ticklabels(ticks)
+
+        # Control tick size/thickness here
+        tick_width = 1.2 * sr
+        tick_length = 5.5 * sr
+        ax.tick_params(axis="y" if mode == "vertical" else "x", width=tick_width, length=tick_length)
 
         return fig
 
