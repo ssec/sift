@@ -74,6 +74,9 @@ class ExportImageDialog(QtWidgets.QDialog):
         self.ui.frameRangeRadio.clicked.connect(self._change_frame_range)
         self._change_frame_range()  # set default
 
+        self.ui.customWidthEdit.setDisabled(True)
+        self.ui.customHeightEdit.setDisabled(True)
+
     def set_total_frames(self, n):
         self.ui.frameRangeFrom.validator().setBottom(1)
         self.ui.frameRangeTo.validator().setBottom(2)
