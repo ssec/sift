@@ -29,7 +29,7 @@ import numpy as np
 from PyQt5.QtCore import QObject, Qt, pyqtSignal
 from PyQt5.QtGui import QCursor
 from pyresample import AreaDefinition
-from vispy import app, scene
+from vispy import app, gloo, scene
 from vispy.geometry import Rect
 from vispy.gloo.util import _screenshot
 from vispy.scene.visuals import Image, Line, Markers, Polygon
@@ -302,6 +302,7 @@ class SceneGraphManager(QObject):
         self.dataset_nodes: dict = {}  # {dataset_uuid: dataset_node}
         self.latlon_grid_node: Optional[Line] = None
         self.borders_nodes: list = []
+        self.initial_rect = None
 
         self.composite_element_dependencies: dict = {}  # {dataset_uuid:set-of-dependent-uuids}
         self.animation_controller = AnimationController()
@@ -323,6 +324,57 @@ class SceneGraphManager(QObject):
 
         self._setup_initial_canvas(center)
         self.pending_polygon = PendingPolygon(self.main_map)
+
+    def _get_optimal_pixel_ratio(self):
+        """Compute the optimal pixel to local coordinates scale ratio."""
+        max_ds_width = 0
+        max_ds_height = 0
+
+        for uuid in self.dataset_nodes.keys():
+            infos = self.workspace.get_info(uuid)
+            shape = infos[Info.SHAPE]
+            LOG.debug("Found dataset shape: %s", shape)
+            max_ds_width = max(max_ds_width, shape[1])
+            max_ds_height = max(max_ds_height, shape[1])
+
+        # Get the scale ratio between the coord systems:
+        rw = self.initial_rect.width / max_ds_width
+        rh = self.initial_rect.height / max_ds_height
+        sratio = min(rw, rh)
+
+        return sratio
+
+    def _compute_screenshot_size(self):
+        """Compute the target screenshot FBO size."""
+        sratio = self._get_optimal_pixel_ratio()
+
+        cam = self.pz_camera
+        cv_size = self.main_canvas.size
+
+        LOG.debug("Canvas size is: %s", cv_size)
+
+        ptl = cam.transform.imap(np.array([0.0, 0.0]))
+        ptr = cam.transform.imap(np.array([cv_size[0], 0.0]))
+        pbl = cam.transform.imap(np.array([0.0, cv_size[1]]))
+        pbr = cam.transform.imap(np.array([cv_size[0], cv_size[1]]))
+        w = ptr[0] - ptl[0]
+        h = ptl[1] - pbl[1]
+
+        LOG.debug("Image corner coords: tl=%s, tr=%s, bl=%s, br=%s", ptl[:2], ptr[:2], pbl[:2], pbr[:2])
+        LOG.debug("Computed local width: %s, height: %s", w, h)
+
+        # sratio is the scale factor we need to go from dataset pixels
+        # to camera local unit.
+        # so to go from camera local to pixel we apply 1/sratio.
+
+        # So with the current canvas w,h we compute the number of pixels we are covering:
+        pw, ph = w / sratio, h / sratio
+
+        LOG.debug("Computed pixel width: %s, height: %s", pw, ph)
+
+        # And this is what we use as fbo size:
+        fbo_size = (int(pw), int(ph))
+        return fbo_size
 
     def get_screenshot_array(
         self, frame_range: None | tuple[int, int] = None
@@ -352,17 +404,32 @@ class SceneGraphManager(QObject):
         else:
             s, e = frame_range
 
+        fbo_size = self._compute_screenshot_size()
+        fbo = gloo.FrameBuffer(color=gloo.RenderBuffer(fbo_size[::-1]), depth=gloo.RenderBuffer(fbo_size[::-1]))
+
+        cv = self.main_canvas
+
+        fbo.activate()
+        cv.context.set_viewport(0, 0, *fbo_size)
+        cv.transforms.configure(viewport=(0, 0, *fbo_size), fbo_size=fbo_size, fbo_rect=(0, 0, *cv.size))
+
         images = []
         for i in range(s, e + 1):
             self.animation_controller.jump(i)
             self._update()
-            self.main_canvas.on_draw(None)
+            cv.on_draw(None)
+            arr = fbo.read()
+
             u = self.animation_controller.get_current_frame_uuid()
-            images.append((u, _screenshot()))
+            images.append((u, arr))
+
+        fbo.deactivate()
+        cv.context.set_viewport(0, 0, *cv.size)
+        cv.transforms.configure(viewport=(0, 0, *cv.size), fbo_size=cv.size, fbo_rect=(0, 0, *cv.size))
 
         self.animation_controller.jump(current_frame)
         self._update()
-        self.main_canvas.on_draw(None)
+        cv.on_draw(None)
         return images
 
     def _setup_initial_canvas(self, center=None):
@@ -395,6 +462,9 @@ class SceneGraphManager(QObject):
 
         area_def = self.document.area_definition()
         self._set_projection(area_def)
+
+        # Store the initial camera rect:
+        self.initial_rect = self.pz_camera.rect
 
     def _create_test_image(self):
         proj4_str = os.getenv("SIFT_DEBUG_IMAGE_PROJ", None)
