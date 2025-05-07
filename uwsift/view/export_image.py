@@ -565,7 +565,7 @@ class ExportImageHelper(QtCore.QObject):
 
         self._write_images(filenames, params)
 
-    def _write_tif_file(self, filename, image_arrays, params):
+    def _write_tif_file(self, filename, image_arrays):
         """Write a single geotiff file."""
         # We expect only one image array in this case:
         assert len(image_arrays) == 1, f"Invalid number of geotiff image arrays: {len(image_arrays)}."
@@ -573,6 +573,11 @@ class ExportImageHelper(QtCore.QObject):
         width = arr.shape[1]
         height = arr.shape[0]
         nchan = arr.shape[2]
+
+        params = self.sgm.collect_projection_infos(width, height)
+        if params is None:
+            LOG.warning("Could not retrieve PROJ4 informations to write geotiff image.")
+
         # LOG.info("Image data type is: %s", arr.dtype)
         with rasterio.open(
             filename,
@@ -582,8 +587,9 @@ class ExportImageHelper(QtCore.QObject):
             width=width,
             count=nchan,
             dtype=arr.dtype,
-            # crs=crs,
-            # transform=transform,
+            crs=params["crs"] if params is not None else None,
+            transform=params["transform"] if params is not None else None,
+            compress="lzw",
         ) as dst:
             # Write each color channel:
             for i in range(nchan):
@@ -594,7 +600,7 @@ class ExportImageHelper(QtCore.QObject):
             images_arrays = _image_to_frame_array(file_images, filename)
             try:
                 if is_tif_filename(filename):
-                    self._write_tif_file(filename, images_arrays, params)
+                    self._write_tif_file(filename, images_arrays)
                 else:
                     imageio.imwrite(filename, images_arrays, **params)
             except IOError:

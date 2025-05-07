@@ -26,15 +26,18 @@ from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
 import numpy as np
+from pyproj import CRS
 from PyQt5.QtCore import QObject, Qt, pyqtSignal
 from PyQt5.QtGui import QCursor
 from pyresample import AreaDefinition
+from rasterio.transform import Affine
 from vispy import app, gloo, scene
 from vispy.geometry import Rect
 from vispy.gloo.util import _screenshot
 from vispy.scene.visuals import Image, Line, Markers, Polygon
 from vispy.util.keys import SHIFT
 from vispy.visuals.transforms import MatrixTransform, STTransform
+from vispy.visuals.transforms.chain import ChainTransform
 
 from uwsift import IMAGE_DISPLAY_MODE, config
 from uwsift.common import (
@@ -324,6 +327,74 @@ class SceneGraphManager(QObject):
 
         self._setup_initial_canvas(center)
         self.pending_polygon = PendingPolygon(self.main_map)
+
+    def _get_top_dataset_proj4_transform(self):
+        """Get the Proj4Transform from the top enabled dataset."""
+        for u, img in self.dataset_nodes.items():
+            xform = img.transform
+            if isinstance(xform, PROJ4Transform):
+                return xform, xform.proj4_str
+            if isinstance(xform, ChainTransform):
+                trs = xform.transforms
+                for tx in trs:
+                    if isinstance(tx, PROJ4Transform):
+                        return xform, tx.proj4_str
+
+        return None, None
+
+    def collect_projection_infos(self, width, height):
+        """Collect the current projection transform of the view."""
+        # Get the top visible image layer below:
+        img_xform, proj4_str = self._get_top_dataset_proj4_transform()
+        if img_xform is None:
+            # Cannot find projection infos.
+            return None
+
+        # Get coordinate system information
+        crs = CRS.from_proj4(proj4_str)
+
+        # Calculate the geotransform transforming the camera rect:
+        rect = self.main_view.camera.rect
+
+        # Create points for the four corners of the viewport in view space coordinates
+        tl = [rect.left, rect.top]
+        tr = [rect.right, rect.top]
+        bl = [rect.left, rect.bottom]
+        br = [rect.right, rect.bottom]
+        LOG.debug("View space: tl=%s, tr=%s, bl=%s, br=%s", tl, tr, bl, br)
+        # We need to transform these points from view space to scene space
+        # and then to the projection space
+
+        # First, get the transform from view to scene space
+        view_to_scene = self.main_view.get_transform("visual", "scene")
+
+        # Transform the corners to scene space
+        tl = view_to_scene.map(tl)[:2]
+        tr = view_to_scene.map(tr)[:2]
+        bl = view_to_scene.map(bl)[:2]
+        br = view_to_scene.map(br)[:2]
+        LOG.debug("Scene space: tl=%s, tr=%s, bl=%s, br=%s", tl, tr, bl, br)
+
+        # The PROJ4Transform applies in scene coordinates
+        tl = img_xform.map(tl)[:2]
+        tr = img_xform.map(tr)[:2]
+        bl = img_xform.map(bl)[:2]
+        br = img_xform.map(br)[:2]
+        LOG.debug("Proj space: tl=%s, tr=%s, bl=%s, br=%s", tl, tr, bl, br)
+
+        # Calculate the bounding box in projection coordinates
+        minx = min(tl[0], bl[0])
+        maxx = max(tr[0], br[0])
+        miny = min(bl[1], br[1])
+        maxy = max(tl[1], tr[1])
+        LOG.debug("Bounds: %s, %s, %s, %s", minx, miny, maxx, maxy)
+
+        x_res = (maxx - minx) / width
+        y_res = (maxy - miny) / height
+
+        # Create the affine transform for the GeoTIFF
+        transform = Affine.translation(minx, maxy) * Affine.scale(x_res, -y_res)
+        return {"crs": crs, "transform": transform, "bounds": (minx, miny, maxx, maxy)}
 
     def _get_optimal_pixel_ratio(self):
         """Compute the optimal pixel to local coordinates scale ratio."""
