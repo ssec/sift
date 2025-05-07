@@ -9,6 +9,7 @@ import imageio.v3 as imageio
 import matplotlib as mpl
 import numpy as np
 import numpy.typing as npt
+import rasterio
 from matplotlib import pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -37,6 +38,10 @@ PYAV_ANIMATION_PARAMS = {
 
 def is_gif_filename(fn):
     return os.path.splitext(fn)[-1] in [".gif"]
+
+
+def is_tif_filename(fn):
+    return os.path.splitext(fn)[-1] in [".tif"]
 
 
 def is_video_filename(fn):
@@ -196,7 +201,7 @@ class ExportImageDialog(QtWidgets.QDialog):
             self,
             caption=self.tr("Screenshot Filename"),
             directory=os.path.join(self._last_dir, self.default_filename),
-            filter=self.tr("Image Files (*.png *.jpg *.gif *.mp4 *.m4v)"),
+            filter=self.tr("Image Files (*.png *.tif *.jpg *.gif *.mp4 *.m4v)"),
             options=QtWidgets.QFileDialog.DontConfirmOverwrite,
         )[0]
         if fn:
@@ -208,7 +213,7 @@ class ExportImageDialog(QtWidgets.QDialog):
     def _validate_filename(self):
         t = self.ui.saveAsLineEdit.text()
         bt = self.ui.buttonBox.button(QtWidgets.QDialogButtonBox.Save)
-        if not t or os.path.splitext(t)[-1] not in [".png", ".jpg", ".gif", ".mp4", ".m4v"]:
+        if not t or os.path.splitext(t)[-1] not in [".png", ".tif", ".jpg", ".gif", ".mp4", ".m4v"]:
             bt.setDisabled(True)
         else:
             self._last_dir = os.path.dirname(t)
@@ -560,11 +565,38 @@ class ExportImageHelper(QtCore.QObject):
 
         self._write_images(filenames, params)
 
+    def _write_tif_file(self, filename, image_arrays, params):
+        """Write a single geotiff file."""
+        # We expect only one image array in this case:
+        assert len(image_arrays) == 1, f"Invalid number of geotiff image arrays: {len(image_arrays)}."
+        arr = image_arrays[0]
+        width = arr.shape[1]
+        height = arr.shape[0]
+        nchan = arr.shape[2]
+        # LOG.info("Image data type is: %s", arr.dtype)
+        with rasterio.open(
+            filename,
+            "w",
+            driver="GTiff",
+            height=height,
+            width=width,
+            count=nchan,
+            dtype=arr.dtype,
+            # crs=crs,
+            # transform=transform,
+        ) as dst:
+            # Write each color channel:
+            for i in range(nchan):
+                dst.write(arr[:, :, i], i + 1)
+
     def _write_images(self, filenames, params):
         for filename, file_images in filenames:
             images_arrays = _image_to_frame_array(file_images, filename)
             try:
-                imageio.imwrite(filename, images_arrays, **params)
+                if is_tif_filename(filename):
+                    self._write_tif_file(filename, images_arrays, params)
+                else:
+                    imageio.imwrite(filename, images_arrays, **params)
             except IOError:
                 msg = "Failed to write to file: {}".format(filename)
                 LOG.error(msg)
