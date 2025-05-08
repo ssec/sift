@@ -3,21 +3,21 @@
 """Test RGB configuration changes through the UI."""
 # from unittest import mock
 
-from PyQt5.QtWidgets import QMainWindow
+# from PyQt5.QtWidgets import QMainWindow
 
 # from uwsift.common import Info, Kind
 # from uwsift.model.composite_recipes import CompositeRecipe
 # from uwsift.model.layer_model import LayerModel
-from uwsift.ui.pov_main_ui import Ui_MainWindow
-from uwsift.view.rgb_config import RGBLayerConfigPane
+# from uwsift.ui.pov_main_ui import Ui_MainWindow
+# from uwsift.view.rgb_config import RGBLayerConfigPane
 
 
-class _PaneWrapper(QMainWindow):
-    def __init__(self, model):
-        super().__init__()
-        self.ui = Ui_MainWindow()
-        self.ui.setupUi(self)
-        self.pane = RGBLayerConfigPane(self.ui, None, model)
+# class _PaneWrapper(QMainWindow):
+#    def __init__(self, model):
+#        super().__init__()
+#        self.ui = Ui_MainWindow()
+#        self.ui.setupUi(self)
+#        self.pane = RGBLayerConfigPane(self.ui, None, model)
 
 
 def test_dummy():
