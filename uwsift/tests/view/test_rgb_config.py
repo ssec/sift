@@ -1,30 +1,29 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """Test RGB configuration changes through the UI."""
-# from unittest import mock
+from unittest import mock
 
-# from PyQt5.QtWidgets import QMainWindow
+from PyQt5.QtWidgets import QMainWindow
 
-# from uwsift.common import Info, Kind
-# from uwsift.model.composite_recipes import CompositeRecipe
-# from uwsift.model.layer_model import LayerModel
-# from uwsift.ui.pov_main_ui import Ui_MainWindow
-# from uwsift.view.rgb_config import RGBLayerConfigPane
+from uwsift.common import Info, Kind
+from uwsift.model.composite_recipes import CompositeRecipe
+from uwsift.model.layer_model import LayerModel
+from uwsift.ui.pov_main_ui import Ui_MainWindow
+from uwsift.view.rgb_config import RGBLayerConfigPane
 
 
-# class _PaneWrapper(QMainWindow):
-#    def __init__(self, model):
-#        super().__init__()
-#        self.ui = Ui_MainWindow()
-#        self.ui.setupUi(self)
-#        self.pane = RGBLayerConfigPane(self.ui, None, model)
+class _PaneWrapper(QMainWindow):
+    def __init__(self, model):
+        super().__init__()
+        self.ui = Ui_MainWindow()
+        self.ui.setupUi(self)
+        self.pane = RGBLayerConfigPane(self.ui, None, model)
 
 
 def test_dummy():
     assert True
 
 
-"""
 def _test_slider_change(qtbot):
     doc = mock.MagicMock()
     workspace = mock.MagicMock()
@@ -82,4 +81,3 @@ def _test_slider_change(qtbot):
     assert recipe is rgb_recipe
     assert color == "r"
     assert clim == ((8.0 / 100.0) * 150, 90.0)
-"""
