@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install snowballstemmer<3.0.0 flake8 flake8-docstrings flake8-debugger flake8-bugbear pytest
+          pip install "snowballstemmer<3.0.0" flake8 flake8-docstrings flake8-debugger flake8-bugbear pytest
       - name: Run linting
         run: |
           flake8 uwsift/
