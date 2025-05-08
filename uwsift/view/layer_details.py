@@ -76,8 +76,25 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         self._details_pane_ui.cmap_combobox.currentIndexChanged.connect(self._cmap_changed)
         self._details_pane_ui.vmin_slider.valueChanged.connect(partial(self._slider_changed, is_max=False))
         self._details_pane_ui.vmax_slider.valueChanged.connect(partial(self._slider_changed, is_max=True))
+
+        # Detect if one of the buttons of the vmin/vmax spinbox has been clicked
+        def on_spinbox_arrow_clicked():
+            self._spinbox_button_was_clicked = True
+
+        # If the text of one of the vmin/vmax spinbox has been changed this resets the
+        # "spin button was clicked"-state.
+        def on_spinbox_text_changed(_):
+            self._spinbox_button_was_clicked = False
+
         self._details_pane_ui.vmin_spinbox.valueChanged.connect(partial(self._spin_box_changed, is_max=False))
+        self._details_pane_ui.vmin_spinbox.upArrowClicked.connect(on_spinbox_arrow_clicked)
+        self._details_pane_ui.vmin_spinbox.downArrowClicked.connect(on_spinbox_arrow_clicked)
+        self._details_pane_ui.vmin_spinbox.lineEdit().textEdited.connect(on_spinbox_text_changed)
         self._details_pane_ui.vmax_spinbox.valueChanged.connect(partial(self._spin_box_changed, is_max=True))
+        self._details_pane_ui.vmax_spinbox.upArrowClicked.connect(on_spinbox_arrow_clicked)
+        self._details_pane_ui.vmax_spinbox.downArrowClicked.connect(on_spinbox_arrow_clicked)
+        self._details_pane_ui.vmax_spinbox.lineEdit().textEdited.connect(on_spinbox_text_changed)
+        self._spinbox_button_was_clicked = False
 
         self._details_pane_ui.gammaSpinBox.valueChanged.connect(self._gamma_changed)
 
@@ -399,8 +416,10 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         # Workaround for the strange behavior in the spinbox, where the value
         # increases or decreases twice with a single arrow click when the maximum
         # or minimum of the range is changed
-        spin_box.setEnabled(False)
-        spin_box.setEnabled(True)
+        if self._spinbox_button_was_clicked:
+            spin_box.setEnabled(False)
+            spin_box.setEnabled(True)
+            self._spinbox_button_was_clicked = False
 
         return self._set_new_clims(val, is_max)
 

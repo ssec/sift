@@ -10,7 +10,11 @@
 
 from PyQt5 import QtCore, QtWidgets
 
-from uwsift.ui.custom_widgets import QNoScrollDoubleSpinBox, QNoScrollWebView
+from uwsift.ui.custom_widgets import (
+    QAdaptiveDoubleSpinBox,
+    QNoScrollDoubleSpinBox,
+    QNoScrollWebView,
+)
 
 
 class Ui_LayerDetailsPane(object):
@@ -103,7 +107,7 @@ class Ui_LayerDetailsPane(object):
         self.vmin_slider.setOrientation(QtCore.Qt.Horizontal)
         self.vmin_slider.setObjectName("vmin_slider")
         self.formLayout_2.setWidget(2, QtWidgets.QFormLayout.LabelRole, self.vmin_slider)
-        self.vmin_spinbox = QtWidgets.QDoubleSpinBox(self.page_IMAGE)
+        self.vmin_spinbox = QAdaptiveDoubleSpinBox(self.page_IMAGE)
         self.vmin_spinbox.setRange(-32767, 32767)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -122,7 +126,7 @@ class Ui_LayerDetailsPane(object):
         self.vmax_slider.setOrientation(QtCore.Qt.Horizontal)
         self.vmax_slider.setObjectName("vmax_slider")
         self.formLayout_2.setWidget(3, QtWidgets.QFormLayout.LabelRole, self.vmax_slider)
-        self.vmax_spinbox = QtWidgets.QDoubleSpinBox(self.page_IMAGE)
+        self.vmax_spinbox = QAdaptiveDoubleSpinBox(self.page_IMAGE)
         self.vmax_spinbox.setRange(-32767, 32767)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)

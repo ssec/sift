@@ -1,4 +1,4 @@
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QEvent, Qt, pyqtSignal
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWidgets import (
     QComboBox,
@@ -114,3 +114,21 @@ class InitiallyIncompleteWizardPage(QWizardPage):
 
     def completeChangedSlot(self, *args, **kwargs):
         self.completeChanged.emit()
+
+
+class QAdaptiveDoubleSpinBox(QDoubleSpinBox):
+    """QDoubleSpinBox that notifies the clicking of the inc/dec buttons"""
+
+    upArrowClicked = pyqtSignal()
+    downArrowClicked = pyqtSignal()
+
+    def __init__(self, *args, **kwargs):
+        super(QAdaptiveDoubleSpinBox, self).__init__(*args, **kwargs)
+
+    def stepBy(self, steps):
+        """Override stepBy by adding notification about the button cklick"""
+        super().stepBy(steps)
+        if steps > 0:
+            self.upArrowClicked.emit()
+        elif steps < 0:
+            self.downArrowClicked.emit()
