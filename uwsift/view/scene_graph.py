@@ -26,15 +26,18 @@ from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
 import numpy as np
+from pyproj import CRS
 from PyQt5.QtCore import QObject, Qt, pyqtSignal
 from PyQt5.QtGui import QCursor
 from pyresample import AreaDefinition
-from vispy import app, scene
+from rasterio.transform import Affine
+from vispy import app, gloo, scene
 from vispy.geometry import Rect
 from vispy.gloo.util import _screenshot
 from vispy.scene.visuals import Image, Line, Markers, Polygon
 from vispy.util.keys import SHIFT
 from vispy.visuals.transforms import MatrixTransform, STTransform
+from vispy.visuals.transforms.chain import ChainTransform
 
 from uwsift import IMAGE_DISPLAY_MODE, config
 from uwsift.common import (
@@ -302,6 +305,7 @@ class SceneGraphManager(QObject):
         self.dataset_nodes: dict = {}  # {dataset_uuid: dataset_node}
         self.latlon_grid_node: Optional[Line] = None
         self.borders_nodes: list = []
+        self.initial_rect = None
 
         self.composite_element_dependencies: dict = {}  # {dataset_uuid:set-of-dependent-uuids}
         self.animation_controller = AnimationController()
@@ -324,8 +328,133 @@ class SceneGraphManager(QObject):
         self._setup_initial_canvas(center)
         self.pending_polygon = PendingPolygon(self.main_map)
 
+    def _get_top_dataset_proj4_transform(self):
+        """Get the Proj4Transform from the top enabled dataset."""
+        for u, img in self.dataset_nodes.items():
+            xform = img.transform
+            if isinstance(xform, PROJ4Transform):
+                return xform, xform.proj4_str
+            if isinstance(xform, ChainTransform):
+                trs = xform.transforms
+                for tx in trs:
+                    if isinstance(tx, PROJ4Transform):
+                        return xform, tx.proj4_str
+
+        return None, None
+
+    def collect_projection_infos(self, width, height):
+        """Collect the current projection transform of the view."""
+        # Get the top visible image layer below:
+        img_xform, proj4_str = self._get_top_dataset_proj4_transform()
+        if img_xform is None:
+            # Cannot find projection infos.
+            return None
+
+        # Get coordinate system information
+        crs = CRS.from_proj4(proj4_str)
+
+        # Calculate the geotransform transforming the camera rect:
+        rect = self.main_view.camera.rect
+
+        # Create points for the four corners of the viewport in view space coordinates
+        tl = [rect.left, rect.top]
+        tr = [rect.right, rect.top]
+        bl = [rect.left, rect.bottom]
+        br = [rect.right, rect.bottom]
+        LOG.debug("View space: tl=%s, tr=%s, bl=%s, br=%s", tl, tr, bl, br)
+        # We need to transform these points from view space to scene space
+        # and then to the projection space
+
+        # First, get the transform from view to scene space
+        view_to_scene = self.main_view.get_transform("visual", "scene")
+
+        # Transform the corners to scene space
+        tl = view_to_scene.map(tl)[:2]
+        tr = view_to_scene.map(tr)[:2]
+        bl = view_to_scene.map(bl)[:2]
+        br = view_to_scene.map(br)[:2]
+        LOG.debug("Scene space: tl=%s, tr=%s, bl=%s, br=%s", tl, tr, bl, br)
+
+        # The PROJ4Transform applies in scene coordinates
+        tl = img_xform.map(tl)[:2]
+        tr = img_xform.map(tr)[:2]
+        bl = img_xform.map(bl)[:2]
+        br = img_xform.map(br)[:2]
+        LOG.debug("Proj space: tl=%s, tr=%s, bl=%s, br=%s", tl, tr, bl, br)
+
+        # Calculate the bounding box in projection coordinates
+        minx = min(tl[0], bl[0])
+        maxx = max(tr[0], br[0])
+        miny = min(bl[1], br[1])
+        maxy = max(tl[1], tr[1])
+        LOG.debug("Bounds: %s, %s, %s, %s", minx, miny, maxx, maxy)
+
+        x_res = (maxx - minx) / width
+        y_res = (maxy - miny) / height
+
+        # Create the affine transform for the GeoTIFF
+        transform = Affine.translation(minx, maxy) * Affine.scale(x_res, -y_res)
+        return {"crs": crs, "transform": transform, "bounds": (minx, miny, maxx, maxy)}
+
+    def _get_optimal_pixel_ratio(self):
+        """Compute the optimal pixel to local coordinates scale ratio."""
+        max_ds_width = 0
+        max_ds_height = 0
+
+        for uuid in self.dataset_nodes.keys():
+            infos = self.workspace.get_info(uuid)
+            shape = infos[Info.SHAPE]
+            LOG.debug("Found dataset shape: %s", shape)
+            max_ds_width = max(max_ds_width, shape[1])
+            max_ds_height = max(max_ds_height, shape[1])
+
+        if max_ds_width == 0 or max_ds_height == 0:
+            return None
+
+        # Get the scale ratio between the coord systems:
+        rw = self.initial_rect.width / max_ds_width
+        rh = self.initial_rect.height / max_ds_height
+        sratio = min(rw, rh)
+
+        return sratio
+
+    def compute_optimal_screenshot_size(self):
+        """Compute the optimal screenshot FBO size."""
+        sratio = self._get_optimal_pixel_ratio()
+        cam = self.pz_camera
+        cv_size = self.main_canvas.size
+
+        if sratio is None:
+            # No optimal size can be computed.
+            return cv_size
+
+        # LOG.debug("Canvas size is: %s", cv_size)
+
+        ptl = cam.transform.imap(np.array([0.0, 0.0]))
+        ptr = cam.transform.imap(np.array([cv_size[0], 0.0]))
+        pbl = cam.transform.imap(np.array([0.0, cv_size[1]]))
+        # pbr = cam.transform.imap(np.array([cv_size[0], cv_size[1]]))
+        w = ptr[0] - ptl[0]
+        h = ptl[1] - pbl[1]
+
+        # LOG.debug("Image corner coords: tl=%s, tr=%s, bl=%s, br=%s", ptl[:2], ptr[:2], pbl[:2], pbr[:2])
+        # LOG.debug("Computed local width: %s, height: %s", w, h)
+
+        # sratio is the scale factor we need to go from dataset pixels
+        # to camera local unit.
+        # so to go from camera local to pixel we apply 1/sratio.
+
+        # So with the current canvas w,h we compute the number of pixels we are covering:
+        pw, ph = w / sratio, h / sratio
+
+        # LOG.debug("Computed pixel width: %s, height: %s", pw, ph)
+
+        # And this is what we use as fbo size:
+        fbo_size = (int(pw), int(ph))
+        return fbo_size
+
     def get_screenshot_array(
-        self, frame_range: None | tuple[int, int] = None
+        self, frame_range: None | tuple[int, int], img_size
     ) -> list[tuple[str | UUID, npt.NDArray[np.uint8]]]:
         """Get numpy arrays representing the current canvas.
 
@@ -352,17 +481,31 @@ class SceneGraphManager(QObject):
         else:
             s, e = frame_range
 
+        fbo = gloo.FrameBuffer(color=gloo.RenderBuffer(img_size[::-1]), depth=gloo.RenderBuffer(img_size[::-1]))
+
+        cv = self.main_canvas
+
+        fbo.activate()
+        cv.context.set_viewport(0, 0, *img_size)
+        cv.transforms.configure(viewport=(0, 0, *img_size), fbo_size=img_size, fbo_rect=(0, 0, *cv.size))
+
         images = []
         for i in range(s, e + 1):
             self.animation_controller.jump(i)
             self._update()
-            self.main_canvas.on_draw(None)
+            cv.on_draw(None)
+            arr = fbo.read()
+
             u = self.animation_controller.get_current_frame_uuid()
-            images.append((u, _screenshot()))
+            images.append((u, arr))
+
+        fbo.deactivate()
+        cv.context.set_viewport(0, 0, *cv.size)
+        cv.transforms.configure(viewport=(0, 0, *cv.size), fbo_size=cv.size, fbo_rect=(0, 0, *cv.size))
 
         self.animation_controller.jump(current_frame)
         self._update()
-        self.main_canvas.on_draw(None)
+        cv.on_draw(None)
         return images
 
     def _setup_initial_canvas(self, center=None):
@@ -395,6 +538,9 @@ class SceneGraphManager(QObject):
 
         area_def = self.document.area_definition()
         self._set_projection(area_def)
+
+        # Store the initial camera rect:
+        self.initial_rect = self.pz_camera.rect
 
     def _create_test_image(self):
         proj4_str = os.getenv("SIFT_DEBUG_IMAGE_PROJ", None)
