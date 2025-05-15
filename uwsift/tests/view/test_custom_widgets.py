@@ -28,13 +28,20 @@ def test_adaptive_spin_box(qtbot, spinbox_obj):
 
     line_edit = sd_spinbox.lineEdit()
 
-    assert sd_spinbox._decimal_places == 2  # should be 2 by default
-    sd_spinbox.setValue(1.019999)  # test for correct rounding
+    sd_spinbox.setValue(1.019999)  # test for correct rounding - here we have more than 5 digits
     assert sd_spinbox.value() == 1.02  # the value itself
     assert line_edit.text() == "1.02"  # as well as the textual representation
 
+    sd_spinbox.setValue(1.01999)  # test for 'not rounding', as we have 5 digits which are the max to be displayed
+    assert sd_spinbox.value() == 1.01999  # the value itself
+    assert line_edit.text() == "1.01999"  # as well as the textual representation
+
+    sd_spinbox.setValue(1.23399999999)  # the number has some "unprecise" representation and ...
+    assert sd_spinbox._decimal_places_displayed == 3  # ...actually it is meant to be 1.234
+    assert sd_spinbox.value() == 1.234
+
     # init the obj for subsequent tests
-    sd_spinbox._decimal_places = 0
+    sd_spinbox._decimal_places_displayed = 0
     sd_spinbox.setValue(1)
     line_edit.setFocus()
 
@@ -63,4 +70,11 @@ def test_adaptive_spin_box(qtbot, spinbox_obj):
     sd_spinbox.stepBy(10)
     assert line_edit.text() == "4.201"  # correct increment in combination with modifier and higher increment step?
     QTest.keyRelease(sd_spinbox, Qt.Key_Shift)
+
+    # now check if the amount of significant digits is being kept when decrementing
+    sd_spinbox.stepBy(-1)
+    assert line_edit.text() == "4.200"  # must keep 3 digits after the comma
+    sd_spinbox.stepBy(-1)
+    assert line_edit.text() == "4.199"
+
     sd_spinbox.blockSignals(False)
