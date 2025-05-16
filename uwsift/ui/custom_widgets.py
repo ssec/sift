@@ -1,4 +1,6 @@
-from PyQt5.QtCore import QEvent, QObject, Qt, pyqtSignal
+from decimal import ROUND_HALF_UP, Decimal
+
+from PyQt5.QtCore import QEvent, Qt, pyqtSignal
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWidgets import (
     QApplication,
@@ -118,18 +120,18 @@ class InitiallyIncompleteWizardPage(QWizardPage):
 
 
 class QAdaptiveDoubleSpinBox(QDoubleSpinBox):
-    """QDoubleSpinBox that increments/decrements on the last two digits (with modifyed)"""
+    """QDoubleSpinBox that sets/increments/decrements values with number of decimals significant to the user"""
 
     upArrowClicked = pyqtSignal()
     downArrowClicked = pyqtSignal()
 
     def __init__(self, *args, **kwargs):
         super(QAdaptiveDoubleSpinBox, self).__init__(*args, **kwargs)
-        self._decimal_places = self.decimals()
-        # Install event filter to detect modifier keys. It needs to be on application level as the focus can be anywhere
+        self._decimal_places_displayed = self.decimals()
+        # install event filter to detect modifier keys. It needs to be on application level as the focus can be anywhere
         # before clicking on the inc/dec butons with a modifier.
         QApplication.instance().installEventFilter(self)
-        # Flag to track if Shift is pressed
+        # flag to track if Shift is pressed
         self._shift_pressed = False
         self.setToolTip("Hold Ctrl and/or Shift for larger increment/decrement")
 
@@ -143,13 +145,20 @@ class QAdaptiveDoubleSpinBox(QDoubleSpinBox):
                 self._shift_pressed = False
         return super().eventFilter(obj, event)
 
+    def setValue(self, value, keep_displ_decimals=False):
+        """Override of setValue, rounds and adjusts the value to the amount of user significant decimals"""
+        value, decimal_places_displayed = self._round_and_count_decimals(value, self.decimals())
+        if not keep_displ_decimals:
+            self._decimal_places_displayed = decimal_places_displayed
+        super().setValue(round(value, self._decimal_places_displayed))
+
     def textFromValue(self, value):
         """Override to set the effective amount of decimals the user intends to have"""
         tfv = super().textFromValue(value)
-        if "." in tfv:  # Do we have decimals at all?
+        if "." in tfv:  # do we have decimals at all?
             parts = tfv.split(".")
-            if self._decimal_places > 0:  # Do we actually have effective decimals?
-                tfv = f"{parts[0]}.{parts[1][: self._decimal_places]}"
+            if self._decimal_places_displayed > 0:  # Do we actually have effective decimals?
+                tfv = f"{parts[0]}.{parts[1][: self._decimal_places_displayed]}"
             else:
                 tfv = parts[0]
         return tfv
@@ -157,31 +166,52 @@ class QAdaptiveDoubleSpinBox(QDoubleSpinBox):
     def valueFromText(self, text):
         """Override to evaluate the effective amount of decimals the user intends to have"""
         vft = super().valueFromText(text)
-        self._eval_num_decimals_displayed()
+        self._eval_num_decimals_displayed(text)
         return vft
 
     def stepBy(self, steps):
         """Override stepBy to provide custom increment/decrement behavior and notification about the button cklick"""
         if self._shift_pressed:
-            # If shift is pressed, 'boost' by 100.
+            # if shift is pressed, 'boost' by 100.
             steps *= 100
-        if self._decimal_places:
-            # If we have decimals we need to take care that the inc/dec is on the last one
-            step_size = 10**-self._decimal_places
-            new_value = round(self.value() + (step_size * steps), self._decimal_places)
+        if self._decimal_places_displayed > 0:
+            # if we have decimals we need to take care that the inc/dec is on the last one
+            step_size = 10**-self._decimal_places_displayed
+            new_value = round(self.value() + (step_size * steps), self._decimal_places_displayed)
         else:
             new_value = round(self.value() + steps)
 
-        self.setValue(new_value)
+        self.setValue(new_value, True)
 
         if steps > 0:
             self.upArrowClicked.emit()
         elif steps < 0:
             self.downArrowClicked.emit()
 
-    def _eval_num_decimals_displayed(self):
+    def _eval_num_decimals_displayed(self, value_as_text):
         """Get the amount of decimals the user has entered"""
-        current_value_as_str = self.lineEdit().text()
-        # Count decimal places to determine step size
-        decimal_str = current_value_as_str.split(".")[-1]
-        self._decimal_places = len(decimal_str)
+        # count decimal places to determine step size
+        if "." in value_as_text:
+            decimal_str = value_as_text.split(".")[-1]
+            # catch case when only the decimal separator is there but no decimal -> this is considered to be one decimal
+            self._decimal_places_displayed = max(1, len(decimal_str))
+        else:
+            self._decimal_places_displayed = 0
+
+    def _round_and_count_decimals(self, value, max_decimals) -> tuple[float, int]:
+        """Rounds a float value if the number of decimals is larger than max_decimals"""
+        # convert to Decimal from str to preserve what user likely intended
+        dval = Decimal(str(value))
+        # create the rounding quantizer, e.g., Decimal('0.00001') for 5 decimals
+        quant = Decimal(f'1.{"0" * max_decimals}')
+        # round with ROUND_HALF_UP
+        rounded = dval.quantize(quant, rounding=ROUND_HALF_UP)
+        # now count actual decimals
+        # normalize removes trailing zeroes; exponent tells how many decimals
+        exp = rounded.normalize().as_tuple().exponent
+        if isinstance(exp, int):
+            decimals = -exp if exp < 0 else 0
+        else:
+            decimals = 0
+
+        return float(rounded), decimals

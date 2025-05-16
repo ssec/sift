@@ -432,13 +432,13 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         LOG.debug("slider %s %s => %f" % (self._current_selected_layer.uuid, "max" if is_max else "min", value))
         display_val = self._current_selected_layer.info[Info.UNIT_CONVERSION][1](value)
         spin_box.blockSignals(True)
-        spin_box.setValue(display_val)
+        spin_box.setValue(display_val, True)
         spin_box.blockSignals(False)
 
         self._set_reassign_button_state(spin_box.value(), spin_box2.value())
         return self._set_new_clims(value, is_max)
 
-    def _spin_box_changed(self, is_max=True):  # pragma: no cover
+    def _spin_box_changed(self, is_max=True):
         self._enable_all_buttons()
 
         slider = self._details_pane_ui.vmax_slider if is_max else self._details_pane_ui.vmin_slider
