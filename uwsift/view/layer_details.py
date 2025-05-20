@@ -266,8 +266,8 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         assert actual_range != (None, None)  # nosec B101
         self._valid_min, self._valid_max = range_hull_no_fail(actual_range, valid_range, actual_range)
 
-        self._update_vmin()
-        self._update_vmax()
+        self._update_vmin(True)
+        self._update_vmax(True)
 
     def _fit_clims_to_current_time(self):
         first_active_dataset = self._current_selected_layer.get_first_active_product_dataset()
@@ -285,8 +285,8 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
             assert actual_range != (None, None)  # nosec B101
             self._valid_min, self._valid_max = range_hull_no_fail(actual_range, valid_range, actual_range)
 
-            self._update_vmin()
-            self._update_vmax()
+            self._update_vmin(True)
+            self._update_vmax(True)
 
     def _gamma_changed(self, val):
         model = self._current_selected_layer.model
@@ -580,7 +580,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
     def _update_gamma(self):
         self._details_pane_ui.gammaSpinBox.setValue(self._current_selected_layer.presentation.gamma)
 
-    def _update_vmin(self):
+    def _update_vmin(self, keep_displ_decs=False):
         current_vmin = self._current_selected_layer.presentation.climits[0]
         self._details_pane_ui.vmin_slider.setRange(0, self._slider_steps)
         slider_val = self._create_slider_value(current_vmin)
@@ -588,10 +588,11 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
         conv = self._current_selected_layer.info[Info.UNIT_CONVERSION]
         self._details_pane_ui.vmin_spinbox.setValue(
-            conv[1](self._valid_min) if conv[1](self._valid_min) > conv[1](current_vmin) else conv[1](current_vmin)
+            conv[1](self._valid_min) if conv[1](self._valid_min) > conv[1](current_vmin) else conv[1](current_vmin),
+            keep_displ_decs,
         )
 
-    def _update_vmax(self):
+    def _update_vmax(self, keep_displ_decs=False):
         current_vmax = self._current_selected_layer.presentation.climits[1]
         self._details_pane_ui.vmax_slider.setMaximum(32767)
         self._details_pane_ui.vmax_slider.setRange(0, self._slider_steps)
@@ -600,5 +601,6 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
         conv = self._current_selected_layer.info[Info.UNIT_CONVERSION]
         self._details_pane_ui.vmax_spinbox.setValue(
-            conv[1](self._valid_max) if conv[1](self._valid_max) < conv[1](current_vmax) else conv[1](current_vmax)
+            conv[1](self._valid_max) if conv[1](self._valid_max) < conv[1](current_vmax) else conv[1](current_vmax),
+            keep_displ_decs,
         )
