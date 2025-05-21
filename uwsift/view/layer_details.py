@@ -478,6 +478,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         if self._spinbox_button_was_clicked:
             spin_box.setEnabled(False)
             spin_box.setEnabled(True)
+            self._details_pane_ui.gammaSpinBox.clearFocus()
             self._spinbox_button_was_clicked = False
 
         self._set_reassign_button_state(dis_val, spin_box2.value())
