@@ -7,8 +7,9 @@ dependencies:
   - appdirs
   - defusedxml
   - Cython
-  - imageio
-  - av
+  # until https://github.com/imageio/imageio/issues/1120 is solved we need to limit imageio and pyav
+  - imageio<=2.35.1
+  - av<14.0.0
   - matplotlib
   - numba
   - numpy
