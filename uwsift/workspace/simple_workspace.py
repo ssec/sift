@@ -265,6 +265,7 @@ class SimpleWorkspace(BaseWorkspace):
             return arrays.data
 
         truck = aImporter.from_product(prod, workspace_cwd=self.cache_dir, database_session=None, **importer_kwargs)
+
         if not truck:
             # aImporter.from_product() didn't return an Importer instance
             # since all files represent data granules, which are already
@@ -294,6 +295,10 @@ class SimpleWorkspace(BaseWorkspace):
         ac = self._overview_content_for_uuid(
             merge_target_uuid if merge_target_uuid else prod.uuid, kind=default_prod_kind
         )
+
+        # Issue #415: When done with the importer processing we should release the importer resources if applicable.
+        truck.release_resources()
+
         if ac is None:
             return None
         return ac.data

@@ -346,6 +346,11 @@ class Main(QtWidgets.QMainWindow):
         """
         self.didFinishLoading.emit(uuid_list)
 
+        if self._wizard_dialog is not None:
+            # Issue #415: reset the state of the wizard here to release
+            # the satpy scenes:
+            self._wizard_dialog.reset_state()
+
         if not uuid_list:
             raise ValueError("no UUIDs provided by background open" " in _bgnd_open_paths_finish")
         if not isok:
@@ -1099,6 +1104,11 @@ class Main(QtWidgets.QMainWindow):
 
         if self._wizard_dialog.exec_():
             LOG.info("Loading products from open wizard...")
+            # The selected projection in the main window is the same as the one chosen in the open file wizard
+            self.ui.projectionComboBox.setCurrentIndex(self._wizard_dialog.ui.projectionComboBox.currentIndex())
+            # setting resampling info in layer details pane for displaying the resolution of the Area
+            self.ui.layerDetailsPane.set_resampling_info(self._wizard_dialog.resampling_info)
+            #
             scenes = self._wizard_dialog.scenes
             reader = self._wizard_dialog.get_reader()
 
@@ -1138,6 +1148,10 @@ class Main(QtWidgets.QMainWindow):
             self.open_paths(self._wizard_dialog.files_to_load, **importer_kwargs)
         else:
             LOG.debug("Wizard closed, nothing to load")
+            # Issue #415: We still need to reset the state of the wizard here
+            # as a satpy scene might have been loaded already even if the user cancels
+            # the opening process.
+            self._wizard_dialog.reset_state()
 
     def _reload_config(self):
         config.refresh()

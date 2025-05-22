@@ -11,6 +11,7 @@ REQUIRES
 :copyright: 2017 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
+import gc
 import logging
 import os
 from abc import ABC, abstractmethod
@@ -411,6 +412,10 @@ class aImporter(ABC):
         # FUTURE: this should be async def coroutine
         pass
 
+    @abstractmethod
+    def release_resources(self):
+        """Release the resources associated to this importer."""
+
 
 def determine_dynamic_dataset_kind(attrs: dict, reader_name: str) -> str:
     """Determine kind of dataset dynamically based on dataset attributes.
@@ -499,6 +504,18 @@ class SatpyImporter(aImporter):
     def is_relevant(cls, source_path=None, source_uri=None):
         # this importer should only be used if specifically requested
         return False
+
+    def release_resources(self):
+        """Release the satpy scene associated to this importer."""
+        if self.scn_original is not None:
+            self.scn_original.unload()
+            self.scn_original = None
+
+        if self.scn is not None:
+            self.scn.unload()
+            self.scn = None
+
+        gc.collect()
 
     def merge_resources(self):
         if len(self._resources) == len(self.filenames):
@@ -1260,20 +1277,42 @@ class SatpyImporter(aImporter):
     def _preprocess_products_with_resampling(self) -> None:
         resampler: str = self.resampling_info["resampler"]
         max_area = self.scn.finest_area()
-        if isinstance(max_area, AreaDefinition) and max_area.area_id == self.resampling_info["area_id"]:
+        if (
+            isinstance(max_area, AreaDefinition)
+            and max_area.area_id == self.resampling_info["area_id"]
+            and self.resampling_info["custom"] is False
+        ):
+            # resampling is not needed
             LOG.info(
                 f"Source and target area ID are identical:"
                 f" '{self.resampling_info['area_id']}'."
                 f" Skipping resampling."
             )
         else:
+            # resampling is needed
             area_name = max_area.area_id if hasattr(max_area, "area_id") else max_area.name
-            LOG.info(
-                f"Resampling from area ID/name '{area_name}'"
-                f" to area ID '{self.resampling_info['area_id']}'"
-                f" with method '{resampler}'"
-            )
             target_area_def = AreaDefinitionsManager.area_def_by_id(self.resampling_info["area_id"])
+
+            if self.resampling_info["custom"] is False:
+                LOG.info(
+                    f"Resampling from area ID/name '{area_name}'"
+                    f" to area ID '{self.resampling_info['area_id']}'"
+                    f" with method '{resampler}'"
+                )
+            else:
+                # custom resolution
+                resampler_shape = self.resampling_info["shape"]
+                resampler_width = resampler_shape[0]
+                resampler_height = resampler_shape[1]
+                LOG.info(
+                    f"Resampling area with the characteristics of '{area_name}'"
+                    f" with method '{resampler}'"
+                    f" with CUSTOM SHAPE: '{resampler_width}, {resampler_height}'"
+                )
+
+                AreaDefinitionsManager.prepare_area_def_for_resampling(
+                    target_area_def, resampler_width, resampler_height
+                )
 
             # About the next strange line of code: keep a reference to the
             # original scene to work around an issue in the resampling
@@ -1284,7 +1323,6 @@ class SatpyImporter(aImporter):
 
             # deactivating reduce_data, see https://github.com/pytroll/satpy/issues/2476
             reduce_data = False if resampler == "native" else True
-
             self.scn = self.scn.resample(
                 target_area_def,
                 resampler=resampler,
