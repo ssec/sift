@@ -7,7 +7,8 @@ dependencies:
   - appdirs
   - defusedxml
   - Cython
-  - imageio
+  # until https://github.com/imageio/imageio/issues/1120 is merged we need to limit imageio
+  - imageio<=2.35.1
   - av
   - matplotlib
   - numba
