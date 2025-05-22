@@ -10,7 +10,11 @@
 
 from PyQt5 import QtCore, QtWidgets
 
-from uwsift.ui.custom_widgets import QNoScrollDoubleSpinBox, QNoScrollWebView
+from uwsift.ui.custom_widgets import (
+    QAdaptiveDoubleSpinBox,
+    QNoScrollDoubleSpinBox,
+    QNoScrollWebView,
+)
 
 
 class Ui_LayerDetailsPane(object):
@@ -98,19 +102,25 @@ class Ui_LayerDetailsPane(object):
         self.cmap_combobox.setMaximumSize(QtCore.QSize(300, 16777215))
         self.cmap_combobox.setObjectName("cmap_combobox")
         self.formLayout_2.setWidget(1, QtWidgets.QFormLayout.SpanningRole, self.cmap_combobox)
+        # Place the vmin elements into a horizontal row layout
+        self.vmin_and_gamma_row_layout = QtWidgets.QHBoxLayout()
         self.vmin_slider = QtWidgets.QSlider(self.page_IMAGE)
         self.vmin_slider.setMinimumSize(QtCore.QSize(150, 0))
         self.vmin_slider.setOrientation(QtCore.Qt.Horizontal)
         self.vmin_slider.setObjectName("vmin_slider")
-        self.formLayout_2.setWidget(2, QtWidgets.QFormLayout.LabelRole, self.vmin_slider)
-        self.vmin_spinbox = QtWidgets.QDoubleSpinBox(self.page_IMAGE)
+        self.vmin_and_gamma_row_layout.addWidget(self.vmin_slider)
+        self.vmin_spinbox = QAdaptiveDoubleSpinBox(self.page_IMAGE)
+        self.vmin_spinbox.setRange(-32767, 32767)
+        self.vmin_spinbox.setDecimals(5)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.vmin_spinbox.sizePolicy().hasHeightForWidth())
         self.vmin_spinbox.setSizePolicy(sizePolicy)
         self.vmin_spinbox.setObjectName("vmin_spinbox")
-        self.formLayout_2.setWidget(2, QtWidgets.QFormLayout.FieldRole, self.vmin_spinbox)
+        self.vmin_and_gamma_row_layout.addWidget(self.vmin_spinbox)
+        # Place the vmax elements into a horizontal row layout
+        self.vmax_and_gamma_row_layout = QtWidgets.QHBoxLayout()
         self.vmax_slider = QtWidgets.QSlider(self.page_IMAGE)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -120,19 +130,25 @@ class Ui_LayerDetailsPane(object):
         self.vmax_slider.setMinimumSize(QtCore.QSize(150, 0))
         self.vmax_slider.setOrientation(QtCore.Qt.Horizontal)
         self.vmax_slider.setObjectName("vmax_slider")
-        self.formLayout_2.setWidget(3, QtWidgets.QFormLayout.LabelRole, self.vmax_slider)
-        self.vmax_spinbox = QtWidgets.QDoubleSpinBox(self.page_IMAGE)
+        self.vmax_and_gamma_row_layout.addWidget(self.vmax_slider)
+        self.vmax_spinbox = QAdaptiveDoubleSpinBox(self.page_IMAGE)
+        self.vmax_spinbox.setRange(-32767, 32767)
+        self.vmax_spinbox.setDecimals(5)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.vmax_spinbox.sizePolicy().hasHeightForWidth())
         self.vmax_spinbox.setSizePolicy(sizePolicy)
         self.vmax_spinbox.setObjectName("vmax_spinbox")
-        self.formLayout_2.setWidget(3, QtWidgets.QFormLayout.FieldRole, self.vmax_spinbox)
+        self.vmax_and_gamma_row_layout.addWidget(self.vmax_spinbox)
+
         self.gammaLabel = QtWidgets.QLabel(self.page_IMAGE)
-        self.gammaLabel.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        self.gammaLabel.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignBottom)
+        self.gammaLabel.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.gammaLabel.setObjectName("gammaLabel")
-        self.formLayout_2.setWidget(4, QtWidgets.QFormLayout.LabelRole, self.gammaLabel)
+        # Place the label also to the upper horizontal row layout
+        self.vmin_and_gamma_row_layout.addWidget(self.gammaLabel, alignment=QtCore.Qt.AlignBottom)
+
         self.gammaSpinBox = QNoScrollDoubleSpinBox(self.page_IMAGE)
         self.gammaSpinBox.setEnabled(True)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
@@ -140,26 +156,48 @@ class Ui_LayerDetailsPane(object):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.gammaSpinBox.sizePolicy().hasHeightForWidth())
         self.gammaSpinBox.setSizePolicy(sizePolicy)
+        self.gammaSpinBox.setAlignment(QtCore.Qt.AlignCenter)
+
+        # The spinbox shall have the same width as the gamma label. Due to this dependency we need to install an event
+        # filter that takes care when the widgets are actually being whown. Unfortunately, At this point in time,
+        # gammaLabel.width() is not correct as it is not being rendered yet.
+        class GamaSpinboxSizer(QtCore.QObject):
+            def __init__(self, outer_self):
+                super().__init__()
+                self.outer_self = outer_self
+                outer_self.gammaLabel.installEventFilter(self)
+
+            def eventFilter(self, obj, event):
+                if obj is self.outer_self.gammaLabel and event.type() == QtCore.QEvent.Resize:
+                    self.outer_self.gammaSpinBox.setFixedWidth(self.outer_self.gammaLabel.width())
+                return False
+
+        self.gamma_spinbox_sizer = GamaSpinboxSizer(self)
+
         self.gammaSpinBox.setDecimals(1)
         self.gammaSpinBox.setMaximum(5.0)
         self.gammaSpinBox.setSingleStep(0.1)
         self.gammaSpinBox.setProperty("value", 1.0)
         self.gammaSpinBox.setObjectName("gammaSpinBox")
-        self.formLayout_2.setWidget(4, QtWidgets.QFormLayout.FieldRole, self.gammaSpinBox)
+        # Place the gamma spinbox also to the lower horizontal row layout
+        self.vmax_and_gamma_row_layout.addWidget(self.gammaSpinBox)
+
+        self.vmaxmin_gamma_column_layout = QtWidgets.QVBoxLayout()
+        self.vmaxmin_gamma_column_layout.addLayout(self.vmin_and_gamma_row_layout)
+        self.vmaxmin_gamma_column_layout.addLayout(self.vmax_and_gamma_row_layout)
+        self.vmaxmin_gamma_column_layout.setContentsMargins(0, 0, 5, 0)  # right margin
+        self.formLayout_2.setLayout(2, QtWidgets.QFormLayout.SpanningRole, self.vmaxmin_gamma_column_layout)
+        # colormap buttons
+        self.colormap_reassign_button = QtWidgets.QPushButton(self.page_IMAGE)
+        self.colormap_reassign_button.setObjectName("colormap_reassign_button")
         self.colormap_reset_button = QtWidgets.QPushButton(self.page_IMAGE)
         self.colormap_reset_button.setObjectName("colormap_reset_button")
-        self.formLayout_2.setWidget(5, QtWidgets.QFormLayout.FieldRole, self.colormap_reset_button)
-        self.line = QtWidgets.QFrame(self.page_IMAGE)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.line.sizePolicy().hasHeightForWidth())
-        self.line.setSizePolicy(sizePolicy)
-        self.line.setMinimumSize(QtCore.QSize(10, 2))
-        self.line.setFrameShape(QtWidgets.QFrame.HLine)
-        self.line.setFrameShadow(QtWidgets.QFrame.Sunken)
-        self.line.setObjectName("line")
-        self.formLayout_2.setWidget(6, QtWidgets.QFormLayout.SpanningRole, self.line)
+        self.colormap_button_layout = QtWidgets.QHBoxLayout()
+        self.colormap_button_layout.addWidget(self.colormap_reassign_button)
+        self.colormap_button_layout.addWidget(self.colormap_reset_button)
+        self.colormap_button_container = QtWidgets.QWidget(self.page_IMAGE)
+        self.colormap_button_container.setLayout(self.colormap_button_layout)
+        self.formLayout_2.setWidget(3, QtWidgets.QFormLayout.SpanningRole, self.colormap_button_container)
         self.horizontalLayout = QtWidgets.QHBoxLayout()
         self.horizontalLayout.setObjectName("horizontalLayout")
         self.fit_data_group_box = QtWidgets.QGroupBox(self.page_IMAGE)
@@ -186,7 +224,7 @@ class Ui_LayerDetailsPane(object):
         self.buttonGroup.addButton(self.climitsAllTimes)
         self.buttonGroup.addButton(self.climitsAllTimesInvert)
         self.buttonGroup.setExclusive(True)
-        self.formLayout_2.setWidget(7, QtWidgets.QFormLayout.SpanningRole, self.fit_data_group_box)
+        self.formLayout_2.setWidget(5, QtWidgets.QFormLayout.SpanningRole, self.fit_data_group_box)
         self.verticalLayout_2.addLayout(self.formLayout_2)
         self.kindDetailsStackedWidget.addWidget(self.page_IMAGE)
         self.page_others = QtWidgets.QWidget()
@@ -219,7 +257,9 @@ class Ui_LayerDetailsPane(object):
         self.layerAreaResolutionValue.setText(_translate("LayerDetailsPane", "N/A"))
         self.vmin_slider.setToolTip(_translate("LayerDetailsPane", "minimum color limit"))
         self.vmax_slider.setToolTip(_translate("LayerDetailsPane", "maximum color limit"))
+        # self.vmax_spinbox.
         self.gammaLabel.setText(_translate("LayerDetailsPane", "Gamma: "))
+        self.colormap_reassign_button.setText(_translate("LayerDetailsPane", "Reassign"))
         self.colormap_reset_button.setText(_translate("LayerDetailsPane", "Reset"))
         self.fit_data_group_box.setTitle(_translate("LayerDetailsPane", "Fit to data:"))
         self.climitsCurrentTime.setText(_translate("LayerDetailsPane", "Current Time"))
