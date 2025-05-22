@@ -103,12 +103,12 @@ class Ui_LayerDetailsPane(object):
         self.cmap_combobox.setObjectName("cmap_combobox")
         self.formLayout_2.setWidget(1, QtWidgets.QFormLayout.SpanningRole, self.cmap_combobox)
         # Place the vmin elements into a horizontal row layout
-        self.vmin_row_layout = QtWidgets.QHBoxLayout()
+        self.vmin_and_gamma_row_layout = QtWidgets.QHBoxLayout()
         self.vmin_slider = QtWidgets.QSlider(self.page_IMAGE)
         self.vmin_slider.setMinimumSize(QtCore.QSize(150, 0))
         self.vmin_slider.setOrientation(QtCore.Qt.Horizontal)
         self.vmin_slider.setObjectName("vmin_slider")
-        self.vmin_row_layout.addWidget(self.vmin_slider)
+        self.vmin_and_gamma_row_layout.addWidget(self.vmin_slider)
         self.vmin_spinbox = QAdaptiveDoubleSpinBox(self.page_IMAGE)
         self.vmin_spinbox.setRange(-32767, 32767)
         self.vmin_spinbox.setDecimals(5)
@@ -118,9 +118,9 @@ class Ui_LayerDetailsPane(object):
         sizePolicy.setHeightForWidth(self.vmin_spinbox.sizePolicy().hasHeightForWidth())
         self.vmin_spinbox.setSizePolicy(sizePolicy)
         self.vmin_spinbox.setObjectName("vmin_spinbox")
-        self.vmin_row_layout.addWidget(self.vmin_spinbox)
+        self.vmin_and_gamma_row_layout.addWidget(self.vmin_spinbox)
         # Place the vmax elements into a horizontal row layout
-        self.vmax_row_layout = QtWidgets.QHBoxLayout()
+        self.vmax_and_gamma_row_layout = QtWidgets.QHBoxLayout()
         self.vmax_slider = QtWidgets.QSlider(self.page_IMAGE)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -130,7 +130,7 @@ class Ui_LayerDetailsPane(object):
         self.vmax_slider.setMinimumSize(QtCore.QSize(150, 0))
         self.vmax_slider.setOrientation(QtCore.Qt.Horizontal)
         self.vmax_slider.setObjectName("vmax_slider")
-        self.vmax_row_layout.addWidget(self.vmax_slider)
+        self.vmax_and_gamma_row_layout.addWidget(self.vmax_slider)
         self.vmax_spinbox = QAdaptiveDoubleSpinBox(self.page_IMAGE)
         self.vmax_spinbox.setRange(-32767, 32767)
         self.vmax_spinbox.setDecimals(5)
@@ -140,18 +140,15 @@ class Ui_LayerDetailsPane(object):
         sizePolicy.setHeightForWidth(self.vmax_spinbox.sizePolicy().hasHeightForWidth())
         self.vmax_spinbox.setSizePolicy(sizePolicy)
         self.vmax_spinbox.setObjectName("vmax_spinbox")
-        self.vmax_row_layout.addWidget(self.vmax_spinbox)
-        # Place the vmin and vmax rows into a vertical column layout
-        self.vmaxmin_column_layout = QtWidgets.QVBoxLayout()
-        self.vmaxmin_column_layout.addLayout(self.vmin_row_layout)
-        self.vmaxmin_column_layout.addLayout(self.vmax_row_layout)
-        self.vmaxmin_column_layout.setContentsMargins(0, 0, 5, 0)  # right margin
-        # Place the gamma elements into a vertical column layout
-        self.gamma_column_layout = QtWidgets.QVBoxLayout()
+        self.vmax_and_gamma_row_layout.addWidget(self.vmax_spinbox)
+
         self.gammaLabel = QtWidgets.QLabel(self.page_IMAGE)
-        self.gammaLabel.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        self.gammaLabel.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignBottom)
+        self.gammaLabel.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.gammaLabel.setObjectName("gammaLabel")
-        self.gamma_column_layout.addWidget(self.gammaLabel)
+        # Place the label also to the upper horizontal row layout
+        self.vmin_and_gamma_row_layout.addWidget(self.gammaLabel, alignment=QtCore.Qt.AlignBottom)
+
         self.gammaSpinBox = QNoScrollDoubleSpinBox(self.page_IMAGE)
         self.gammaSpinBox.setEnabled(True)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
@@ -159,18 +156,37 @@ class Ui_LayerDetailsPane(object):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.gammaSpinBox.sizePolicy().hasHeightForWidth())
         self.gammaSpinBox.setSizePolicy(sizePolicy)
+        self.gammaSpinBox.setAlignment(QtCore.Qt.AlignCenter)
+
+        # The spinbox shall have the same width as the gamma label. Due to this dependency we need to install an event
+        # filter that takes care when the widgets are actually being whown. Unfortunately, At this point in time,
+        # gammaLabel.width() is not correct as it is not being rendered yet.
+        class GamaSpinboxSizer(QtCore.QObject):
+            def __init__(self, outer_self):
+                super().__init__()
+                self.outer_self = outer_self
+                outer_self.gammaLabel.installEventFilter(self)
+
+            def eventFilter(self, obj, event):
+                if obj is self.outer_self.gammaLabel and event.type() == QtCore.QEvent.Resize:
+                    self.outer_self.gammaSpinBox.setFixedWidth(self.outer_self.gammaLabel.width())
+                return False
+
+        self.gamma_spinbox_sizer = GamaSpinboxSizer(self)
+
         self.gammaSpinBox.setDecimals(1)
         self.gammaSpinBox.setMaximum(5.0)
         self.gammaSpinBox.setSingleStep(0.1)
         self.gammaSpinBox.setProperty("value", 1.0)
         self.gammaSpinBox.setObjectName("gammaSpinBox")
-        self.gamma_column_layout.addWidget(self.gammaSpinBox)
-        self.gamma_column_layout.setContentsMargins(0, 0, 5, 0)  # right margin
-        # Place the vertical elements into a horizontal row layout
-        self.vminmax_gamma_row = QtWidgets.QHBoxLayout()
-        self.vminmax_gamma_row.addLayout(self.vmaxmin_column_layout)
-        self.vminmax_gamma_row.addLayout(self.gamma_column_layout)
-        self.formLayout_2.setLayout(2, QtWidgets.QFormLayout.SpanningRole, self.vminmax_gamma_row)
+        # Place the gamma spinbox also to the lower horizontal row layout
+        self.vmax_and_gamma_row_layout.addWidget(self.gammaSpinBox)
+
+        self.vmaxmin_gamma_column_layout = QtWidgets.QVBoxLayout()
+        self.vmaxmin_gamma_column_layout.addLayout(self.vmin_and_gamma_row_layout)
+        self.vmaxmin_gamma_column_layout.addLayout(self.vmax_and_gamma_row_layout)
+        self.vmaxmin_gamma_column_layout.setContentsMargins(0, 0, 5, 0)  # right margin
+        self.formLayout_2.setLayout(2, QtWidgets.QFormLayout.SpanningRole, self.vmaxmin_gamma_column_layout)
         # colormap buttons
         self.colormap_reassign_button = QtWidgets.QPushButton(self.page_IMAGE)
         self.colormap_reassign_button.setObjectName("colormap_reassign_button")
