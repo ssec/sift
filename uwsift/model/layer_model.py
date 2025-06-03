@@ -146,6 +146,9 @@ class LayerModel(QAbstractItemModel):
     def get_dynamic_layers(self):
         return [layer for layer in self.layers if layer.dynamic]
 
+    def get_dynamic_layer_id(self, layer: LayerItem):
+        return next((i for i, layer_ in enumerate(self.get_dynamic_layers()) if layer_.uuid == layer.uuid), -1)
+
     def data(self, index: QModelIndex, role: Optional[int] = None):
         if not index.isValid():
             return None

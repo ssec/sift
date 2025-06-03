@@ -331,3 +331,6 @@ class QmlBackend(QObject):
             data_layer_index = self.qml_layer_manager.get_convenience_function(conv_func_name)()
             if data_layer_index >= 0:
                 self.didChangeTimebase.emit(data_layer_index)
+
+    def select_layer_index(self, idx):
+        self.didChangeTimebase.emit(idx)
