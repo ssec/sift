@@ -919,6 +919,8 @@ class Main(QtWidgets.QMainWindow):
         time_manager.qml_backend = QmlBackend()
         time_manager.qml_backend.didJumpInTimeline.connect(self.scene_manager.animation_controller.jump)
         time_manager.qml_backend.didChangeTimebase.connect(time_manager.on_timebase_change)
+        self.ui.treeView.layerSelectionChangedIndex.connect(time_manager.qml_backend.select_layer_index)
+
         # TODO(mk): refactor all QML related objects as belonging to TimeManager's QMLBackend
         #           instance -> communication between TimeManager and QMLBackend via Signal/Slot?
         time_manager.qml_backend.qml_layer_manager = time_manager.qml_layer_manager
