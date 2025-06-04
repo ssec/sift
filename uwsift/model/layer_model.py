@@ -51,6 +51,7 @@ class LayerModel(QAbstractItemModel):
     didChangeRecipeLayerNames = pyqtSignal(str)
 
     didUpdateLayers = pyqtSignal()
+    didChangeCurrentLayer = pyqtSignal(UUID)
     didReorderLayers = pyqtSignal(list)
     didFinishActivateProductDatasets = pyqtSignal()
 
@@ -351,6 +352,7 @@ class LayerModel(QAbstractItemModel):
             else:
                 raise NotImplementedError(f"Managing datasets of kind {product_dataset.kind}" f" not (yet) supported.")
 
+            self.didChangeCurrentLayer.emit(layer.uuid)
             self.didUpdateLayers.emit()
         self._update_dependent_recipe_layers(layer)
 
@@ -716,7 +718,7 @@ class LayerModel(QAbstractItemModel):
                 self.change_color_limits_for_layer(recipe_layer.uuid, climits)
             elif not any(input_layers):
                 self.change_color_limits_for_layer(recipe_layer.uuid, INVALID_COLOR_LIMITS)
-
+        self.didChangeCurrentLayer.emit(recipe_layer.uuid)
         self.didUpdateLayers.emit()
 
     def _check_recipe_layer_sched_times_to_update(
