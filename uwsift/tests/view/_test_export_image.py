@@ -351,6 +351,7 @@ def test_export_image_dialog_info_default(qtbot, window):
         "fps": None,
         "font_size": 11,
         "colorbar": None,
+        "size": (909, 731),
     }
 
     assert res == exp
@@ -382,6 +383,7 @@ def test_export_image_dialog_info(qtbot, window):
         "fps": None,
         "font_size": 20,
         "colorbar": "vertical",
+        "size": (909, 731),
     }
 
     assert res == exp
