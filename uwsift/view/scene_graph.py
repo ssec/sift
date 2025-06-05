@@ -37,7 +37,6 @@ from vispy.gloo.util import _screenshot
 from vispy.scene.visuals import Image, Line, Markers, Polygon
 from vispy.util.keys import SHIFT
 from vispy.visuals.transforms import MatrixTransform, STTransform
-from vispy.visuals.transforms.chain import ChainTransform
 
 from uwsift import IMAGE_DISPLAY_MODE, config
 from uwsift.common import (
@@ -330,15 +329,13 @@ class SceneGraphManager(QObject):
 
     def _get_top_dataset_proj4_transform(self):
         """Get the Proj4Transform from the top enabled dataset."""
-        for u, img in self.dataset_nodes.items():
-            xform = img.transform
-            if isinstance(xform, PROJ4Transform):
-                return xform, xform.proj4_str
-            if isinstance(xform, ChainTransform):
-                trs = xform.transforms
-                for tx in trs:
-                    if isinstance(tx, PROJ4Transform):
-                        return xform, tx.proj4_str
+        # Start with the top node in the scene graph, and retrieve
+        # the first dataset node that has a PROJ4Transform.
+        if isinstance(self.main_map.transform, PROJ4Transform):
+            xform = self.main_map.transform
+            # We found a PROJ4Transform on the main map node
+            # LOG.debug("Found PROJ4Transform on main map node: %s", xform.proj4_str)
+            return xform, xform.proj4_str
 
         return None, None
 
@@ -353,41 +350,50 @@ class SceneGraphManager(QObject):
         # Get coordinate system information
         crs = CRS.from_proj4(proj4_str)
 
-        # Calculate the geotransform transforming the camera rect:
-        rect = self.main_view.camera.rect
+        # We start with computing the lon/lat coordinates from some points around the center
+        # location of the view.
+        cs = 0.4  # reference clip size for sampling from center
+        xform = self.latlon_grid_node.transforms.get_transform()
+        t_ll = xform.imap([0.0, cs])[:2]
+        b_ll = xform.imap([0.0, -cs])[:2]
+        l_ll = xform.imap([-cs, 0.0])[:2]
+        r_ll = xform.imap([cs, 0.0])[:2]
 
-        # Create points for the four corners of the viewport in view space coordinates
-        tl = [rect.left, rect.top]
-        tr = [rect.right, rect.top]
-        bl = [rect.left, rect.bottom]
-        br = [rect.right, rect.bottom]
-        LOG.debug("View space: tl=%s, tr=%s, bl=%s, br=%s", tl, tr, bl, br)
-        # We need to transform these points from view space to scene space
-        # and then to the projection space
+        # LOG.debug("lat/lon range: %s", (t_ll, b_ll, l_ll, r_ll))
 
-        # First, get the transform from view to scene space
-        view_to_scene = self.main_view.get_transform("visual", "scene")
+        xform = self.main_map.transform
 
-        # Transform the corners to scene space
-        tl = view_to_scene.map(tl)[:2]
-        tr = view_to_scene.map(tr)[:2]
-        bl = view_to_scene.map(bl)[:2]
-        br = view_to_scene.map(br)[:2]
-        LOG.debug("Scene space: tl=%s, tr=%s, bl=%s, br=%s", tl, tr, bl, br)
+        t_xy = xform.map(t_ll)
+        b_xy = xform.map(b_ll)
+        l_xy = xform.map(l_ll)
+        r_xy = xform.map(r_ll)
 
-        # The PROJ4Transform applies in scene coordinates
-        tl = img_xform.map(tl)[:2]
-        tr = img_xform.map(tr)[:2]
-        bl = img_xform.map(bl)[:2]
-        br = img_xform.map(br)[:2]
-        LOG.debug("Proj space: tl=%s, tr=%s, bl=%s, br=%s", tl, tr, bl, br)
+        # LOG.debug("Transformed coords range: %s", (t_xy, b_xy, l_xy, r_xy))
 
         # Calculate the bounding box in projection coordinates
-        minx = min(tl[0], bl[0])
-        maxx = max(tr[0], br[0])
-        miny = min(bl[1], br[1])
-        maxy = max(tl[1], tr[1])
-        LOG.debug("Bounds: %s, %s, %s, %s", minx, miny, maxx, maxy)
+        minx = l_xy[0]
+        maxx = r_xy[0]
+        miny = b_xy[1]
+        maxy = t_xy[1]
+        # LOG.debug("Central Bounds: %s, %s, %s, %s", minx, miny, maxx, maxy)
+
+        if any(not np.isfinite(val) for val in [minx, maxx, miny, maxy]):
+            LOG.debug("central bounds are not valid cannot extrapolate.")
+            return None
+
+        # Compute the center coordinate and half width/heigh:
+        cx = (minx + maxx) * 0.5
+        cy = (miny + maxy) * 0.5
+        hw = (maxx - minx) * 0.5
+        hh = (maxy - miny) * 0.5
+
+        # Extrapolate the width/height, and then
+        # from there we can recompute the full min/max ranges:
+        minx = cx - hw / cs
+        maxx = cx + hw / cs
+        miny = cy - hh / cs
+        maxy = cy + hh / cs
+        LOG.debug("Full Bounds: %s, %s, %s, %s", minx, miny, maxx, maxy)
 
         x_res = (maxx - minx) / width
         y_res = (maxy - miny) / height
