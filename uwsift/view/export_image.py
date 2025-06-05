@@ -218,6 +218,14 @@ class ExportImageDialog(QtWidgets.QDialog):
         else:
             self._last_dir = os.path.dirname(t)
             bt.setDisabled(False)
+
+        # #414: disable the footer for tif files:
+        if t and os.path.splitext(t)[1].lower() == ".tif":
+            self.ui.includeFooterCheckbox.setDisabled(True)
+            self.ui.includeFooterCheckbox.setChecked(False)
+        else:
+            self.ui.includeFooterCheckbox.setDisabled(False)
+
         self._check_animation_controls()
 
     def _is_gif_filename(self):
