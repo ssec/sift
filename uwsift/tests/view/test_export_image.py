@@ -112,7 +112,7 @@ class _MockSGM:
         self.rng = np.random.default_rng()
         self._frame_order = frame_order
 
-    def get_screenshot_array(self, fr):
+    def get_screenshot_array(self, fr, _size):
         if self._frame_order is False and fr is None:
             # no data loaded
             return [("", self.rng.integers(0, 255, self.fake_screenshot_shape, dtype=np.uint8))]

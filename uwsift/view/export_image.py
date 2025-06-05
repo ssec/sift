@@ -535,7 +535,7 @@ class ExportImageHelper(QtCore.QObject):
             return
 
         # get canvas screenshot arrays (numpy arrays of canvas pixels)
-        img_arrays = self.sgm.get_screenshot_array(info["frame_range"], info["size"])
+        img_arrays = self.sgm.get_screenshot_array(info["frame_range"], info.get("size"))
         if not img_arrays or len(uuids) != len(img_arrays):
             LOG.error(
                 f"Number of frames: {0 if not img_arrays else len(img_arrays)}"

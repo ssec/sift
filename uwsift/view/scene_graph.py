@@ -460,7 +460,7 @@ class SceneGraphManager(QObject):
         return fbo_size
 
     def get_screenshot_array(
-        self, frame_range: None | tuple[int, int], img_size
+        self, frame_range: None | tuple[int, int], img_size=None
     ) -> list[tuple[str | UUID, npt.NDArray[np.uint8]]]:
         """Get numpy arrays representing the current canvas.
 
@@ -487,9 +487,11 @@ class SceneGraphManager(QObject):
         else:
             s, e = frame_range
 
-        fbo = gloo.FrameBuffer(color=gloo.RenderBuffer(img_size[::-1]), depth=gloo.RenderBuffer(img_size[::-1]))
-
         cv = self.main_canvas
+        if img_size is None:
+            img_size = cv.size
+
+        fbo = gloo.FrameBuffer(color=gloo.RenderBuffer(img_size[::-1]), depth=gloo.RenderBuffer(img_size[::-1]))
 
         fbo.activate()
         cv.context.set_viewport(0, 0, *img_size)
