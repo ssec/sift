@@ -576,7 +576,10 @@ class ExportImageHelper(QtCore.QObject):
     def _write_tif_file(self, filename, image_arrays):
         """Write a single geotiff file."""
         # We expect only one image array in this case:
-        assert len(image_arrays) == 1, f"Invalid number of geotiff image arrays: {len(image_arrays)}."
+        if len(image_arrays) != 1:
+            LOG.error("Invalid number of geotiff image arrays: %s.", len(image_arrays))
+            return
+
         arr = image_arrays[0]
         width = arr.shape[1]
         height = arr.shape[0]
