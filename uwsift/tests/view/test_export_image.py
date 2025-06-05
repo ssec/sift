@@ -278,10 +278,10 @@ def test_save_screenshot_animations(fr, fn, overwrite, fps, monkeypatch, window,
     window.export_image._save_screenshot()
     assert fn.is_file()
     if fn.suffix == ".gif":
-        exp_frame_shape = (15, 20)
+        exp_frame_shape = (15, 18)
         read_kwargs = {"plugin": "pillow", "mode": "RGBA"}
     else:
-        exp_frame_shape = (14, 20)
+        exp_frame_shape = (14, 18)
         read_kwargs = {"plugin": "pyav"}
     frames = imageio.imread(fn, **read_kwargs)
     assert frames.shape[0] == (len(fr) if fr else 1)
@@ -319,7 +319,7 @@ def test_save_screenshot_images(fr, fn, overwrite, monkeypatch, window, tmp_path
     for exp_file in expected_files:
         assert exp_file.is_file()
         img = imageio.imread(exp_file)
-        assert img.shape[:2] == (15, 20)
+        assert img.shape[:2] == (15, 18)
 
 
 def test_cmd_open_export_image_dialog(qtbot, window):
