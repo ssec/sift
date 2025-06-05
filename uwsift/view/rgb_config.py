@@ -234,7 +234,8 @@ class RGBLayerConfigPane(QObject):
         return (slider_val / self._slider_steps) * (valid_max - valid_min) + valid_min
 
     def _create_slider_value(self, valid_min, valid_max, channel_val):
-        return int((channel_val - valid_min) / (valid_max - valid_min)) * self._slider_steps
+        # return int((channel_val - valid_min) / (valid_max - valid_min)) * self._slider_steps
+        return int((channel_val - valid_min) / (valid_max - valid_min) * self._slider_steps)
 
     def _update_line_edits(self, color: str, n: Optional[float] = None, x: Optional[float] = None):
         """
@@ -287,7 +288,7 @@ class RGBLayerConfigPane(QObject):
         n, x = self._update_line_edits(color, value if not is_max else None, value if is_max else None)
         self._signal_color_changing_range(color, n, x)
 
-    def _edit_changed(self, line_edit: QLineEdit, color: str, is_max: bool):
+    def _edit_changed(self, line_edit: QLineEdit, color: str, is_max: bool):  # pragma: no cover
         """
         update relevant slider value, propagate to the document
         :param line_edit: field that got a new value
@@ -302,9 +303,20 @@ class RGBLayerConfigPane(QObject):
         LOG.debug("line edit %s %s => %f => %f" % (color, "max" if is_max else "min", vdis, val))
         sv = self._create_slider_value(vn, vx, val)
         slider = self.sliders[idx][1 if is_max else 0]
+        slider2 = self.sliders[idx][0 if is_max else 1]
+        current_slider_max = slider.maximum()
+        current_slider_min = slider.minimum()
         slider.blockSignals(True)
+        slider2.blockSignals(True)
+        if current_slider_max < sv:
+            slider.setMaximum(sv)
+            slider2.setMaximum(sv)
+        if current_slider_min > sv:
+            slider.setMinimum(sv)
+            slider2.setMinimum(sv)
         slider.setValue(sv)
         slider.blockSignals(False)
+        slider2.blockSignals(False)
         self._signal_color_changing_range(color, *self._update_line_edits(color))
 
     def selection_did_change(self, layers: Tuple[LayerItem]):

@@ -17,6 +17,7 @@ __author__ = "evas"
 __docformat__ = "reStructuredText"
 
 import logging
+import math
 from functools import partial
 from typing import Optional, Tuple
 
@@ -43,7 +44,7 @@ LOG = logging.getLogger(__name__)
 class SingleLayerInfoPane(QtWidgets.QWidget):
     """Shows details about one layer that is currently selected."""
 
-    _slider_steps = 100
+    _slider_steps = 1000000
     _resampling_info = None
 
     # Flags that indicate whether to perform invert current time fit data or invert all times fit data
@@ -76,8 +77,25 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         self._details_pane_ui.cmap_combobox.currentIndexChanged.connect(self._cmap_changed)
         self._details_pane_ui.vmin_slider.valueChanged.connect(partial(self._slider_changed, is_max=False))
         self._details_pane_ui.vmax_slider.valueChanged.connect(partial(self._slider_changed, is_max=True))
+
+        # Detect if one of the buttons of the vmin/vmax spinbox has been clicked
+        def on_spinbox_arrow_clicked():
+            self._spinbox_button_was_clicked = True
+
+        # If the text of one of the vmin/vmax spinbox has been changed this resets the
+        # "spin button was clicked"-state.
+        def on_spinbox_text_changed(_):
+            self._spinbox_button_was_clicked = False
+
         self._details_pane_ui.vmin_spinbox.valueChanged.connect(partial(self._spin_box_changed, is_max=False))
+        self._details_pane_ui.vmin_spinbox.upArrowClicked.connect(on_spinbox_arrow_clicked)
+        self._details_pane_ui.vmin_spinbox.downArrowClicked.connect(on_spinbox_arrow_clicked)
+        self._details_pane_ui.vmin_spinbox.lineEdit().textEdited.connect(on_spinbox_text_changed)
         self._details_pane_ui.vmax_spinbox.valueChanged.connect(partial(self._spin_box_changed, is_max=True))
+        self._details_pane_ui.vmax_spinbox.upArrowClicked.connect(on_spinbox_arrow_clicked)
+        self._details_pane_ui.vmax_spinbox.downArrowClicked.connect(on_spinbox_arrow_clicked)
+        self._details_pane_ui.vmax_spinbox.lineEdit().textEdited.connect(on_spinbox_text_changed)
+        self._spinbox_button_was_clicked = False
 
         self._details_pane_ui.gammaSpinBox.valueChanged.connect(self._gamma_changed)
 
@@ -90,6 +108,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         self._details_pane_ui.climitsCurrentTimeInvert.clicked.connect(self._invert_fit_clims_to_current_times)
 
         self._details_pane_ui.colormap_reset_button.clicked.connect(self._reset_to_initial_state)
+        self._details_pane_ui.colormap_reassign_button.clicked.connect(self._reassign_color_limits)
 
     # Slot functions
 
@@ -172,6 +191,18 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         self._current_cmap = str(cmap_str)
         model.change_colormap_for_layer(self._current_selected_layer.uuid, self._current_cmap)
 
+    def _set_valid_min_max(self, channel_val):
+        if self._valid_max >= self._valid_min:
+            if channel_val < self._valid_min:
+                self._valid_min = channel_val
+            if channel_val > self._valid_max:
+                self._valid_max = channel_val
+        else:
+            if channel_val < self._valid_max:
+                self._valid_max = channel_val
+            if channel_val > self._valid_min:
+                self._valid_min = channel_val
+
     def _create_slider_value(self, channel_val):
         if self._valid_max == self._valid_min:
             return 0
@@ -235,8 +266,8 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         assert actual_range != (None, None)  # nosec B101
         self._valid_min, self._valid_max = range_hull_no_fail(actual_range, valid_range, actual_range)
 
-        self._update_vmin()
-        self._update_vmax()
+        self._update_vmin(True)
+        self._update_vmax(True)
 
     def _fit_clims_to_current_time(self):
         first_active_dataset = self._current_selected_layer.get_first_active_product_dataset()
@@ -254,8 +285,8 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
             assert actual_range != (None, None)  # nosec B101
             self._valid_min, self._valid_max = range_hull_no_fail(actual_range, valid_range, actual_range)
 
-            self._update_vmin()
-            self._update_vmax()
+            self._update_vmin(True)
+            self._update_vmax(True)
 
     def _gamma_changed(self, val):
         model = self._current_selected_layer.model
@@ -337,6 +368,46 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         self._update_vmax()
         self._update_gamma()
 
+    def _set_reassign_button_state(self, val1, val2):
+        if math.isclose(val1, val2, rel_tol=1e-6):
+            self._details_pane_ui.colormap_reassign_button.setEnabled(False)
+        else:
+            self._details_pane_ui.colormap_reassign_button.setEnabled(True)
+
+    def _reassign_color_limits(self):
+        # Get spin box values
+        spin_box_max = self._details_pane_ui.vmax_spinbox
+        spin_box_min = self._details_pane_ui.vmin_spinbox
+        val_max = spin_box_max.value()
+        val_min = spin_box_min.value()
+
+        # Convert spin box values using the inverse unit conversion
+        unit_converter = self._current_selected_layer.info[Info.UNIT_CONVERSION][1]
+        val_max = self._create_slider_value(unit_converter(val_max, inverse=True))
+        val_min = self._create_slider_value(unit_converter(val_min, inverse=True))
+
+        # Determine min and max values for sliders
+        real_max = max(val_min, val_max)
+        real_min = min(val_min, val_max)
+
+        # Access sliders
+        slider_max = self._details_pane_ui.vmax_slider
+        slider_min = self._details_pane_ui.vmin_slider
+
+        # Block signals to prevent unwanted updates during setup
+        for slider in (slider_max, slider_min):
+            slider.blockSignals(True)
+            slider.setMaximum(real_max)
+            slider.setMinimum(real_min)
+
+        # Set current slider values
+        slider_max.setValue(val_max)
+        slider_min.setValue(val_min)
+
+        # Re-enable signals after setup
+        for slider in (slider_max, slider_min):
+            slider.blockSignals(False)
+
     def _set_new_clims(self, val, is_max):
         if is_max:
             new_clims = (self._current_selected_layer.presentation.climits[0], val)
@@ -352,6 +423,8 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         self._enable_all_buttons()
 
         spin_box = self._details_pane_ui.vmax_spinbox if is_max else self._details_pane_ui.vmin_spinbox
+        spin_box2 = self._details_pane_ui.vmin_spinbox if is_max else self._details_pane_ui.vmax_spinbox
+
         if value is None:
             slider = self._details_pane_ui.vmax_slider if is_max else self._details_pane_ui.vmin_slider
             value = slider.value()
@@ -359,8 +432,10 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         LOG.debug("slider %s %s => %f" % (self._current_selected_layer.uuid, "max" if is_max else "min", value))
         display_val = self._current_selected_layer.info[Info.UNIT_CONVERSION][1](value)
         spin_box.blockSignals(True)
-        spin_box.setValue(display_val)
+        spin_box.setValue(display_val, True)
         spin_box.blockSignals(False)
+
+        self._set_reassign_button_state(spin_box.value(), spin_box2.value())
         return self._set_new_clims(value, is_max)
 
     def _spin_box_changed(self, is_max=True):
@@ -373,10 +448,40 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         LOG.debug(
             "spin box %s %s => %f => %f" % (self._current_selected_layer.uuid, "max" if is_max else "min", dis_val, val)
         )
+        # The val value probably affects _valid_min and _valid_max
+        self._set_valid_min_max(val)
         sv = self._create_slider_value(val)
+
+        # take the data for the second slider and spinbox
+        slider2 = self._details_pane_ui.vmin_slider if is_max else self._details_pane_ui.vmax_slider
+        spin_box2 = self._details_pane_ui.vmin_spinbox if is_max else self._details_pane_ui.vmax_spinbox
+        dis_val2 = spin_box2.value()
+        val2 = self._current_selected_layer.info[Info.UNIT_CONVERSION][1](dis_val2, inverse=True)
+        sv2 = self._create_slider_value(val2)
+
+        # block the slider signals
         slider.blockSignals(True)
+        slider2.blockSignals(True)
+
+        # set value to the slider
         slider.setValue(sv)
+        # set the value of the second slider, as the mapping of the slider values may have changed
+        slider2.setValue(sv2)
+
+        # unblock the slider signals
         slider.blockSignals(False)
+        slider2.blockSignals(False)
+
+        # Workaround for the strange behavior in the spinbox, where the value
+        # increases or decreases twice with a single arrow click when the maximum
+        # or minimum of the range is changed
+        if self._spinbox_button_was_clicked:
+            spin_box.setEnabled(False)
+            spin_box.setEnabled(True)
+            self._details_pane_ui.gammaSpinBox.clearFocus()
+            self._spinbox_button_was_clicked = False
+
+        self._set_reassign_button_state(dis_val, spin_box2.value())
         return self._set_new_clims(val, is_max)
 
     def _update_displayed_info(self):
@@ -476,28 +581,27 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
     def _update_gamma(self):
         self._details_pane_ui.gammaSpinBox.setValue(self._current_selected_layer.presentation.gamma)
 
-    def _update_spin_box(self, spinbox, cur_val):
-        # Issue #333: need to take into account here that valid_min/valid_max might be inverted,
-        # so the spinbox range should be set with the actual min/max values:
-        conv = self._current_selected_layer.info[Info.UNIT_CONVERSION]
-        vmin = min(conv[1](self._valid_min), conv[1](self._valid_max))
-        vmax = max(conv[1](self._valid_min), conv[1](self._valid_max))
-        spinbox.setRange(vmin, vmax)
-        spinbox.setValue(conv[1](cur_val))
-
-    def _update_vmin(self):
+    def _update_vmin(self, keep_displ_decs=False):
         current_vmin = self._current_selected_layer.presentation.climits[0]
         self._details_pane_ui.vmin_slider.setRange(0, self._slider_steps)
         slider_val = self._create_slider_value(current_vmin)
         self._details_pane_ui.vmin_slider.setSliderPosition(max(slider_val, 0))
 
-        self._update_spin_box(self._details_pane_ui.vmin_spinbox, current_vmin)
+        conv = self._current_selected_layer.info[Info.UNIT_CONVERSION]
+        self._details_pane_ui.vmin_spinbox.setValue(
+            conv[1](self._valid_min) if conv[1](self._valid_min) > conv[1](current_vmin) else conv[1](current_vmin),
+            keep_displ_decs,
+        )
 
-    def _update_vmax(self):
+    def _update_vmax(self, keep_displ_decs=False):
         current_vmax = self._current_selected_layer.presentation.climits[1]
         self._details_pane_ui.vmax_slider.setMaximum(32767)
         self._details_pane_ui.vmax_slider.setRange(0, self._slider_steps)
         slider_val = self._create_slider_value(current_vmax)
         self._details_pane_ui.vmax_slider.setSliderPosition(min(slider_val, 32767))
 
-        self._update_spin_box(self._details_pane_ui.vmax_spinbox, current_vmax)
+        conv = self._current_selected_layer.info[Info.UNIT_CONVERSION]
+        self._details_pane_ui.vmax_spinbox.setValue(
+            conv[1](self._valid_max) if conv[1](self._valid_max) < conv[1](current_vmax) else conv[1](current_vmax),
+            keep_displ_decs,
+        )
