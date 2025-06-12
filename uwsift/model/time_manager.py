@@ -258,6 +258,7 @@ class TimeManager(QObject):
         self.sync_to_time_transformer()
 
     def change_current_timebase_uuid(self, uuid):
-        layer = self._layer_model.get_layer_by_uuid(uuid)
-        if layer.dynamic:
-            self.current_timebase_uuid = uuid
+        if self.qml_backend.link_to_selected_layer:
+            layer = self._layer_model.get_layer_by_uuid(uuid)
+            if layer.dynamic:
+                self.current_timebase_uuid = uuid

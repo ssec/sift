@@ -21,7 +21,7 @@ Item{
         y: parent.y
         width: parent.width
         height: parent.height
-        rows    : 2
+        rows    : 3
         columns : 9
         columnSpacing: 0
         rowSpacing: 0
@@ -51,8 +51,7 @@ Item{
             Layout.preferredHeight : grid.prefHeight(this)
             Layout.bottomMargin: 0;
             Column{
-                spacing: 10
-
+            anchors.verticalCenter: parent.verticalCenter
                 Label{
                     id: current_dt_label
                     text: timebaseModel.currentTimestamp;
@@ -224,13 +223,35 @@ Item{
 
         }
         Rectangle {
+            id : checkbox_rect
+
+            color : default_gray
+            border.color: default_gray;
+
+            Layout.row       : 2
+            Layout.column    : 0
+            Layout.rowSpan   : 1
+            Layout.columnSpan: 2
+            Layout.preferredWidth  : grid.prefWidth(this)
+            Layout.preferredHeight : grid.prefHeight(this)
+            Layout.bottomMargin: 0;
+
+            CheckBox {
+                id: myCheckBox
+                text: "Link to Selected Layer"
+                checked: true
+                scale: 0.9
+                onCheckedChanged: backend.setLinkToSelectedLayer(checked)
+            }
+        }
+        Rectangle {
             id : timeline_rect
             color : default_gray
             border.color: default_gray;
 
             Layout.row       : 0
             Layout.column    : 2
-            Layout.rowSpan : 2
+            Layout.rowSpan : 3
 
             Layout.columnSpan : 7
             Layout.preferredWidth  : grid.prefWidth(this)
