@@ -920,6 +920,7 @@ class Main(QtWidgets.QMainWindow):
         time_manager.qml_backend.didJumpInTimeline.connect(self.scene_manager.animation_controller.jump)
         time_manager.qml_backend.didChangeTimebase.connect(time_manager.on_timebase_change)
         self.ui.treeView.layerSelectionChangedIndex.connect(time_manager.qml_backend.select_layer_index)
+        self.ui.layerCheckbox.toggled.connect(time_manager.qml_backend.setLinkToSelectedLayer)
 
         # TODO(mk): refactor all QML related objects as belonging to TimeManager's QMLBackend
         #           instance -> communication between TimeManager and QMLBackend via Signal/Slot?
