@@ -41,7 +41,7 @@ def is_gif_filename(fn):
 
 
 def is_tif_filename(fn):
-    return os.path.splitext(fn)[-1] in [".tif"]
+    return os.path.splitext(fn)[-1] in [".tif", ".tiff"]
 
 
 def is_video_filename(fn):
@@ -201,7 +201,7 @@ class ExportImageDialog(QtWidgets.QDialog):
             self,
             caption=self.tr("Screenshot Filename"),
             directory=os.path.join(self._last_dir, self.default_filename),
-            filter=self.tr("Image Files (*.png *.tif *.jpg *.gif *.mp4 *.m4v)"),
+            filter=self.tr("Image Files (*.png *.tif *.tiff *.jpg *.gif *.mp4 *.m4v)"),
             options=QtWidgets.QFileDialog.DontConfirmOverwrite,
         )[0]
         if fn:
@@ -213,14 +213,14 @@ class ExportImageDialog(QtWidgets.QDialog):
     def _validate_filename(self):
         t = self.ui.saveAsLineEdit.text()
         bt = self.ui.buttonBox.button(QtWidgets.QDialogButtonBox.Save)
-        if not t or os.path.splitext(t)[-1] not in [".png", ".tif", ".jpg", ".gif", ".mp4", ".m4v"]:
+        if not t or os.path.splitext(t)[-1] not in [".png", ".tif", ".tiff", ".jpg", ".gif", ".mp4", ".m4v"]:
             bt.setDisabled(True)
         else:
             self._last_dir = os.path.dirname(t)
             bt.setDisabled(False)
 
         # #414: disable the footer for tif files:
-        if t and os.path.splitext(t)[1].lower() == ".tif":
+        if t and os.path.splitext(t)[1].lower() in [".tif", ".tiff"]:
             self.ui.includeFooterCheckbox.setDisabled(True)
             self.ui.includeFooterCheckbox.setChecked(False)
         else:
