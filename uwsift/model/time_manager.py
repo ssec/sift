@@ -70,6 +70,7 @@ class TimeManager(QObject):
         layer_model.didUpdateLayers.connect(self.sync_to_time_transformer)
         layer_model.didChangeRecipeLayerNames.connect(self.update_qml_layer_model)
         layer_model.didReorderLayers.connect(self._update_layer_order)
+        layer_model.didChangeCurrentLayer.connect(self.change_current_timebase_uuid)
 
         self.didMatchTimes.connect(self._layer_model.on_didMatchTimes)
 
@@ -255,3 +256,9 @@ class TimeManager(QObject):
         self._time_transformer.change_timebase(layer)
         self.update_qml_timeline(layer)
         self.sync_to_time_transformer()
+
+    def change_current_timebase_uuid(self, uuid):
+        if self.qml_backend.link_to_selected_layer:
+            layer = self._layer_model.get_layer_by_uuid(uuid)
+            if layer.dynamic:
+                self.current_timebase_uuid = uuid

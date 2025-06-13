@@ -289,6 +289,7 @@ class QmlBackend(QObject):
     def __init__(self) -> None:
         super().__init__()
         self.qml_layer_manager: QmlLayerManager | None = None
+        self.link_to_selected_layer = True
 
     def clear_timeline(self):
         self.doClearTimeline.emit()
@@ -331,3 +332,11 @@ class QmlBackend(QObject):
             data_layer_index = self.qml_layer_manager.get_convenience_function(conv_func_name)()
             if data_layer_index >= 0:
                 self.didChangeTimebase.emit(data_layer_index)
+
+    def select_layer_index(self, idx):
+        if self.link_to_selected_layer:
+            self.didChangeTimebase.emit(idx)
+
+    @pyqtSlot(bool)
+    def setLinkToSelectedLayer(self, checked):
+        self.link_to_selected_layer = checked
