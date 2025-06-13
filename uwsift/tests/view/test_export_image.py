@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import os
 from typing import Any, Optional
+from unittest.mock import MagicMock, Mock, patch
 
 import imageio.v3 as imageio
 import numpy as np
@@ -387,3 +388,96 @@ def test_export_image_dialog_info(qtbot, window):
     }
 
     assert res == exp
+
+
+@pytest.mark.parametrize(
+    "fn,exp",
+    [
+        ("test.tif", True),
+        ("test.tiff", True),
+        ("test.TIF", True),
+        ("test.TIFF", True),
+        ("test.png", False),
+        ("test.jpg", False),
+    ],
+)
+def test_is_tif_filename(fn, exp):
+    """Test that TIF/TIFF file names are recognized correctly."""
+    res = export_image.is_tif_filename(fn)
+    assert res == exp
+
+
+@pytest.mark.parametrize(
+    "images,filename,expected_channels",
+    [
+        # Test RGBA image (4 channels)
+        ([("uuid1", Image.new("RGBA", (10, 10), (255, 0, 0, 128)))], "test.tif", 4),
+        # Test RGB image (3 channels)
+        ([("uuid1", Image.new("RGB", (10, 10), (255, 0, 0)))], "test.tif", 3),
+    ],
+)
+def test_image_to_frame_array_tif_formats(images, filename, expected_channels):
+    """Test conversion of PIL Images to numpy arrays for TIF files."""
+    result = export_image._image_to_frame_array(images, filename)
+
+    assert len(result) == 1
+    print(f"Shape: {result[0].shape}")
+
+    assert result[0].shape[2] == expected_channels
+    assert result[0].shape[:2] == (10, 10)
+
+
+def test_image_to_frame_array_jpeg_removes_alpha():
+    """Test that JPEG files have alpha channel removed."""
+    images = [("uuid1", Image.new("RGBA", (10, 10), (255, 0, 0, 128)))]
+    result = export_image._image_to_frame_array(images, "test.jpg")
+
+    assert len(result) == 1
+    assert result[0].shape[2] == 3  # RGB only, no alpha
+
+
+def test_supports_rgba():
+    """Test RGBA support detection for different file formats."""
+    assert export_image._supports_rgba("test.png")
+    assert export_image._supports_rgba("test.tif")
+    assert export_image._supports_rgba("test.tiff")
+    assert export_image._supports_rgba("test.gif")
+    assert not export_image._supports_rgba("test.jpg")
+    assert not export_image._supports_rgba("test.jpeg")
+
+
+@patch("rasterio.open")
+def test_write_tif_file_with_projection(mock_rasterio_open, window):
+    """Test writing TIF file with projection information."""
+    # Setup mock projection parameters
+    mock_proj_params = {"crs": "EPSG:4326", "transform": [1.0, 0.0, -180.0, 0.0, -1.0, 90.0]}
+
+    # Mock the SGM's collect_projection_infos method
+    window.export_image.sgm.collect_projection_infos = Mock(return_value=mock_proj_params)
+
+    # Create test image array
+    test_array = np.random.randint(0, 255, (100, 200, 4), dtype=np.uint8)
+
+    # Mock rasterio context manager
+    mock_dst = MagicMock()
+    mock_rasterio_open.return_value.__enter__.return_value = mock_dst
+
+    # Call the method
+    window.export_image._write_tif_file("test.tif", [test_array])
+
+    # Verify rasterio.open was called with correct parameters
+    mock_rasterio_open.assert_called_once_with(
+        "test.tif",
+        "w",
+        driver="GTiff",
+        height=100,
+        width=200,
+        count=4,
+        dtype=test_array.dtype,
+        crs="EPSG:4326",
+        transform=[1.0, 0.0, -180.0, 0.0, -1.0, 90.0],
+        compress="lzw",
+    )
+
+    # Verify all channels were written
+    assert mock_dst.write.call_count == 4

@@ -37,15 +37,15 @@ PYAV_ANIMATION_PARAMS = {
 
 
 def is_gif_filename(fn):
-    return os.path.splitext(fn)[-1] in [".gif"]
+    return os.path.splitext(fn)[-1].lower() in [".gif"]
 
 
 def is_tif_filename(fn):
-    return os.path.splitext(fn)[-1] in [".tif", ".tiff"]
+    return os.path.splitext(fn)[-1].lower() in [".tif", ".tiff"]
 
 
 def is_video_filename(fn):
-    return os.path.splitext(fn)[-1] in [".mp4", ".m4v", ".gif"]
+    return os.path.splitext(fn)[-1].lower() in [".mp4", ".m4v", ".gif"]
 
 
 class ExportImageDialog(QtWidgets.QDialog):
