@@ -481,3 +481,106 @@ def test_write_tif_file_with_projection(mock_rasterio_open, window):
 
     # Verify all channels were written
     assert mock_dst.write.call_count == 4
+
+
+@patch("rasterio.open")
+def test_write_tif_file_without_projection(mock_rasterio_open, window):
+    """Test writing TIF file without projection information."""
+    # Mock SGM to return None (no projection info)
+    window.export_image.sgm.collect_projection_infos = Mock(return_value=None)
+
+    # Create test image array
+    test_array = np.random.randint(0, 255, (50, 75, 3), dtype=np.uint8)
+
+    # Mock rasterio context manager
+    mock_dst = MagicMock()
+    mock_rasterio_open.return_value.__enter__.return_value = mock_dst
+
+    # Call the method
+    window.export_image._write_tif_file("test.tif", [test_array])
+
+    # Verify rasterio.open was called with None for crs and transform
+    mock_rasterio_open.assert_called_once_with(
+        "test.tif",
+        "w",
+        driver="GTiff",
+        height=50,
+        width=75,
+        count=3,
+        dtype=test_array.dtype,
+        crs=None,
+        transform=None,
+        compress="lzw",
+    )
+
+
+def test_write_tif_file_invalid_image_count(window, caplog):
+    """Test error handling when multiple images are provided for single TIF."""
+    test_arrays = [
+        np.random.randint(0, 255, (10, 10, 3), dtype=np.uint8),
+        np.random.randint(0, 255, (10, 10, 3), dtype=np.uint8),
+    ]
+
+    window.export_image._write_tif_file("test.tif", test_arrays)
+
+    # Check that error was logged
+    assert "Invalid number of geotiff image arrays: 2" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "fr,fn,overwrite",
+    [
+        ([1, 2], "test_{start_time:%H%M%S}.tif", True),
+        ([1, 2], "test_{start_time:%H%M%S}.tiff", True),
+        (None, "test_single.tif", True),
+    ],
+)
+@patch("uwsift.view.export_image.ExportImageHelper._write_tif_file")
+def test_save_screenshot_tif_files(mock_write_tif, fr, fn, overwrite, monkeypatch, window, tmp_path):
+    """Test screenshot saving for TIF/TIFF files."""
+    exp_num = 1 if not fr else len(fr)
+    expected_files = [
+        tmp_path / fn.format(start_time=datetime.datetime(2000, 1, 1, 0, offset, 0)) for offset in range(exp_num)
+    ]
+
+    if overwrite:
+        for exp_file in expected_files:
+            exp_file.touch()
+        monkeypatch.setattr(window.export_image, "_overwrite_dialog", lambda: overwrite)
+
+    monkeypatch.setattr(window.export_image, "_screenshot_dialog", _get_mock_sd(fr or None, str(tmp_path / fn)))
+    monkeypatch.setattr(window.export_image, "sgm", _get_mock_sgm(fr))
+    monkeypatch.setattr(window.export_image, "model", _get_mock_model())
+
+    window.export_image._save_screenshot()
+
+    # Verify _write_tif_file was called for each expected file
+    assert mock_write_tif.call_count == len(expected_files)
+
+    # Verify the calls were made with correct filenames
+    for call, expected_file in zip(mock_write_tif.call_args_list, expected_files):
+        filename, image_arrays = call[0]
+        assert filename == str(expected_file)
+        assert len(image_arrays) == 1  # Single image per TIF file
+
+
+@patch("rasterio.open")
+def test_write_images_calls_tif_writer(mock_rasterio_open, window):
+    """Test that _write_images calls the TIF writer for TIF files."""
+    # Mock rasterio
+    mock_dst = MagicMock()
+    mock_rasterio_open.return_value.__enter__.return_value = mock_dst
+
+    # Mock SGM projection info
+    window.export_image.sgm.collect_projection_infos = Mock(return_value=None)
+
+    # Create test data
+    test_image = Image.new("RGB", (10, 10), (255, 0, 0))
+    filenames = [("test.tif", [("uuid1", test_image)])]
+    params = {}
+
+    # Call the method
+    window.export_image._write_images(filenames, params)
+
+    # Verify rasterio.open was called
+    mock_rasterio_open.assert_called_once()
