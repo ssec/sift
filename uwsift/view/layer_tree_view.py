@@ -16,6 +16,7 @@ LOG = logging.getLogger(__name__)
 
 class LayerTreeView(QTreeView):
     layerSelectionChanged = pyqtSignal(tuple)
+    layerSelectionChangedIndex = pyqtSignal(int)
     selectedLayerForProbeChanged = pyqtSignal(str)
 
     def __init__(self, *args, **kwargs):
@@ -128,6 +129,10 @@ class LayerTreeView(QTreeView):
         if len(self.model().layers) > 0:
             selected_layer: tuple = (self.model().layers[current.row()],)
             self.layerSelectionChanged.emit(selected_layer)
+            dynamic_layer_id = self.model().get_dynamic_layer_id(selected_layer[0])
+            if dynamic_layer_id != -1:
+                self.layerSelectionChangedIndex.emit(dynamic_layer_id)
+
             self.selectedLayerForProbeChanged.emit(DEFAULT_POINT_PROBE)
 
     def begin_layers_removal(self, *args, **kwargs):

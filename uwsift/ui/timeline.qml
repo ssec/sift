@@ -51,8 +51,7 @@ Item{
             Layout.preferredHeight : grid.prefHeight(this)
             Layout.bottomMargin: 0;
             Column{
-                spacing: 10
-
+            anchors.verticalCenter: parent.verticalCenter
                 Label{
                     id: current_dt_label
                     text: timebaseModel.currentTimestamp;
