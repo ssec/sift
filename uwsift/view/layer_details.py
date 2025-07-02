@@ -41,6 +41,10 @@ from uwsift.view.colormap import COLORMAP_MANAGER
 LOG = logging.getLogger(__name__)
 
 
+SLIDER_MIN_VAL = -2147483648
+SLIDER_MAX_VAL = 2147483647
+
+
 class SingleLayerInfoPane(QtWidgets.QWidget):
     """Shows details about one layer that is currently selected."""
 
@@ -462,6 +466,9 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         # block the slider signals
         slider.blockSignals(True)
         slider2.blockSignals(True)
+
+        sv = max(SLIDER_MIN_VAL, min(SLIDER_MAX_VAL, sv))  # avoid OverflowError in slider.setvalue(...)
+        sv2 = max(SLIDER_MIN_VAL, min(SLIDER_MAX_VAL, sv2))
 
         # set value to the slider
         slider.setValue(sv)
