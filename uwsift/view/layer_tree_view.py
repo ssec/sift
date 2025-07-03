@@ -26,27 +26,59 @@ LOG = logging.getLogger(__name__)
 
 class EqualizerBarDelegate(QStyledItemDelegate):
 
-    # If there is no valid_range available, we need to store and maintain the colour limits in _climits_map
-    _climits_map: dict[int, tuple[float, float]]
+    # If there is no valid_range available, we need to store and maintain the colour limits, since they are initially
+    # valid (total) ranges but can get changed by the user. But since we also need to take care for reordering, we
+    # also store the valid_range values to keep the reordering algorithm simple.
+    _total_ranges: dict[int, tuple[float, float]] = {}
     EQUALIZER_BLUE = QColor(100, 200, 250)
     EQUALIZER_COL_EXEED_BLUE = QColor(180, 220, 255)
 
-    def __init__(self, parent=None, view=None):
-        super().__init__(parent)
-        self.view = view
-
     def _layers_reordered(self, sourceParent, sourceStart, sourceEnd, destinationParent, destinationRow):
-        print(
-            f"\nsourceParent:{sourceParent}\nsourceStart:{sourceStart}\nsourceEnd:{sourceEnd}\n"
-            f"destinationParent:{destinationParent}\ndestinationRow:{destinationRow}"
-        )
-        if (sourceStart == sourceEnd) and (sourceStart in self._climits_map) and (destinationRow in self._climits_map):
-            tmp = self._climits_map[sourceStart]
-            self._climits_map[sourceStart] = self._climits_map[destinationRow]
-            self._climits_map[destinationRow] = tmp
-            print(f"Exchanged: {sourceStart} <-> {destinationRow}")
+
+        def prt(when):
+            print(f"{when} _total_ranges content:")
+            for k, v in self._total_ranges.items():
+                print(f"{k}: {v}")
+
+        # must not differ due to setSelectionMode(QTableWidget.SingleSelection)
+        assert sourceStart == sourceEnd  # nosec B101
+        highest_index = max(self._total_ranges.keys())
+        if (sourceStart <= highest_index) and (destinationRow <= highest_index + 1):
+            prt("before")
+            self._move_and_reindex(sourceStart, destinationRow)
+            print(f"Moved: {sourceStart} -> {destinationRow}")
+            prt("after")
+
+    def _move_and_reindex(self, from_idx: int, target_idx: int):
+        # QT would never provide the same indices when reordering
+        assert from_idx != target_idx  # nosec B101
+        # Get ordered list of values
+        items = [self._total_ranges[i] for i in sorted(self._total_ranges.keys())]
+        # Move the item
+        moved_item = items.pop(from_idx)
+        # Insert at target position
+        # If we removed an item before target_idx, target_idx shifts left by 1
+        if from_idx > target_idx:
+            insert_pos = target_idx
+        else:
+            insert_pos = target_idx - 1
+        items.insert(insert_pos, moved_item)
+        # Return reindexed dictionary
+        self._total_ranges = {i: item for i, item in enumerate(items)}
+
+    def _layers_removed(self, parent, first, last):
+        print(f"_layers_removed: {first} -- {last}")
+        self._reset()
+
+    def _layers_inserted(self, parent, first, last):
+        print(f"_layers_inserted: {first} -- {last}")
+        self._reset()
+
+    def _reset(self):
+        self._total_ranges = {}
 
     def paint(self, painter, option, index):
+        """Override from base class to realise the custom rendering of the bar."""
         dummy_index = QModelIndex()
         super().paint(painter, option, dummy_index)
 
@@ -58,19 +90,20 @@ class EqualizerBarDelegate(QStyledItemDelegate):
             value = None
 
         painter.save()
-        if value:
-            idx = index.row()
+        idx = index.row()
+
+        if value is not None:
             layer = index.model().layers[idx]
             conv = layer.info[Info.UNIT_CONVERSION][1]
             probe_val_range = FALLBACK_RANGE
             if layer.valid_range:
-                probe_val_range = self._process_valid_range(idx, layer.valid_range)
+                probe_val_range = self._process_range(idx, layer.valid_range, disp_text)
             else:
-                probe_val_range = self._climits_map[idx] if idx in self._climits_map else probe_val_range
+                probe_val_range = self._total_ranges[idx] if idx in self._total_ranges else probe_val_range
                 _climits = layer.presentation.climits
                 if _climits and any(isinstance(v, (int, float)) for v in _climits):
                     if np.isfinite(_climits).all():
-                        probe_val_range = self._process_climit(idx, _climits)
+                        probe_val_range = self._process_range(idx, _climits, disp_text)
 
             probe_val_range = (conv(probe_val_range[0]), conv(probe_val_range[1]))
 
@@ -81,41 +114,44 @@ class EqualizerBarDelegate(QStyledItemDelegate):
                 bar_color = self.EQUALIZER_COL_EXEED_BLUE
                 normed_probe_value = 1.0
 
-            bar_rect = QRect(
-                option.rect.left(),
-                option.rect.top() + 1,
-                int(option.rect.width() * normed_probe_value),
-                option.rect.height() - 2,
-            )
-            painter.setRenderHint(QPainter.Antialiasing)
-            painter.fillRect(bar_rect, bar_color)
+            if not np.isnan(normed_probe_value):
+                bar_rect = QRect(
+                    option.rect.left(),
+                    option.rect.top() + 1,
+                    int(option.rect.width() * normed_probe_value),
+                    option.rect.height() - 2,
+                )
+                painter.setRenderHint(QPainter.Antialiasing)
+                painter.fillRect(bar_rect, bar_color)
+        else:
+            if idx not in self._total_ranges:
+                self._total_ranges[idx] = (np.inf, -np.inf)
 
         painter.setPen(Qt.black)
         painter.drawText(option.rect, Qt.AlignVCenter, f"{disp_text}")
 
         painter.restore()
 
-    def _process_valid_range(self, idx: int, climit: tuple) -> tuple:
-        if idx not in self._climits_map:
-            min_val, max_val = climit
-            # Swap if needed
-            if min_val > max_val:
-                min_val, max_val = max_val, min_val
-            self._climits_map[idx] = (min_val, max_val)
-        return self._climits_map[idx]
-
-    def _process_climit(self, idx: int, climit: tuple) -> tuple:
+    def _process_range(self, idx: int, climit: tuple, add_info) -> tuple:
         min_val, max_val = climit
         # Swap if needed
         if min_val > max_val:
             min_val, max_val = max_val, min_val
-        if idx not in self._climits_map:
-            self._climits_map[idx] = (min_val, max_val)
+
+        if idx not in self._total_ranges:
+            self._total_ranges[idx] = (min_val, max_val)
+            print(f"{idx}: {self._total_ranges[idx]} <--- (n) ({add_info})")
         else:
-            stored_climits = self._climits_map[idx]
+            stored_climits = self._total_ranges[idx]
             if (min_val < stored_climits[0]) or (stored_climits[1] < max_val):
-                self._climits_map[idx] = (min(min_val, stored_climits[0]), max(max_val, stored_climits[1]))
-        return self._climits_map[idx]
+                print(f"{idx}: {self._total_ranges[idx]} <--- (b) ({add_info})")
+                self._total_ranges[idx] = (
+                    float(min(min_val, stored_climits[0])),
+                    float(max(max_val, stored_climits[1])),
+                )
+                print(f"{idx}: {self._total_ranges[idx]} <--- (a) ({add_info})")
+
+        return self._total_ranges[idx]
 
     def _normalize_val(self, val: float, min_max: tuple) -> float:
         min_val, max_val = min_max
@@ -190,10 +226,10 @@ class CustomHeaderView(QHeaderView):
         for col_index in range(self.count()):
             self._process_col_resize(col_index)
 
-    def _eval_width(self, logical_index, demanded_width):
-        if logical_index in self._column_limits:
-            min_width = self._column_limits[logical_index][0]
-            max_width = self._column_limits[logical_index][1]
+    def _eval_width(self, col_index, demanded_width):
+        if col_index in self._column_limits:
+            min_width = self._column_limits[col_index][0]
+            max_width = self._column_limits[col_index][1]
             if demanded_width < min_width:
                 return min_width
             elif max_width < demanded_width:
@@ -213,11 +249,11 @@ class CustomHeaderView(QHeaderView):
         # Resize the section
         self.resizeSection(col_index, ideal_width)
 
-    def _getHeaderTextWidth(self, logical_index):
+    def _getHeaderTextWidth(self, col_index):
         if not self.model():
             return 0
         # Get the header text
-        header_text = self.model().headerData(logical_index, self.orientation(), Qt.DisplayRole)
+        header_text = self.model().headerData(col_index, self.orientation(), Qt.DisplayRole)
         if not header_text:
             return 0
         # Get font metrics for the header font
@@ -323,6 +359,8 @@ class LayerTreeView(QTreeView):
         header.setMaximumSectionSize(200)
 
         model.rowsMoved.connect(self._equalizer_bar_delegate._layers_reordered)
+        model.rowsRemoved.connect(self._equalizer_bar_delegate._layers_removed)
+        model.rowsInserted.connect(self._equalizer_bar_delegate._layers_inserted)
 
     def mouseMoveEvent(self, event):
         """Override from base class."""
