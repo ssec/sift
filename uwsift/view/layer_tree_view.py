@@ -33,80 +33,40 @@ class EqualizerBarDelegate(QStyledItemDelegate):
     EQUALIZER_BLUE = QColor(100, 200, 250)
     EQUALIZER_COL_EXEED_BLUE = QColor(180, 220, 255)
 
-    def _layers_reordered(self, sourceParent, sourceStart, sourceEnd, destinationParent, destinationRow):
-
-        def prt(when):
-            print(f"{when} _total_ranges content:")
-            for k, v in self._total_ranges.items():
-                print(f"{k}: {v}")
-
-        # must not differ due to setSelectionMode(QTableWidget.SingleSelection)
-        assert sourceStart == sourceEnd  # nosec B101
-        highest_index = max(self._total_ranges.keys())
-        if (sourceStart <= highest_index) and (destinationRow <= highest_index + 1):
-            prt("before")
-            self._move_and_reindex(sourceStart, destinationRow)
-            print(f"Moved: {sourceStart} -> {destinationRow}")
-            prt("after")
-
-    def _move_and_reindex(self, from_idx: int, target_idx: int):
-        # QT would never provide the same indices when reordering
-        assert from_idx != target_idx  # nosec B101
-        # Get ordered list of values
-        items = [self._total_ranges[i] for i in sorted(self._total_ranges.keys())]
-        # Move the item
-        moved_item = items.pop(from_idx)
-        # Insert at target position
-        # If we removed an item before target_idx, target_idx shifts left by 1
-        if from_idx > target_idx:
-            insert_pos = target_idx
-        else:
-            insert_pos = target_idx - 1
-        items.insert(insert_pos, moved_item)
-        # Return reindexed dictionary
-        self._total_ranges = {i: item for i, item in enumerate(items)}
-
-    def _layers_removed(self, parent, first, last):
-        print(f"_layers_removed: {first} -- {last}")
-        self._reset()
-
-    def _layers_inserted(self, parent, first, last):
-        print(f"_layers_inserted: {first} -- {last}")
-        self._reset()
-
-    def _reset(self):
-        self._total_ranges = {}
-
     def paint(self, painter, option, index):
         """Override from base class to realise the custom rendering of the bar."""
         dummy_index = QModelIndex()
         super().paint(painter, option, dummy_index)
 
         disp_text = index.data(Qt.DisplayRole)
-
         try:
             value = float(disp_text)
         except ValueError:
             value = None
 
         painter.save()
-        idx = index.row()
 
+        idx = index.row()
         if value is not None:
             layer = index.model().layers[idx]
-            conv = layer.info[Info.UNIT_CONVERSION][1]
+            unit_conv_funct = layer.info[Info.UNIT_CONVERSION][1]
             probe_val_range = FALLBACK_RANGE
             if layer.valid_range:
-                probe_val_range = self._process_range(idx, layer.valid_range, disp_text)
+                # Simple case: the layer has a valid_range item that is fixed.
+                probe_val_range = self._process_range(idx, layer.valid_range)
             else:
-                probe_val_range = self._total_ranges[idx] if idx in self._total_ranges else probe_val_range
+                # No valid_range member? Then we need to get that info via the colour limits.
+                probe_val_range = self._total_ranges.get(idx, probe_val_range)
                 _climits = layer.presentation.climits
                 if _climits and any(isinstance(v, (int, float)) for v in _climits):
                     if np.isfinite(_climits).all():
-                        probe_val_range = self._process_range(idx, _climits, disp_text)
+                        # After the "health" checks of the colour limut values we store them after checking for min/max.
+                        # Why check? The upper and lower limits come from the colour map and can get changed by the
+                        # user. Since at this point we cannot be 100% sure when we do get the absolute limits,
+                        # we always check for updates of the limits.
+                        probe_val_range = self._process_range(idx, _climits)
 
-            probe_val_range = (conv(probe_val_range[0]), conv(probe_val_range[1]))
-
+            probe_val_range = (unit_conv_funct(probe_val_range[0]), unit_conv_funct(probe_val_range[1]))
             normed_probe_value = self._normalize_val(value, probe_val_range)
             if normed_probe_value != -1.0:
                 bar_color = self.EQUALIZER_BLUE
@@ -123,7 +83,8 @@ class EqualizerBarDelegate(QStyledItemDelegate):
                 )
                 painter.setRenderHint(QPainter.Antialiasing)
                 painter.fillRect(bar_rect, bar_color)
-        else:
+
+        else:  # Store dummies if there is no value to have the tree view structure in the total range list reflected
             if idx not in self._total_ranges:
                 self._total_ranges[idx] = (np.inf, -np.inf)
 
@@ -132,7 +93,39 @@ class EqualizerBarDelegate(QStyledItemDelegate):
 
         painter.restore()
 
-    def _process_range(self, idx: int, climit: tuple, add_info) -> tuple:
+    def _layers_reordered(self, sourceParent, sourceStart, sourceEnd, destinationParent, destinationRow):
+        # Must not differ due to setSelectionMode(QTableWidget.SingleSelection)
+        assert sourceStart == sourceEnd  # nosec B101
+        highest_index = max(self._total_ranges.keys())
+        if (sourceStart <= highest_index) and (destinationRow <= highest_index + 1):
+            self._move_and_reindex(sourceStart, destinationRow)
+
+    def _layers_removed(self, parent, first, last):
+        self._reset()  # No management, just reset and let the list get built up again.
+
+    def _layers_inserted(self, parent, first, last):
+        self._reset()  # No management, just reset and let the list get built up again.
+
+    def _move_and_reindex(self, from_idx: int, target_idx: int):
+        # QT would never provide the same indices when reordering
+        assert from_idx != target_idx  # nosec B101
+        # Get ordered list of values
+        items = [self._total_ranges[i] for i in sorted(self._total_ranges.keys())]
+        # Move the item
+        moved_item = items.pop(from_idx)
+        # Insert at target position
+        if from_idx > target_idx:
+            insert_pos = target_idx
+        else:
+            insert_pos = target_idx - 1
+        items.insert(insert_pos, moved_item)
+        # Return reindexed dictionary
+        self._total_ranges = {i: item for i, item in enumerate(items)}
+
+    def _reset(self):
+        self._total_ranges = {}
+
+    def _process_range(self, idx: int, climit: tuple) -> tuple:
         min_val, max_val = climit
         # Swap if needed
         if min_val > max_val:
@@ -140,16 +133,14 @@ class EqualizerBarDelegate(QStyledItemDelegate):
 
         if idx not in self._total_ranges:
             self._total_ranges[idx] = (min_val, max_val)
-            print(f"{idx}: {self._total_ranges[idx]} <--- (n) ({add_info})")
         else:
-            stored_climits = self._total_ranges[idx]
-            if (min_val < stored_climits[0]) or (stored_climits[1] < max_val):
-                print(f"{idx}: {self._total_ranges[idx]} <--- (b) ({add_info})")
-                self._total_ranges[idx] = (
-                    float(min(min_val, stored_climits[0])),
-                    float(max(max_val, stored_climits[1])),
-                )
-                print(f"{idx}: {self._total_ranges[idx]} <--- (a) ({add_info})")
+            stored_range = self._total_ranges[idx]
+            # If the upper max or lower min exceeds, we need to set this as the new
+            # total range.
+            if (min_val < stored_range[0]) or (stored_range[1] < max_val):
+                min_val = float(min(min_val, stored_range[0]))
+                max_val = float(max(max_val, stored_range[1]))
+                self._total_ranges[idx] = (min_val, max_val)
 
         return self._total_ranges[idx]
 
@@ -377,7 +368,7 @@ class LayerTreeView(QTreeView):
             option.rect = self.visualRect(index)
 
             font_metrics = QFontMetrics(option.font)
-            text_width = font_metrics.width(text)
+            text_width = font_metrics.width(f"{text}  ")  # Add two spaces to be on the safe side
             column_width = self.columnWidth(index.column())
 
             if text_width > column_width:
