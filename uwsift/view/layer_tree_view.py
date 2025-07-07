@@ -60,7 +60,7 @@ class EqualizerBarDelegate(QStyledItemDelegate):
                 _climits = layer.presentation.climits
                 if _climits and any(isinstance(v, (int, float)) for v in _climits):
                     if np.isfinite(_climits).all():
-                        # After the "health" checks of the colour limut values we store them after checking for min/max.
+                        # After the "health" checks of the colour limit values we store them after checking for min/max.
                         # Why check? The upper and lower limits come from the colour map and can get changed by the
                         # user. Since at this point we cannot be 100% sure when we do get the absolute limits,
                         # we always check for updates of the limits.

@@ -831,6 +831,8 @@ class Main(QtWidgets.QMainWindow):
 
         self.layer_model.init_system_layers()
 
+        self.ui.treeView.resizeColumnsToContents()
+
     def _init_algebraic_pane(self):
         self.algebraic_config_pane = AlgebraicLayerConfigPane(
             self.ui, self.ui.algebraicScrollAreaWidget, self.layer_model
@@ -938,6 +940,7 @@ class Main(QtWidgets.QMainWindow):
         return engine.rootContext()
 
     def _init_arrange_panes(self):
+        self.tabifyDockWidget(self.ui.layerDetailsPaneDockWidget, self.ui.datasetStatisticsPaneDockWidget)
         self.tabifyDockWidget(self.ui.layerDetailsPaneDockWidget, self.ui.rgbConfigPaneDockWidget)
         self.tabifyDockWidget(self.ui.layerDetailsPaneDockWidget, self.ui.algebraicConfigPaneDockWidget)
 
@@ -945,11 +948,9 @@ class Main(QtWidgets.QMainWindow):
         self.ui.layerDetailsPaneDockWidget.raise_()
 
         self.ui.datasetStatisticsPaneDockWidget.show()
-        self.ui.datasetStatisticsPaneDockWidget.raise_()
-
         self.ui.areaProbePaneDockWidget.hide()
-        self.ui.algebraicConfigPaneDockWidget.hide()
         self.ui.rgbConfigPaneDockWidget.hide()
+        self.ui.algebraicConfigPaneDockWidget.hide()
 
         # refer to objectName'd entities as self.ui.objectName
         self.setAcceptDrops(True)
