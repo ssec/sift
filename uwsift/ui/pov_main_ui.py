@@ -428,7 +428,6 @@ class Ui_MainWindow(object):
         self.datasetStatisticsPane.setObjectName("datasetStatisticsPane")
         self.verticalLayout_9.addWidget(self.datasetStatisticsPane)
         self.datasetStatisticsPaneDockWidget.setWidget(self.datasetStatisticsPaneDockWidgetContents)
-        MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(1), self.datasetStatisticsPaneDockWidget)
         self.areaProbePaneDockWidget = QtWidgets.QDockWidget(MainWindow)
         self.areaProbePaneDockWidget.setFeatures(
             QtWidgets.QDockWidget.DockWidgetFloatable | QtWidgets.QDockWidget.DockWidgetMovable
