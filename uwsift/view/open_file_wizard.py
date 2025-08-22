@@ -21,7 +21,6 @@ from collections import OrderedDict
 from enum import Enum
 from typing import Generator, Tuple, Union
 
-import satpy.resample
 import trollsift.parser as fnparser
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QPoint
@@ -737,18 +736,12 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         cb_model = self.ui.resamplingMethodComboBox.model()
 
-        known_resampling_methods = ["none"]
-        known_resampling_methods.extend(satpy.resample.RESAMPLERS)
         first_enabled_item_index = -1
-        for resampling_method in known_resampling_methods:
-            configuration = RESAMPLING_METHODS.get(resampling_method, None)
+        for resampling_method, configuration in RESAMPLING_METHODS.items():
             if configuration == Conf.SKIP:
                 continue
-            # If not explicitly skipped but also not "configured" in
-            # RESAMPLING_METHODS add the resampler's ID, disabled (see below).
-            # This makes "unknown" (newly added to Satpy) resamplers show up
-            # drawing attention to ask a developer to test and enable them.
-            resampling_method_name = configuration[0] if configuration else resampling_method
+
+            resampling_method_name = configuration[0]
             self.ui.resamplingMethodComboBox.addItem(resampling_method_name, userData=resampling_method)
 
             # Check, whether current item is approved for detected geometry
@@ -756,7 +749,7 @@ class OpenFileWizard(QtWidgets.QWizard):
             # item is preselected or - if an attempt is to be made to do so,
             # preselect the previously selected item, if it is enabled.
             item_index = self.ui.resamplingMethodComboBox.count() - 1
-            if not configuration or geometry_definition not in configuration:
+            if geometry_definition not in configuration:
                 item = cb_model.item(item_index)
                 item.setEnabled(False)
             else:
