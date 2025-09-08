@@ -572,6 +572,16 @@ class Main(QtWidgets.QMainWindow):
 
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+
+        def _apply_system_font():
+            # The font of the menu bar is the source of the correct system font
+            menu_font = self.menuBar().font()
+            # Apply globally to the app
+            QtWidgets.QApplication.instance().setFont(menu_font)
+
+        # Apply font after Qt is fully initialized
+        QtCore.QTimer.singleShot(0, _apply_system_font)
+
         if AUTO_UPDATE_MODE__ACTIVE:
             self.ui.animFrame.hide()
             self.ui.timelineFrame.hide()
