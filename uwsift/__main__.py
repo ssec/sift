@@ -88,6 +88,8 @@ WATCHDOG_DATETIME_FORMAT_STORE = "%Y-%m-%d %H:%M:%S %z"
 EXIT_FORCED_SHUTDOWN = 101
 EXIT_CONFIRMED_SHUTDOWN = 102
 
+JUST_FOR_TESTING = False
+
 
 async def do_test_cycle(txt: QtWidgets.QWidget):
     from asyncio import sleep
