@@ -453,7 +453,8 @@ class GlobbingCreator:
 
         expanded_filter_pattern_parts: List[str] = []
 
-        for parse_result in trollsift.formatter.parse(filter_pattern):
+        trollsift_formatter = trollsift.StringFormatter()
+        for parse_result in trollsift_formatter.parse(filter_pattern):
             literal_text, field_name, format_spec, conversion = parse_result
 
             replacement_fields_list: List[str] = []
