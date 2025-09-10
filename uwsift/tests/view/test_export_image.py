@@ -343,6 +343,8 @@ def test_export_image_dialog_info_default(qtbot, window):
 
     # only look at the filename
     res["filename"] = os.path.split(res["filename"])[-1]
+    # since the sizes are system dependent, we ignore them.
+    res.pop("size", None)
 
     exp = {
         "frame_range": None,
@@ -352,7 +354,6 @@ def test_export_image_dialog_info_default(qtbot, window):
         "fps": None,
         "font_size": 11,
         "colorbar": None,
-        "size": (909, 731),
     }
 
     assert res == exp
@@ -375,6 +376,8 @@ def test_export_image_dialog_info(qtbot, window):
 
     res = window.export_image._screenshot_dialog.get_info()
     res["filename"] = os.path.split(res["filename"])[-1]
+    # since the sizes are system dependent, we ignore them.
+    res.pop("size", None)
 
     exp = {
         "frame_range": [1, 1],
@@ -384,7 +387,6 @@ def test_export_image_dialog_info(qtbot, window):
         "fps": None,
         "font_size": 20,
         "colorbar": "vertical",
-        "size": (909, 731),
     }
 
     assert res == exp

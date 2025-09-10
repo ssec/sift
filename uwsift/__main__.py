@@ -453,12 +453,8 @@ class Main(QtWidgets.QMainWindow):
 
         col, row = "N/A", "N/A"
         data_str = "N/A"
-        layer_str = "N/A"
 
         if state:
-            if selected_layer:
-                layer_str = selected_layer.short_descriptor
-
             if uuid is not None:
                 data_point = selected_layer.probe_value
 
@@ -469,7 +465,6 @@ class Main(QtWidgets.QMainWindow):
                     data_str = format_quantity_func(convert_unit_func(data_point), numeric=False)
                     col, row = self.workspace.position_to_grid_index(uuid, xy_pos)
 
-        self.ui.cursorProbeLayer.setText(layer_str)
         self.ui.cursorProbeText.setText(f"{data_str} ({probe_loc}) [{col}, {row}]")
 
     def run_gc_after_layer_deletion(self):
@@ -577,6 +572,16 @@ class Main(QtWidgets.QMainWindow):
 
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+
+        def _apply_system_font():
+            # The font of the menu bar is the source of the correct system font
+            menu_font = self.menuBar().font()
+            # Apply globally to the app
+            QtWidgets.QApplication.instance().setFont(menu_font)
+
+        # Apply font after Qt is fully initialized
+        QtCore.QTimer.singleShot(0, _apply_system_font)
+
         if AUTO_UPDATE_MODE__ACTIVE:
             self.ui.animFrame.hide()
             self.ui.timelineFrame.hide()
@@ -586,7 +591,6 @@ class Main(QtWidgets.QMainWindow):
             self._init_auto_restart()
         else:
             self.ui.watchdogFrame.hide()
-        self._init_font_sizes()
 
         self.setWindowTitle(self.windowTitle().replace("|X.X.X|", __version__))
         self._init_arrange_panes()
@@ -954,14 +958,6 @@ class Main(QtWidgets.QMainWindow):
 
         # refer to objectName'd entities as self.ui.objectName
         self.setAcceptDrops(True)
-
-    def _init_font_sizes(self):
-        # hack some font sizes until we migrate to PyQt5 and handle it better
-        # was 14 on osx
-        font = QtGui.QFont("Andale Mono")
-        font.setPointSizeF(14)
-        self.ui.cursorProbeLayer.setFont(font)
-        self.ui.cursorProbeText.setFont(font)
 
     def _init_update_times_display(self):
         self._palette_text_green = QtGui.QPalette()
