@@ -311,9 +311,11 @@ class aImporter(ABC):
         # For an unknown reason reusing the scene breaks for FCI data,
         #
         # this Importer data reading magic is too confused.
-        if prod.info[Info.KIND] in (Kind.POINTS, Kind.LINES, Kind.VECTORS):
+        if prod.info[Info.KIND] in (Kind.POINTS, Kind.LINES, Kind.VECTORS, Kind.IMAGE):
             del kwargs["scenes"]
             kwargs["scene"] = scn
+
+        LOG.debug(f'Product is of Kind "{prod.info[Info.KIND]}"')
 
         # TODO: ignore mypy error for now because in the future aImporter should be merged with SatpyImporter
         return cls(paths, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)  # type: ignore
@@ -458,10 +460,10 @@ class SatpyImporter(aImporter):
         self.reader = reader
         self.resampling_info = kwargs.get("resampling_info")
         self.scn = kwargs.get("scene")
-        self.merge_target = kwargs.get("merge_target")
         if self.scn is None:
             reader_kwargs = get_reader_kwargs_dict([self.reader])
             self.scn = Scene(filenames={self.reader: self.filenames}, reader_kwargs=reader_kwargs)
+        self.merge_target = kwargs.get("merge_target")
         self._resources = []
         # DataID filters
         self.product_filters = {}
