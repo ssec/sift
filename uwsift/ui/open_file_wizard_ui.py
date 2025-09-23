@@ -103,6 +103,11 @@ class Ui_openFileWizard(object):
         self.verticalLayout.setObjectName("verticalLayout")
         self.productSelectionButtonLayout = QtWidgets.QHBoxLayout()
         self.productSelectionButtonLayout.setObjectName("productSelectionButtonLayout")
+
+        self.productTypeSelection = QtWidgets.QComboBox()
+        self.productTypeSelection.addItems(["All 🌐", "Single 📗", "Composite 📚"])
+        self.productSelectionButtonLayout.addWidget(self.productTypeSelection)
+
         self.selectAllButton = QtWidgets.QPushButton(self.productSelectionPage)
         self.selectAllButton.setObjectName("selectAllButton")
         self.productSelectionButtonLayout.addWidget(self.selectAllButton)
