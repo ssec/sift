@@ -313,13 +313,13 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.selectIDTable.setRowCount(0)  # remove all rows
         # name and level
         id_components = self.config["id_components"]
+        self.ui.selectIDTable.setRowCount(len(all_datasets))
         for idx, ds_id in enumerate(all_datasets):
             col_idx = 0
             for id_key, id_val, pretty_val in self._pretty_identifiers(ds_id):
                 if id_key not in id_components:
                     continue
 
-                self.ui.selectIDTable.setRowCount(idx + 1)
                 if id_key == "wavelength":
                     item = NumericTableWidgetItem(pretty_val, id_val[1] if id_val is not None else None)
                 elif id_key == "level" or id_key == "resolution":
