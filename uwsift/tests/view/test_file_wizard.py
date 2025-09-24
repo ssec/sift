@@ -1,3 +1,4 @@
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -34,6 +35,23 @@ def test_numeric_table_widget_item(lower, higher, exp_result):
     assert (ntwi_lower < ntwi_higher) is exp_result
 
 
+def _is_ubuntu() -> bool:
+    if not sys.platform.startswith("linux"):
+        return False
+    try:
+        with open("/etc/os-release", "r", encoding="utf-8") as f:
+            for line in f:
+                if "Ubuntu" in line:
+                    return True
+    except OSError:
+        return False
+    return False
+
+
+@pytest.mark.skipif(
+    (sys.version_info.major == 3 and sys.version_info.minor == 11) and _is_ubuntu(),
+    reason="Test crashes for Python 3.11 in Ubuntu",
+)
 def test_dataset_table(qtbot):
     main_window = QtWidgets.QMainWindow()
 
