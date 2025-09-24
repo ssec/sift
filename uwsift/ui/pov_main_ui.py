@@ -10,6 +10,8 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
+from uwsift.ui.custom_widgets import AnimationSpeedWidget
+
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -308,18 +310,30 @@ class Ui_MainWindow(object):
         self.animBack = QtWidgets.QToolButton(self.animFrame)
         self.animBack.setToolTip("")
         self.animBack.setObjectName("animBack")
+        self.animBack.setIcon(
+            QtWidgets.QApplication.instance().style().standardIcon(QtWidgets.QStyle.SP_MediaSkipBackward)
+        )
+        self.animBack.setIconSize(QtCore.QSize(30, 30))
         self.horizontalLayout.addWidget(self.animBack)
         self.animPlayPause = QtWidgets.QToolButton(self.animFrame)
-        font = QtGui.QFont()
-        font.setFamily("Andale Mono")
-        font.setPointSize(18)
-        font.setItalic(False)
-        self.animPlayPause.setFont(font)
         self.animPlayPause.setObjectName("animPlayPause")
+        self.animPlayPause.setCheckable(True)
+        self.animPlayPause.setIcon(
+            QtWidgets.QApplication.instance().style().standardIcon(QtWidgets.QStyle.SP_MediaPlay)
+        )
+        self.animPlayPause.setIconSize(QtCore.QSize(40, 40))
         self.horizontalLayout.addWidget(self.animPlayPause)
         self.animForward = QtWidgets.QToolButton(self.animFrame)
         self.animForward.setObjectName("animForward")
+        self.animForward.setIcon(
+            QtWidgets.QApplication.instance().style().standardIcon(QtWidgets.QStyle.SP_MediaSkipForward)
+        )
+        self.animForward.setIconSize(QtCore.QSize(30, 30))
         self.horizontalLayout.addWidget(self.animForward)
+
+        self.animation_speed = AnimationSpeedWidget(self.animFrame)
+        self.horizontalLayout.addWidget(self.animation_speed)
+
         spacerItem2 = QtWidgets.QSpacerItem(1, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.horizontalLayout.addItem(spacerItem2)
         self.verticalLayout.addWidget(self.animFrame)
@@ -828,11 +842,9 @@ class Ui_MainWindow(object):
         self.cursorProbeText.setStatusTip(_translate("MainWindow", "Top layer data value under point probe"))
         self.cursorProbeText.setText(_translate("MainWindow", "N/A"))
         self.animBack.setStatusTip(_translate("MainWindow", "Step backward"))
-        self.animBack.setText(_translate("MainWindow", "|◀"))
         self.animPlayPause.setStatusTip(_translate("MainWindow", "Start or stop animation"))
-        self.animPlayPause.setText(_translate("MainWindow", "▶"))
         self.animForward.setStatusTip(_translate("MainWindow", "Step forward"))
-        self.animForward.setText(_translate("MainWindow", "▶|"))
+        self.animation_speed.setStatusTip(_translate("MainWindow", "Set animation speed"))
         self.timeLastDatasetCreation.setText(_translate("MainWindow", "Data Time"))
         self.timeLastDatasetCreationLineEdit.setText(_translate("MainWindow", "1900-01-01 00:00:00"))
         self.timeLastDatasetImport.setText(_translate("MainWindow", "Import Time"))

@@ -140,66 +140,6 @@ class OpenCacheDialog(QtWidgets.QDialog):
         self.hide()
 
 
-class AnimationSpeedPopupWindow(QtWidgets.QWidget):
-    _slider = None
-    _active = False
-
-    def __init__(self, slot, *args, **kwargs):
-        super(AnimationSpeedPopupWindow, self).__init__(*args, **kwargs)
-        from PyQt5.QtCore import Qt
-
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Popup)
-        self.setFocusPolicy(Qt.ClickFocus)
-        self.setToolTip("Set animation speed")
-        self._slider = QtWidgets.QSlider(parent=self)
-        n, x = 2, 150  # frames per 10 seconds
-        self._slider.setRange(n, x)  #
-        self._slot = slot
-        self._slider.valueChanged.connect(self._changed)
-        self._layout = QtWidgets.QHBoxLayout()
-        self._layout.addWidget(self._slider)
-        self.setLayout(self._layout)
-
-    def _convert(self, val: int, reverse: bool = False) -> float:
-        """Map 1..100 nonlinearly to 10ms .. 5000ms.
-
-        Args:
-            val: raw value to remap to milliseconds
-            reverse: when True, reverse conversion milliseconds to ticks
-
-        Returns: converted value
-        """
-        if reverse:  # convert milliseconds to fp10s
-            fp10s = 10000.0 / float(val)
-            return fp10s
-        else:
-            ms = 10000.0 / float(val)
-            return ms
-
-    def _changed(self, value):
-        if not self._active:
-            return
-        fps = float(value) / 10.0
-        self.setToolTip("{0:.1f} fps".format(fps))
-        val = self._convert(value)
-        self._slot(val)
-
-    def show_at(self, pos, val):
-        from PyQt5.QtCore import QPoint, QRect, QSize
-
-        sz = QSize(40, 180)
-        pt = QPoint(pos.x() - 20, pos.y() - 160)
-        rect = QRect(pt, sz)
-        self.setGeometry(rect)
-        self.show()
-        self._slider.setValue(int(self._convert(val, reverse=True)))
-        self._active = True
-
-    def focusOutEvent(self, *args, **kwargs):
-        self.hide()
-        self._active = False
-
-
 def _recursive_split(path):
     dn, fn = os.path.split(path)
     if dn and not fn:
@@ -252,15 +192,11 @@ class UserControlsAnimation(QtCore.QObject):
         super(UserControlsAnimation, self).__init__()
         self.ui = ui
         self.scene_manager = scene_manager
-        # window we'll show temporarily with animation speed popup
-        self._animation_speed_popup: typ.Optional[AnimationSpeedPopupWindow] = None
 
         self.ui.animPlayPause.clicked.connect(self.toggle_animation)
-        self.ui.animPlayPause.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        self.ui.animPlayPause.customContextMenuRequested.connect(self.show_animation_speed_slider)
-
         self.ui.animForward.clicked.connect(self.next_frame)
         self.ui.animBack.clicked.connect(self.prev_frame)
+        self.ui.animation_speed.set_value_changed_callback(self.set_animation_speed)
 
     def next_frame(self, *args, **kwargs):
         """Advance a frame along the animation order."""
@@ -277,21 +213,18 @@ class UserControlsAnimation(QtCore.QObject):
         LOG.info("animation speed set to {}ms".format(milliseconds))
         self.scene_manager.animation_controller.animation_speed = milliseconds
 
-    def show_animation_speed_slider(self, pos: QtCore.QPoint, *args):
-        """Show frame-rate slider as a pop-up control, at current mouse position."""
-        LOG.info("menu requested for animation control")
-        gpos = self.ui.animPlayPause.mapToGlobal(pos)
-
-        if self._animation_speed_popup is None:
-            self._animation_speed_popup = popup = AnimationSpeedPopupWindow(slot=self.set_animation_speed, parent=None)
-        else:
-            popup = self._animation_speed_popup
-        if not popup.isVisible():
-            popup.show_at(gpos, self.scene_manager.animation_controller.animation_speed)
-
     def toggle_animation(self, action: QtWidgets.QAction = None, *args):
         """Toggle animation on/off."""
         new_state = self.scene_manager.animation_controller.toggle_animation()
+        if new_state is True:
+            self.ui.animPlayPause.setIcon(
+                QtWidgets.QApplication.instance().style().standardIcon(QtWidgets.QStyle.SP_MediaPause)
+            )
+        else:
+            self.ui.animPlayPause.setIcon(
+                QtWidgets.QApplication.instance().style().standardIcon(QtWidgets.QStyle.SP_MediaPlay)
+            )
+
         self.ui.animPlayPause.setChecked(new_state)
 
 

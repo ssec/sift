@@ -1,14 +1,20 @@
 from decimal import ROUND_HALF_UP, Decimal
 
-from PyQt5.QtCore import QEvent, Qt, pyqtSignal
+from PyQt5.QtCore import QEvent, QSize, Qt, pyqtSignal
+from PyQt5.QtGui import QFont
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWidgets import (
     QApplication,
     QComboBox,
+    QDial,
     QDoubleSpinBox,
+    QHBoxLayout,
+    QLabel,
     QListWidget,
     QSlider,
+    QStyle,
     QTableWidget,
+    QWidget,
     QWizardPage,
 )
 
@@ -215,3 +221,89 @@ class QAdaptiveDoubleSpinBox(QDoubleSpinBox):
             decimals = 0
 
         return float(rounded), decimals
+
+
+class AnimationSpeedWidget(QWidget):
+    """Custom animation speed control."""
+
+    def __init__(self, *args, **kwargs):
+        super(AnimationSpeedWidget, self).__init__(*args, **kwargs)
+
+        self._dial = AnimationSpeedWidget._AnimSpeedDial(parent=self)
+
+        self._framerate_label = AnimationSpeedWidget._FPSLabel(self)
+        self._framerate_label.update_fixed_width()
+        self._framerate_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        self._dial.setFixedSize(QSize(60, 60))
+
+        self._dial.setRange(self._raw_minimum, self._raw_maximum)
+        self._dial.setWrapping(False)
+        self._dial.setNotchesVisible(True)
+        self._dial.setSingleStep(1)
+        self._dial.valueChanged.connect(self._changed)
+        self._display_fps(self._dial.value())
+        self._value_change_cb = None
+        self._layout = QHBoxLayout()
+
+        self._layout.addWidget(self._dial)
+        self._layout.addWidget(self._framerate_label)
+
+        self.setLayout(self._layout)
+
+    def _convert(self, val: int, reverse: bool = False) -> float:
+        """Map 1..100 nonlinearly to 10ms .. 5000ms.
+        Args:
+            val: raw value to remap to milliseconds
+            reverse: when True, reverse conversion milliseconds to ticks
+        Returns: converted value
+        """
+        if reverse:  # convert milliseconds to fp10s
+            fp10s = 10000.0 / float(val)
+            return fp10s
+        else:
+            ms = 10000.0 / float(val)
+            return ms
+
+    def _changed(self, value):
+        self._display_fps(value)
+        val = self._convert(value)
+        if self._value_change_cb:
+            self._value_change_cb(val)
+
+    def _display_fps(self, value):
+        fps = float(value) / 10.0
+        self._framerate_label.setText("{0:.1f} fps".format(fps))
+
+    def set_value_changed_callback(self, callback):
+        self._value_change_cb = callback
+
+    class _AnimSpeedDial(QDial):
+        def __init__(self, parent=None, step=1):
+            super().__init__(parent)
+            self.step = step  # How much the dial changes per wheel step
+
+        def wheelEvent(self, event):
+            # event.angleDelta().y() is in 1/8 degrees, each notch = 120
+            num_steps = event.angleDelta().y() // 120
+            self.setValue(self.value() + num_steps * self.step)
+            event.accept()
+
+    class _FPSLabel(QLabel):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            # optional: set initial fixed width based on max expected content
+            self.update_fixed_width()
+
+        def event(self, event):
+            if event.type() == QEvent.FontChange:
+                # system/application font changed
+                self.update_fixed_width()
+            return super().event(event)
+
+        def update_fixed_width(self):
+            self.setFixedWidth(self.fontMetrics().boundingRect("15.0 fps").width())
+
+    _dial = None
+    _raw_minimum = 2
+    _raw_maximum = 150  # frames per 10 seconds
