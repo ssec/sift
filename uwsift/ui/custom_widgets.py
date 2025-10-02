@@ -235,8 +235,6 @@ class AnimationSpeedWidget(QWidget):
         self._framerate_label.update_fixed_width()
         self._framerate_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-        self._dial.setFixedSize(QSize(60, 60))
-
         self._dial.setRange(self._raw_minimum, self._raw_maximum)
         self._dial.setWrapping(False)
         self._dial.setNotchesVisible(True)
@@ -278,6 +276,9 @@ class AnimationSpeedWidget(QWidget):
     def set_value_changed_callback(self, callback):
         self._value_change_cb = callback
 
+    def setSize(self, size: QSize):
+        self._dial.setFixedSize(size)
+
     class _AnimSpeedDial(QDial):
         def __init__(self, parent=None, step=1):
             super().__init__(parent)
@@ -304,6 +305,6 @@ class AnimationSpeedWidget(QWidget):
         def update_fixed_width(self):
             self.setFixedWidth(self.fontMetrics().boundingRect("15.0 fps").width())
 
-    _dial = None
+    _dial: _AnimSpeedDial
     _raw_minimum = 2
-    _raw_maximum = 150  # frames per 10 seconds
+    _raw_maximum = 100  # frames per 10 seconds

@@ -313,7 +313,7 @@ class Ui_MainWindow(object):
         self.animBack.setIcon(
             QtWidgets.QApplication.instance().style().standardIcon(QtWidgets.QStyle.SP_MediaSkipBackward)
         )
-        self.animBack.setIconSize(QtCore.QSize(30, 30))
+        self.animBack.setIconSize(QtCore.QSize(20, 20))
         self.horizontalLayout.addWidget(self.animBack)
         self.animPlayPause = QtWidgets.QToolButton(self.animFrame)
         self.animPlayPause.setObjectName("animPlayPause")
@@ -321,17 +321,19 @@ class Ui_MainWindow(object):
         self.animPlayPause.setIcon(
             QtWidgets.QApplication.instance().style().standardIcon(QtWidgets.QStyle.SP_MediaPlay)
         )
-        self.animPlayPause.setIconSize(QtCore.QSize(40, 40))
+        self.animPlayPause.setIconSize(QtCore.QSize(30, 30))
         self.horizontalLayout.addWidget(self.animPlayPause)
         self.animForward = QtWidgets.QToolButton(self.animFrame)
         self.animForward.setObjectName("animForward")
         self.animForward.setIcon(
             QtWidgets.QApplication.instance().style().standardIcon(QtWidgets.QStyle.SP_MediaSkipForward)
         )
-        self.animForward.setIconSize(QtCore.QSize(30, 30))
+        self.animForward.setIconSize(QtCore.QSize(20, 20))
         self.horizontalLayout.addWidget(self.animForward)
 
         self.animation_speed = AnimationSpeedWidget(self.animFrame)
+        self.animation_speed.setSize(QtCore.QSize(40, 40))
+
         self.horizontalLayout.addWidget(self.animation_speed)
 
         spacerItem2 = QtWidgets.QSpacerItem(1, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
@@ -844,7 +846,9 @@ class Ui_MainWindow(object):
         self.animBack.setStatusTip(_translate("MainWindow", "Step backward"))
         self.animPlayPause.setStatusTip(_translate("MainWindow", "Start or stop animation"))
         self.animForward.setStatusTip(_translate("MainWindow", "Step forward"))
-        self.animation_speed.setStatusTip(_translate("MainWindow", "Set animation speed"))
+        self.animation_speed.setStatusTip(
+            _translate("MainWindow", "Set animation speed (use mouse wheel for precise control)")
+        )
         self.timeLastDatasetCreation.setText(_translate("MainWindow", "Data Time"))
         self.timeLastDatasetCreationLineEdit.setText(_translate("MainWindow", "1900-01-01 00:00:00"))
         self.timeLastDatasetImport.setText(_translate("MainWindow", "Import Time"))
