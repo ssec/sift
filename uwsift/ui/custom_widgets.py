@@ -1,7 +1,6 @@
 from decimal import ROUND_HALF_UP, Decimal
 
-from PyQt5.QtCore import QEvent, QSize, Qt, pyqtSignal
-from PyQt5.QtGui import QFont
+from PyQt5.QtCore import QEvent, QLocale, QSize, Qt, pyqtSignal
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWidgets import (
     QApplication,
@@ -49,6 +48,7 @@ class QNoScrollDoubleSpinBox(QDoubleSpinBox):
     def __init__(self, *args, **kwargs):
         super(QNoScrollDoubleSpinBox, self).__init__(*args, **kwargs)
         self.setFocusPolicy(Qt.StrongFocus)
+        self.setLocale(QLocale(QLocale.English, QLocale.UnitedStates))  # always use the "." separator
 
     def wheelEvent(self, ev):
         if not self.hasFocus():
@@ -134,6 +134,7 @@ class QAdaptiveDoubleSpinBox(QDoubleSpinBox):
     def __init__(self, *args, **kwargs):
         super(QAdaptiveDoubleSpinBox, self).__init__(*args, **kwargs)
         self._decimal_places_displayed = self.decimals()
+        self.setLocale(QLocale(QLocale.English, QLocale.UnitedStates))  # always use the "." separator
         # install event filter to detect modifier keys. It needs to be on application level as the focus can be anywhere
         # before clicking on the inc/dec butons with a modifier.
         QApplication.instance().installEventFilter(self)
