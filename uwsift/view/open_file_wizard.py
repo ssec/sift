@@ -176,7 +176,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         self._all_selected = [False, False, False]
         self._ds_type_visible = None  # stores the currently visible dataset type (all, single or composites)
 
-        self.ui.productTypeSelection.currentIndexChanged.connect(self._update_dataset_table)
+        self.ui.productTypeGroup.idClicked.connect(self._update_dataset_table)
         self.ui.selectAllButton.clicked.connect(self._select_all_products_state)
         self.ui.selectIDTable.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.ui.selectIDTable.customContextMenuRequested.connect(self._product_context_menu)
@@ -344,12 +344,12 @@ class OpenFileWizard(QtWidgets.QWizard):
         if dataset_type_selection == 1:
 
             def _is_hidden(row_index: int) -> bool:
-                return self.mask_single_ds[row_index]
+                return not self.mask_single_ds[row_index]
 
         elif dataset_type_selection == 2:
 
             def _is_hidden(row_index: int) -> bool:
-                return self.mask_composite_ds[row_index]
+                return not self.mask_composite_ds[row_index]
 
         else:
 
@@ -370,7 +370,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.selectIDTable.setColumnCount(len(id_components))
         self.ui.selectIDTable.setHorizontalHeaderLabels([x.title() for x in id_components])
 
-        self._ds_type_visible = self.ui.productTypeSelection.currentIndex()
+        self._ds_type_visible = self.ui.productTypeGroup.checkedId()
         self._populate_dataset_table(self.all_datasets)
 
         self._update_dataset_table(self._ds_type_visible)

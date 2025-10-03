@@ -66,18 +66,18 @@ def test_dataset_table(qtbot):
         def available_dataset_ids(self, reader_name=None, composites=False):
             """Generate some test data: 10 single, then 10 composite and then another 10 single datasets."""
             data_ids_single_1 = {
-                DataID(id_keys=minimal_default_keys_config, name=f"TestDataID_{n:02}", resolution=1000 + n * 10)
+                DataID(id_keys=default_id_keys_config, name=f"TestDataID_{n:02}", resolution=1000 + n * 10)
                 for n in range(0, 10)
             }
             data_ids_single_2 = {
-                DataID(id_keys=minimal_default_keys_config, name=f"TestDataID_{n:02}", resolution=1000 + n * 10)
+                DataID(id_keys=default_id_keys_config, name=f"TestDataID_{n:02}", resolution=1000 + n * 10)
                 for n in range(20, 30)
             }
             data_ids_with_composites = (
                 data_ids_single_1
                 | {
                     DataID(
-                        id_keys=default_id_keys_config,
+                        id_keys=minimal_default_keys_config,
                         name=f"TestDataID_{n:02}",
                         resolution=1000 + n * 10,
                         calibration="reflectance",
@@ -140,17 +140,17 @@ def test_dataset_table(qtbot):
 
         assert ofw._ds_type_visible == 0  # initially all datasets should be selected to be visible
 
-        # select only the composite datasets
-        ofw.ui.productTypeSelection.setCurrentIndex(1)
-        qtbot.waitUntil(lambda: ofw.ui.selectIDTable.rowCount() > 0, timeout=1000)
-        check_rows_displayed(list(range(10, 20)))
-
         # select only the single datasets
-        ofw.ui.productTypeSelection.setCurrentIndex(2)
+        ofw.ui.productTypeSingle.click()
         qtbot.waitUntil(lambda: ofw.ui.selectIDTable.rowCount() > 0, timeout=1000)
         check_rows_displayed(list(range(10)) + list(range(20, 30)))
 
+        # select only the composite datasets
+        ofw.ui.productTypeComposite.click()
+        qtbot.waitUntil(lambda: ofw.ui.selectIDTable.rowCount() > 0, timeout=1000)
+        check_rows_displayed(list(range(10, 20)))
+
         # now select all - single and composite datasets
-        ofw.ui.productTypeSelection.setCurrentIndex(0)
+        ofw.ui.productTypeAll.click()
         qtbot.waitUntil(lambda: ofw.ui.selectIDTable.rowCount() > 0, timeout=1000)
         check_rows_displayed(list(range(30)))
