@@ -118,7 +118,7 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         # tuple(filenames) -> scene object
         self.scenes = {}
-        self.all_available_products = None
+        self.all_datasets = None
         self.file_groups = {}
         self.unknown_files = set()
 
@@ -173,7 +173,10 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         # Page 2 - Product selection
 
-        self._all_selected = False
+        self._all_selected = [False, False, False]
+        self._ds_type_visible = None  # stores the currently visible dataset type (all, single or composites)
+
+        self.ui.productTypeGroup.idClicked.connect(self._update_dataset_table)
         self.ui.selectAllButton.clicked.connect(self._select_all_products_state)
         self.ui.selectIDTable.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.ui.selectIDTable.customContextMenuRequested.connect(self._product_context_menu)
@@ -246,7 +249,11 @@ class OpenFileWizard(QtWidgets.QWizard):
 
             # try to create scenes
             try:
-                self.all_available_products = create_scenes(self.scenes, self.file_groups)
+                self.all_datasets, single_datasets, composite_datasets = create_scenes(self.scenes, self.file_groups)
+                self.all_datasets = [ds for ds in filter_dataset_ids(self.all_datasets)]
+                # create boolean masks to be able to filter the selection table
+                self.mask_single_ds = [d in single_datasets for d in self.all_datasets]
+                self.mask_composite_ds = [d in composite_datasets for d in self.all_datasets]
             except IOError as e:
                 self.ui.statusMessage.setText(f"ERROR: {e}")
                 self.ui.statusMessage.setStyleSheet("color: red")
@@ -259,7 +266,7 @@ class OpenFileWizard(QtWidgets.QWizard):
                 return False
 
             # ensure at least 1 product could be created
-            if not self.all_available_products:
+            if not self.all_datasets:
                 LOG.error("No known products can be loaded from the selected files.")
                 self.ui.statusMessage.setText("ERROR: No known products can be loaded from the selected files.")
                 self.ui.statusMessage.setStyleSheet("color: red")
@@ -301,19 +308,18 @@ class OpenFileWizard(QtWidgets.QWizard):
             (ri.get("short_name", ri["name"]), ri["name"]) for ri in readers
         )
 
-    def _initialize_page_product_selection(self):
+    def _populate_dataset_table(self, all_datasets):
+        self.ui.selectIDTable.clearContents()  # clears cell contents, but keeps headers
+        self.ui.selectIDTable.setRowCount(0)  # remove all rows
         # name and level
         id_components = self.config["id_components"]
-        self.ui.selectIDTable.setColumnCount(len(id_components))
-        self.ui.selectIDTable.setHorizontalHeaderLabels([x.title() for x in id_components])
-        self.ui.selectIDTable.cellChanged.disconnect(self._check_product_page_completeness)
-        for idx, ds_id in enumerate(filter_dataset_ids(self.all_available_products)):
+        self.ui.selectIDTable.setRowCount(len(all_datasets))
+        for idx, ds_id in enumerate(all_datasets):
             col_idx = 0
             for id_key, id_val, pretty_val in self._pretty_identifiers(ds_id):
                 if id_key not in id_components:
                     continue
 
-                self.ui.selectIDTable.setRowCount(idx + 1)
                 if id_key == "wavelength":
                     item = NumericTableWidgetItem(pretty_val, id_val[1] if id_val is not None else None)
                 elif id_key == "level" or id_key == "resolution":
@@ -323,12 +329,51 @@ class OpenFileWizard(QtWidgets.QWizard):
                 item.setData(QtCore.Qt.UserRole, ds_id if col_idx == 0 else id_val)
                 item.setFlags((item.flags() ^ QtCore.Qt.ItemIsEditable) | QtCore.Qt.ItemIsUserCheckable)
                 if id_key == "name":
-                    item.setCheckState(_to_Qt_CheckState(self._all_selected))
+                    item.setCheckState(_to_Qt_CheckState(self._all_selected[self._ds_type_visible]))
                 self.ui.selectIDTable.setItem(idx, col_idx, item)
                 col_idx += 1
+
+    def _update_dataset_table(self, dataset_type_selection):
+        try:
+            self.ui.selectIDTable.cellChanged.disconnect(self._check_product_page_completeness)
+        except TypeError:
+            pass  # ok we were not connected ... don't bother.
+
+        self._ds_type_visible = dataset_type_selection
+
+        if dataset_type_selection == 1:
+
+            def _is_hidden(row_index: int) -> bool:
+                return not self.mask_single_ds[row_index]
+
+        elif dataset_type_selection == 2:
+
+            def _is_hidden(row_index: int) -> bool:
+                return not self.mask_composite_ds[row_index]
+
+        else:
+
+            def _is_hidden(row_index: int) -> bool:
+                return False
+
+        row_count = self.ui.selectIDTable.rowCount()
+        for row in range(row_count):
+            self.ui.selectIDTable.setRowHidden(row, _is_hidden(row))
+
         self.ui.selectIDTable.cellChanged.connect(self._check_product_page_completeness)
         # resize columns to fit to content (table's sizeAdjustPolicy is set to AdjustToContents)
         self.ui.selectIDTable.resizeColumnsToContents()
+
+    def _initialize_page_product_selection(self):
+        # name and level
+        id_components = self.config["id_components"]
+        self.ui.selectIDTable.setColumnCount(len(id_components))
+        self.ui.selectIDTable.setHorizontalHeaderLabels([x.title() for x in id_components])
+
+        self._ds_type_visible = self.ui.productTypeGroup.checkedId()
+        self._populate_dataset_table(self.all_datasets)
+
+        self._update_dataset_table(self._ds_type_visible)
 
         self.ui.projectionComboBox.setCurrentIndex(self.parent().document.current_projection_index())
 
@@ -683,13 +728,18 @@ class OpenFileWizard(QtWidgets.QWizard):
     def _select_all_products_state(self, checked: bool):
         """Select all or deselect all products listed on the product table."""
         # the new state (all selected or all unselected)
-        self._all_selected = not self._all_selected
-        self._select_all_products(select=self._all_selected)
 
-    def _select_all_products(self, select=True, prop_key: Union[str, None] = None, prop_val: Union[str, None] = None):
+        self._all_selected[self._ds_type_visible] = not self._all_selected[self._ds_type_visible]
+        self._select_all_products(select=self._all_selected[self._ds_type_visible], only_visible=True)
+
+    def _select_all_products(
+        self, select=True, prop_key: Union[str, None] = None, prop_val: Union[str, None] = None, only_visible=False
+    ):
         """Select products based on a specific property."""
         for row_idx in range(self.ui.selectIDTable.rowCount()):
             # our check state goes on the name item (always)
+            if only_visible and self.ui.selectIDTable.isRowHidden(row_idx):
+                continue
             name_item = self.ui.selectIDTable.item(row_idx, 0)
             if prop_key is not None:
                 item_id = name_item.data(QtCore.Qt.UserRole)

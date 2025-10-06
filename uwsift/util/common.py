@@ -4,7 +4,7 @@ import logging
 import math
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional, Set
+from typing import Optional, Set
 
 import numpy as np
 import satpy.readers.hrit_base
@@ -72,9 +72,10 @@ def get_reader_kwargs_dict(reader_names):
     return reader_kwargs
 
 
-def create_scenes(scenes: dict, file_groups: dict) -> List[DataID]:
-    """Create Scene objects for the selected files."""
+def create_scenes(scenes: dict, file_groups: dict) -> tuple[list[DataID], list[DataID], list[DataID]]:
+    """Create Scene objects for the selected files and return lists for all, single, or composite datasets."""
     all_available_products: Set[DataID] = set()
+    all_available_singles: Set[DataID] = set()
     for group_id, file_group in file_groups.items():
         scn = scenes.get(group_id)
         if scn is None:
@@ -105,9 +106,14 @@ def create_scenes(scenes: dict, file_groups: dict) -> List[DataID]:
                 satpy.readers.hrit_base.get_xritdecompress_cmd()
 
         all_available_products.update(scn.available_dataset_ids(composites=True))
+        all_available_singles.update(scn.available_dataset_ids(composites=False))
 
-    # update the widgets
-    return sorted(all_available_products)
+    # return three lists generated, hoever without copies of the items due to set operations.
+    return (
+        sorted(all_available_products),
+        sorted(all_available_singles),
+        sorted(all_available_products - all_available_singles),  # this is all composite datasets
+    )
 
 
 def _scene_contains_compressed_seviri_hrit_files(scn):

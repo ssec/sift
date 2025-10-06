@@ -77,7 +77,7 @@ class Catalogue:
         *reader*.
         """
         scn_mng: SceneManager = SceneManager()
-        all_available_products = create_scenes(scn_mng.scenes, file_group_map)
+        all_available_products, _, _ = create_scenes(scn_mng.scenes, file_group_map)
         dataset_ids: List[DataID] = scn_mng.get_data_ids_for_products(all_available_products, products)
         importer_kwargs = {"reader": reader, "scenes": scn_mng.scenes, "dataset_ids": dataset_ids}
         files_to_load: List[str] = [fn for fgroup in file_group_map.values() for fn in fgroup]
