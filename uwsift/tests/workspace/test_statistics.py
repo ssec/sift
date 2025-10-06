@@ -38,7 +38,7 @@ def test_categorial_data_statistics_dict():
         [1, "n/a", 3, 30.0],
         [2, "n/a", 2, 20.0],
     ]
-    assert isinstance(stats_dict["stats"][0][2], int)
+    assert isinstance(stats_dict["stats"][0][2], np.integer)
     assert isinstance(stats_dict["stats"][0][3], float)
 
 
@@ -66,7 +66,7 @@ def test_general_algebraics_data_statistics_dict():
     assert type(stats_dict["stats"]) is dict
     assert "mad" not in stats_dict["stats"]
     stats_values_iter = iter(stats_dict["stats"].values())
-    assert isinstance(next(stats_values_iter)[0], int)
+    assert isinstance(next(stats_values_iter)[0], np.integer)
     assert isinstance(next(stats_values_iter)[0], float)
 
 
@@ -83,7 +83,7 @@ def test_difference_algebraics_data_statistics_dict():
     assert type(stats_dict["stats"]) is dict
     assert "mad" in stats_dict["stats"]
     stats_values_iter = iter(stats_dict["stats"].values())
-    assert isinstance(next(stats_values_iter)[0], int)
+    assert isinstance(next(stats_values_iter)[0], np.integer)
     assert isinstance(next(stats_values_iter)[0], float)
 
 
@@ -107,7 +107,7 @@ def test_implicit_categorial_data_statistics_dict():
         [1, "n/a", 3, 30.0],
         [2, "n/a", 2, 20.0],
     ]
-    assert isinstance(stats_dict["stats"][0][2], int)
+    assert isinstance(stats_dict["stats"][0][2], np.integer)
     assert isinstance(stats_dict["stats"][0][3], float)
 
 
@@ -120,5 +120,5 @@ def test_continuous_data_statistics_dict():
     assert "header" not in stats_dict
     assert type(stats_dict["stats"]) is dict
     stats_values_iter = iter(stats_dict["stats"].values())
-    assert isinstance(next(stats_values_iter)[0], int)
+    assert isinstance(next(stats_values_iter)[0], np.integer)
     assert isinstance(next(stats_values_iter)[0], float)
