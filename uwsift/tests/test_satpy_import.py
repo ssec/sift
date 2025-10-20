@@ -1,13 +1,17 @@
 import importlib
-import importlib.util
 import os
 import subprocess
 import sys
 from ast import literal_eval
 from typing import Union
+from unittest.mock import create_autospec
 
 import appdirs
 import pytest
+
+from uwsift.common import Info, Kind
+from uwsift.workspace.importer import aImporter
+from uwsift.workspace.metadatabase import Product
 
 
 def get_python_path() -> str:
@@ -57,3 +61,51 @@ def test_xdg_config_home(tmp_path):
     sift_tmp_config_dir = os.path.join(tmp_config_dir, relative_config_dir)
     os.makedirs(sift_tmp_config_dir)
     check_uwsift_paths(tmp_config_dir, sift_tmp_config_dir)
+
+
+def test_scene_obj_transfer():
+
+    dummy_test_path = "TEST:/PATH/"
+
+    class SceneDummy(object):
+        def __init__(self):
+            pass
+
+    class ImporterDummy(aImporter):
+        def __init__(self, source_paths, workspace_cwd, database_session, **kwargs):
+            ImporterDummy.kw_args_passed_on = kwargs
+
+        def is_relevant(cls, source_path=None, source_uri=None):  # dummy implementation of abstract method
+            return True
+
+        def merge_resources(self):  # dummy implementation of abstract method
+            return []
+
+        def merge_products(self):  # dummy implementation of abstract method
+            return []
+
+        def begin_import_products(self, *product_ids):  # dummy implementation of abstract method
+            pass
+
+        def release_resources(self):  # dummy implementation of abstract method
+            pass
+
+    class ResourceDummy(object):
+        format = ImporterDummy
+        path = dummy_test_path
+
+    scene_dummy = SceneDummy()
+
+    kwargs = {"scenes": {tuple([dummy_test_path]): scene_dummy}}
+
+    mocked_prod = create_autospec(Product, instance=True)
+    mocked_prod.resource = [ResourceDummy()]
+    mocked_prod.info = {"_satpy_id": "DUMMY", Info.KIND: Kind.IMAGE}
+    aImporter.from_product(mocked_prod, "", "", **kwargs)
+    assert "scenes" not in ImporterDummy.kw_args_passed_on
+    assert ImporterDummy.kw_args_passed_on["scene"] == scene_dummy
+
+    mocked_prod.info = {"_satpy_id": "DUMMY", Info.KIND: Kind.UNKNOWN}
+    aImporter.from_product(mocked_prod, "", "", **kwargs)
+    assert "scenes" in ImporterDummy.kw_args_passed_on
+    assert "scene" not in ImporterDummy.kw_args_passed_on
