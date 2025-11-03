@@ -1,27 +1,27 @@
 exclude: '^$'
 fail_fast: false
 repos:
-  - repo: https://github.com/psf/black
-    rev: 24.8.0
+  - repo: https://github.com/psf/black-pre-commit-mirror
+    rev: 25.9.0
     hooks:
       - id: black
         language_version: python3
         args:
           - --target-version=py38
   - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
+    rev: 7.0.0
     hooks:
       - id: isort
         language_version: python3
   - repo: https://github.com/pycqa/flake8
-    rev: 7.1.1
+    rev: 7.3.0
     hooks:
       - id: flake8
         language_version: python3
         additional_dependencies: [flake8-docstrings, flake8-debugger, flake8-bugbear, mccabe]
         args: [--max-complexity, "10"]
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -30,12 +30,12 @@ repos:
         # conda-recipes use jinja templating which isn't valid YAML syntax
         exclude: conda-recipe\/
   - repo: https://github.com/PyCQA/bandit
-    rev: '1.7.9'
+    rev: '1.8.6'
     hooks:
       - id: bandit
         args: [--ini, .bandit]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 'v1.11.2'  # Use the sha / tag you want to point at
+    rev: 'v1.18.2'  # Use the sha / tag you want to point at
     hooks:
       - id: mypy
         additional_dependencies:
